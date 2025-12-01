@@ -1,5 +1,6 @@
 add_executable(
   unit_tests 
+  Lexer.cpp
 )
 
 target_link_libraries(

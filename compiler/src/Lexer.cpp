@@ -77,7 +77,11 @@ void Lexer::skip_comment()
 
 void Lexer::read_char()
 {
-  if(m_index >= m_content.size()) return;
+  if(m_index >= m_content.size())
+  {
+    m_current_char = EOF; // If m_current_char is not set, you will stuck in an infinite loop for the last token
+    return;
+  }
   m_current_char = m_content[m_index++];
   if (m_current_char == '\n')
   {
@@ -92,8 +96,8 @@ void Lexer::read_char()
 
 int Lexer::peek()
 {
-  if(m_index+1 >= m_content.size()) return EOF;
-  return m_content[m_index+1];
+  if(m_index >= m_content.size()) return EOF; //m_index is already pointing to the next value
+  return m_content[m_index];
 }
 
 void Lexer::read_number()
@@ -191,6 +195,8 @@ void Lexer::read_string()
 {
   const char quote = m_current_char;
 
+  read_char(); //point to the next char after the quote
+
   while (m_current_char != EOF && m_current_char != quote)
   {
     if (m_current_char == '\\')
@@ -273,7 +279,7 @@ const Lexeme &Lexer::next_sym()
     read_number();
     return m_token;
   }
-  if (m_current_char == '"')
+  if (m_current_char == '"' || m_current_char == '\'') // Should handle chars too
   {
     read_string();
     return m_token;
