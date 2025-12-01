@@ -1,4 +1,4 @@
-#include "lexer.hpp"
+#include "Lexer.hpp"
 
 namespace pascal_compiler
 {
@@ -14,7 +14,6 @@ const std::unordered_map<std::string, TOKEN_TYPE> Lexer::keywords = {
   {"downto", TOKEN_TYPE::DOWNTO_TOKEN},
   {"else", TOKEN_TYPE::ELSE_TOKEN},
   {"end", TOKEN_TYPE::END_TOKEN},
-  {"file", TOKEN_TYPE::FILE_TOKEN},
   {"for", TOKEN_TYPE::FOR_TOKEN},
   {"function", TOKEN_TYPE::FUNCTION_TOKEN},
   {"goto", TOKEN_TYPE::GOTO_TOKEN},
@@ -45,20 +44,8 @@ const std::unordered_map<std::string, TOKEN_TYPE> Lexer::keywords = {
   {"false", TOKEN_TYPE::FALSE_TOKEN},
 };
 
-Lexer::Lexer(const std::string &filename) : m_line(1), m_col(1), m_index(0)
+Lexer::Lexer(std::string &&content) : m_content(std::move(content)), m_index(0), m_col(1), m_line(1)
 {
-  std::ifstream file(filename);
-  if(!file.is_open()){
-    std::cout << "Unable to open file " << filename << " !\n";
-    exit(EXIT_FAILURE);
-  }
-
-  file.seekg(0,std::ios_base::end);
-  const auto size = file.tellg();
-  file.seekg(0,std::ios_base::beg);
-
-  m_content.reserve(size);
-  file.read(m_content.data(),size);
 
   m_token.m_line = 1;
   m_token.m_col = 1;
@@ -202,7 +189,7 @@ void Lexer::read_word()
 
 void Lexer::read_string()
 {
-  const char quote = '"';
+  const char quote = m_current_char;
 
   while (m_current_char != EOF && m_current_char != quote)
   {
@@ -241,12 +228,16 @@ void Lexer::read_string()
   {
     read_char(); // consume closing quote
   }
+  else if (quote == '\'' && m_token.m_id.length() != 1)
+  {
+    throw LexerException(LEXER_ERROR::LE_INVALID_CHAR,"Lexer error: chars have a length of 1",m_line,m_col);
+  }
   else
   {
     throw LexerException(LEXER_ERROR::LE_INVALID_STRING,"Lexer error: missing closing quote",m_line,m_col);
   }
 
-  m_token.m_type = TOKEN_TYPE::STRING_LITERAL_TOKEN;
+  m_token.m_type = (quote == '"' ? TOKEN_TYPE::STRING_LITERAL_TOKEN : TOKEN_TYPE::CHAR_LITERAL_TOKEN);
 
 }
 
@@ -389,8 +380,7 @@ const Lexeme &Lexer::next_sym()
     }
     break;
   default:
-    m_token.m_type = TOKEN_TYPE::ERROR_TOKEN;
-    throw LexerException(LEXER_ERROR::LE_INVALID_CHAR,"Lexer error: invalid character",m_line,m_col);
+    throw LexerException(LEXER_ERROR::LE_INVALID_TOKEN,"Lexer error: invalid token",m_line,m_col);
   }
   read_char();
   return m_token;
