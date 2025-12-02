@@ -1,9 +1,9 @@
+#pragma once
 #include "Lexer.hpp"
 #include <format>
 #include <vector>
 #include <unordered_map>
 #include <memory>
-#include <variant>
 #include <concepts>
 
 namespace pascal_compiler
@@ -12,7 +12,8 @@ namespace pascal_compiler
 enum class SEMANTIC_ERROR
 {
   SE_SUBRANGE_TYPES_MISMATCH,
-  SE_DUPLICATE_ID
+  SE_DUPLICATE_ID,
+  SE_INVALID_TYPE
 };
 
 class SemanticException{
@@ -52,37 +53,55 @@ struct Label
   // TODO: store Location
 };
 
-enum class CONST_CAT
+enum class CONST_CAT : int
 {
   CC_INT,
   CC_REAL,
   CC_ENUM,
   CC_STRING,
-  CC_CHAR
+  CC_CHAR,
+  CC_MAX = CC_CHAR
 };
-
-struct Type;
 
 template <typename T>
 concept ConstType = std::is_same_v<T,Int> || std::is_same_v<T,Real> || std::is_same_v<T,std::string_view> || std::is_same_v<T,char>;
 
+static inline const char* CONST_CAT_NAMES[int(CONST_CAT::CC_MAX) + 1] = {
+  "Int",
+  "Real",
+  "Enum",
+  "String",
+  "Char"
+};
+
+struct Type;
+
+struct Enum;
 
 struct Const
 {
   
   std::string_view m_name;
   size_t m_line, m_col;
-  std::variant<Int,Real,std::string_view,char> m_val;
+  union {
+    Int m_ival;
+    Real m_dval;
+    std::string_view m_sval;
+    char m_cval;
+  };
   Type *m_type;
   CONST_CAT m_cat;
 
   template <ConstType T>
-  Const(std::string_view name, size_t line, size_t col, T value, Type *type) : m_name(name), m_line(line), m_col(col), m_type(type)
-  {
-    
-  }
+  Const(std::string_view name, size_t line, size_t col, T value, Type *type);
+
+  Const(std::string_view name, size_t line, size_t col, std::string_view value, Enum *type);
+
+  template <ConstType T>
+  T get();
 
 };
+
 //TODO: Types don't always have names, in which case we can create one instantaneously using a counter (since IDs cannot start with numbers). For now we pick ""
 //Remember that when type X = Y, X and Y are the same (same pointer)
 struct Type
@@ -91,7 +110,7 @@ struct Type
   const size_t m_line;
   const size_t m_col;
 
-  Type(const std::string_view& name, size_t line, size_t col) : m_name(name), m_line(line), m_col(col) {}
+  Type(std::string_view name, size_t line, size_t col) : m_name(name), m_line(line), m_col(col) {}
   std::string to_string(){
     return std::format("\"{}\" at ({},{})", m_name, m_line, m_col); 
   }
@@ -101,7 +120,7 @@ struct Type
 
 struct Enum : Type
 {
-  std::vector<std::string> m_values;
+  std::unordered_map<std::string_view,int> m_values;
   Enum(const std::string_view &name, size_t line, size_t col) : Type(name, line, col) {}
 };
 
@@ -111,35 +130,7 @@ struct Subrange : Type
   Subrange(
     const std::string_view& name, size_t line, size_t col,
     Const&& beg, Const&& end 
-    ) : Type(name, line, col), m_beg(std::move(beg)), m_end(std::move(end)) {
-    if(m_beg.m_cat != m_end.m_cat || typeid(m_beg.m_type) != typeid(m_end.m_type)){
-      throw SemanticException(
-        SEMANTIC_ERROR::SE_SUBRANGE_TYPES_MISMATCH,
-        std::format(
-          "Semantic error: Subrange type must be made using 2 constants of the same type. Found {} and {} !",
-          m_beg.m_type->to_string(), m_end.m_type->to_string()
-        ),
-        m_beg.m_line,
-        m_beg.m_col
-      );
-    }
-    switch(m_beg.m_cat){
-      case CONST_CAT::CC_CHAR:
-      case CONST_CAT::CC_ENUM:
-      case CONST_CAT::CC_INT:
-      break;
-      default:
-        throw SemanticException(
-          SEMANTIC_ERROR::SE_SUBRANGE_TYPES_MISMATCH,
-          std::format(
-            "Semantic error: Subrange type \"{}\" can be made only using chars, enums or ints (constants) !",
-            m_beg.m_type->to_string()
-          ),
-          m_line,
-          m_col
-        );
-    }
-  }
+  );
 };
 
 struct Array : Type

@@ -43,10 +43,11 @@ void Parser::parse()
 
 void Parser::init_block(Block& block){
   auto& types = block.m_types;
-  types["Int"] = std::make_unique<Type>("Int", 0, 0);
-  types["Real"] = std::make_unique<Type>("Real", 0, 0);
-  types["String"] = std::make_unique<Type>("String", 0, 0);
-  types["Char"] = std::make_unique<Type>("Char", 0, 0);
+  for (auto type : {CONST_CAT::CC_INT, CONST_CAT::CC_REAL, CONST_CAT::CC_CHAR, CONST_CAT::CC_STRING})
+  {
+    auto name = CONST_CAT_NAMES[int(type)];
+    types[name] = std::make_unique<Type>(name,0,0);
+  }
 }
 
 void Parser::program()

@@ -1,3 +1,4 @@
+#pragma once
 #include "Semantics.hpp"
 
 namespace pascal_compiler
