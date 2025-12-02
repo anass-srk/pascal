@@ -3,6 +3,76 @@
 namespace pascal_compiler
 {
 
+const char* TOKEN_NAMES[size_t(TOKEN_TYPE::TOKEN_TYPE_MAX) + 1] = 
+{
+  "and",
+  "array",
+  "begin",
+  "case",
+  "const",
+  "div",
+  "do",
+  "downto",
+  "else",
+  "end",
+  "for",
+  "function",
+  "goto",
+  "if",
+  "in",
+  "label",
+  "mod",
+  "nil",
+  "not",
+  "of",
+  "or",
+  "packed",
+  "procedure",
+  "program",
+  "record",
+  "repeat",
+  "set",
+  "then",
+  "to",
+  "type",
+  "until",
+  "var",
+  "while",
+  "with",
+  "plus",
+  "minus",
+  "star",
+  "slash",
+  "assign",
+  "comma",
+  ";",
+  ":",
+  "=",
+  "<>",
+  "<",
+  "<=",
+  ">",
+  ">=",
+  "(",
+  ")",
+  "[",
+  "]",
+  "read",
+  "write",
+  "^",
+  "@",
+  ".",
+  "..",
+  "true",
+  "false",
+  "ID",
+  "string",
+  "integer",
+  "real",
+  "char",
+  "EOF_TOKEN"
+};
+
 const std::unordered_map<std::string, TOKEN_TYPE> Lexer::keywords = {
   {"and", TOKEN_TYPE::AND_TOKEN},
   {"array", TOKEN_TYPE::ARRAY_TOKEN},
@@ -249,9 +319,6 @@ void Lexer::read_string()
 
 const Lexeme &Lexer::next_sym()
 {
-  m_token.m_id = "";
-  m_token.m_line = m_line;
-  m_token.m_col = m_col;
 
   while (isspace(m_current_char))
   {
@@ -269,6 +336,12 @@ const Lexeme &Lexer::next_sym()
     skip_comment();
     return next_sym(); // Skip to next token after comment
   }
+
+  m_token.m_id = "";
+  m_token.m_line = m_line;
+  m_token.m_col = m_col;
+  m_token.m_index = m_index-1;
+
   if (isalpha(m_current_char) || m_current_char == '_')
   {
     read_word();
@@ -306,7 +379,7 @@ const Lexeme &Lexer::next_sym()
     {
       m_token.m_id += '=';
       m_token.m_type = TOKEN_TYPE::ASSIGN_TOKEN;
-      // read_char() will be called after thw switch statement
+      // read_char() will be called after the switch statement
     }
     else
     {

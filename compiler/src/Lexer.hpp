@@ -80,6 +80,12 @@ enum class TOKEN_TYPE : int
   TOKEN_TYPE_MAX = EOF_TOKEN
 };
 
+using Int = long long;
+using Real = double;
+using Uint = unsigned long long;
+
+extern const char* TOKEN_NAMES[size_t(TOKEN_TYPE::TOKEN_TYPE_MAX) + 1];
+
 enum class LEXER_ERROR
 {
   LE_INVALID_CHAR,
@@ -94,7 +100,7 @@ class LexerException
 {
 
   const LEXER_ERROR m_error;
-  const char *m_msg;
+  const char *m_msg; //Remember to not initialize it with string.cstr()
   const size_t m_line;
   const size_t m_col;
 
@@ -130,12 +136,13 @@ struct Lexeme
   TOKEN_TYPE m_type;
   union
   {
-    long long m_ival;
-    double m_dval;
+    Int m_ival;
+    Real m_dval;
   };
   std::string m_id;
   size_t m_col;
   size_t m_line;
+  size_t m_index;
 };
 
 class Lexer
@@ -180,6 +187,11 @@ public:
   const size_t get_column() const
   {
     return m_col;
+  }
+
+  std::string_view get_token_view(size_t index) const
+  {
+    return std::string_view(m_content.data()+index,m_token.m_id.length());
   }
 };
 
