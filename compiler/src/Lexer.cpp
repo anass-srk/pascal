@@ -114,6 +114,42 @@ const std::unordered_map<std::string, TOKEN_TYPE> Lexer::keywords = {
   {"false", TOKEN_TYPE::FALSE_TOKEN},
 };
 
+std::string Lexeme::to_string_literal() const
+{
+  std::string res;
+  res.reserve(m_id.length());
+  for (size_t i = 1; i < m_id.length(); ++i) // To skip first quote
+  {
+    if (m_id[i] == '\\')
+    {
+      ++i; // consume backslash. No need to check if out-of-bounds since m_id was checked before
+      switch (m_id[i])
+      {
+      case 'n':
+        res += '\n';
+        break;
+      case 't':
+        res += '\t';
+        break;
+      case 'r':
+        res += '\r';
+        break;
+      case '\\':
+        res += '\\';
+        break;
+      case '"':
+        res += '"';
+        break;
+      }
+    }
+    else
+    {
+      res += m_id[i];
+    }
+  }
+  return res;
+}
+
 Lexer::Lexer(std::string &&content) : m_content(std::move(content)), m_index(0), m_col(1), m_line(1)
 {
 
@@ -173,9 +209,10 @@ int Lexer::peek()
 void Lexer::read_number()
 {
   bool is_real = false;
+  size_t len = 0;
   do
   {
-    m_token.m_id += m_current_char;
+    ++len;
     read_char();
   } while (isdigit(m_current_char));
 
@@ -189,11 +226,11 @@ void Lexer::read_number()
     {
       is_real = true;
       // m_current_char is '.' here and the next one is a number
-      m_token.m_id += m_current_char;
+      ++len;
       read_char();
       do
       {
-        m_token.m_id += m_current_char;
+        ++len;
         read_char();
       } while (isdigit(m_current_char));
     }
@@ -202,12 +239,12 @@ void Lexer::read_number()
   if (m_current_char == 'e' || m_current_char == 'E')
   {
     is_real = true;
-    m_token.m_id += m_current_char;
+    ++len;
     read_char();
     
     if (m_current_char == '+' || m_current_char == '-')
     {
-      m_token.m_id += m_current_char;
+      ++len;
       read_char();
     }
     
@@ -218,19 +255,21 @@ void Lexer::read_number()
     
     do
     {
-      m_token.m_id += m_current_char;
+      ++len;
       read_char();
     }while (isdigit(m_current_char));
   }
 
+  m_token.m_id = std::string_view(m_content.data()+m_token.m_index,len);
+
   if (is_real)
   {
-    m_token.m_dval = atof(m_token.m_id.c_str());
+    m_token.m_dval = atof(std::string(m_token.m_id).c_str());
     m_token.m_type = TOKEN_TYPE::NUM_REAL_TOKEN;
   }
   else
   {
-    m_token.m_ival = atoll(m_token.m_id.c_str());
+    m_token.m_ival = atoll(std::string(m_token.m_id).c_str());
     m_token.m_type = TOKEN_TYPE::NUM_INT_TOKEN;
   }
 }
@@ -238,14 +277,18 @@ void Lexer::read_number()
 void Lexer::read_word()
 {
 
+  size_t len = 0;
+
   do
   {
-    m_token.m_id += m_current_char;
+    ++len;
     read_char();
   } while (isalnum(m_current_char) || m_current_char == '_');
 
+  m_token.m_id = std::string_view(m_content.data()+m_token.m_index,len);
+  
   // Convert to lowercase for keyword lookup
-  std::string lower_id = m_token.m_id;
+  std::string lower_id = std::string(m_token.m_id);
   for (char &c : lower_id)
   {
     c = tolower(c);
@@ -267,6 +310,8 @@ void Lexer::read_string()
 
   read_char(); //point to the next char after the quote
 
+  size_t len = 1;
+
   while (m_current_char != EOF && m_current_char != quote)
   {
     if (m_current_char == '\\')
@@ -275,19 +320,11 @@ void Lexer::read_string()
       switch (m_current_char)
       {
       case 'n':
-        m_token.m_id += '\n';
-        break;
       case 't':
-        m_token.m_id += '\t';
-        break;
       case 'r':
-        m_token.m_id += '\r';
-        break;
       case '\\':
-        m_token.m_id += '\\';
-        break;
       case '"':
-        m_token.m_id += '"';
+        len += 2;
         break;
       default:
         throw LexerException(LEXER_ERROR::LE_INVALID_STRING,"Lexer error: only \\n, \\t, \\r, \\\\ and \" can be used in a string",m_line,m_col);
@@ -295,16 +332,21 @@ void Lexer::read_string()
     }
     else
     {
-      m_token.m_id += m_current_char;
+      ++len;
     }
     read_char();
   }
+
+  m_token.m_id = std::string_view(m_content.data() + m_token.m_index, len);
 
   if (m_current_char == quote)
   {
     read_char(); // consume closing quote
   }
-  else if (quote == '\'' && m_token.m_id.length() != 1)
+  // For chars :
+  // the length is 2 (includes single quote)
+  // Could be 3 if the first char is '\' (escaped chars) 
+  else if (quote == '\'' && (len != 2 || (len == 3 && m_token.m_id[1] != '\\') || len > 3))
   {
     throw LexerException(LEXER_ERROR::LE_INVALID_CHAR,"Lexer error: chars have a length of 1",m_line,m_col);
   }
@@ -358,58 +400,67 @@ const Lexeme &Lexer::next_sym()
     return m_token;
   }
   // Handle special chars
-  m_token.m_id = char(m_current_char);
   switch (m_current_char)
   {
   case '+':
+    m_token.m_id = "+";
     m_token.m_type = TOKEN_TYPE::PLUS_TOKEN;
     break;
   case '-':
+    m_token.m_id = "-";
     m_token.m_type = TOKEN_TYPE::MINUS_TOKEN;
     break;
   case '*':
+    m_token.m_id = "*";
     m_token.m_type = TOKEN_TYPE::STAR_TOKEN;
     break;
   case '/':
+    m_token.m_id = "/";
     m_token.m_type = TOKEN_TYPE::SLASH_TOKEN;
     break;
   case ':':
     read_char();
     if (m_current_char == '=')
     {
-      m_token.m_id += '=';
+
+      m_token.m_id = ":=";
       m_token.m_type = TOKEN_TYPE::ASSIGN_TOKEN;
       // read_char() will be called after the switch statement
     }
     else
     {
+      m_token.m_id = ":";
       m_token.m_type = TOKEN_TYPE::COLON_TOKEN;
       return m_token;
     }
     break;
   case ',':
+    m_token.m_id = ",";
     m_token.m_type = TOKEN_TYPE::COMMA_TOKEN;
     break;
   case ';':
+    m_token.m_id = ";";
     m_token.m_type = TOKEN_TYPE::SEMI_TOKEN;
     break;
   case '=':
+    m_token.m_id = "=";
     m_token.m_type = TOKEN_TYPE::EQ_TOKEN;
     break;
   case '<':
     read_char();
     if (m_current_char == '>')
     {
-      m_token.m_id += m_current_char;
+      m_token.m_id = "<>";
       m_token.m_type = TOKEN_TYPE::NEQ_TOKEN;
     }
     else if (m_current_char == '=')
     {
-      m_token.m_id += m_current_char;
+      m_token.m_id = "<=";
       m_token.m_type = TOKEN_TYPE::LE_TOKEN;
     }
     else
     {
+      m_token.m_id = "<";
       m_token.m_type = TOKEN_TYPE::LT_TOKEN;
       return m_token;
     }
@@ -418,42 +469,50 @@ const Lexeme &Lexer::next_sym()
     read_char();
     if (m_current_char == '=')
     {
-      m_token.m_id += m_current_char;
+      m_token.m_id = ">=";
       m_token.m_type = TOKEN_TYPE::GE_TOKEN;
     }
     else
     {
+      m_token.m_id = ">";
       m_token.m_type = TOKEN_TYPE::GT_TOKEN;
       return m_token;
     }
     break;
   case '(':
+    m_token.m_id = "(";
     m_token.m_type = TOKEN_TYPE::LP_TOKEN;
     break;
   case ')':
+    m_token.m_id = ")";
     m_token.m_type = TOKEN_TYPE::RP_TOKEN;
     break;
   case '[':
+    m_token.m_id = "[";
     m_token.m_type = TOKEN_TYPE::LB_TOKEN;
     break;
   case ']':
+    m_token.m_id = "]";
     m_token.m_type = TOKEN_TYPE::RB_TOKEN;
     break;
   case '^':
+    m_token.m_id = "^";
     m_token.m_type = TOKEN_TYPE::POINTER_TOKEN;
     break;
   case '@':
+    m_token.m_id = "@";
     m_token.m_type = TOKEN_TYPE::AT_TOKEN;
     break;
   case '.':
     read_char();
     if (m_current_char == '.')
     {
-      m_token.m_id += m_current_char;
+      m_token.m_id = "..";
       m_token.m_type = TOKEN_TYPE::DOTDOT_TOKEN;
     }
     else
     {
+      m_token.m_id = ".";
       m_token.m_type = TOKEN_TYPE::DOT_TOKEN;
       return m_token;
     }

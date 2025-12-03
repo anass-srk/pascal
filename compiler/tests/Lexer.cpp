@@ -111,14 +111,16 @@ TEST(LexerTest, StringsAndChars)
   auto str_test = [&lexer](const char* str)
   {
     EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::STRING_LITERAL_TOKEN);
-    EXPECT_EQ(lexer.getToken().m_id, str);
+    EXPECT_EQ(lexer.getToken().to_string_literal(), str);
   };
 
-  auto char_test = [&lexer](char c)
+  std::string s;
+  auto char_test = [&lexer, &s](char c)
   {
     EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::CHAR_LITERAL_TOKEN);
-    EXPECT_EQ(lexer.getToken().m_id.length(), 1);
-    EXPECT_EQ(lexer.getToken().m_id[0], c);
+    s = lexer.getToken().to_string_literal();
+    EXPECT_EQ(s.length(), 1);
+    EXPECT_EQ(s[0], c);
   };
 
   str_test("");

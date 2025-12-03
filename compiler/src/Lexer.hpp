@@ -139,10 +139,12 @@ struct Lexeme
     Int m_ival;
     Real m_dval;
   };
-  std::string m_id;
+  std::string_view m_id;
   size_t m_col;
   size_t m_line;
   size_t m_index;
+
+  std::string to_string_literal() const;
 };
 
 class Lexer
