@@ -32,7 +32,6 @@ enum class TOKEN_TYPE : int
   NOT_TOKEN,
   OF_TOKEN,
   OR_TOKEN,
-  PACKED_TOKEN,
   PROCEDURE_TOKEN,
   PROGRAM_TOKEN,
   RECORD_TOKEN,
@@ -191,10 +190,6 @@ public:
     return m_col;
   }
 
-  std::string_view get_token_view(size_t index) const
-  {
-    return std::string_view(m_content.data()+index,m_token.m_id.length());
-  }
 };
 
 };
