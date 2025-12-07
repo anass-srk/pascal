@@ -36,15 +36,15 @@ public:
 public:
   Parser(std::string&&);
 
-  size_t match(TOKEN_TYPE);
-  inline size_t match_adv(TOKEN_TYPE type)
+  void match(TOKEN_TYPE);
+  inline void match_adv(TOKEN_TYPE type)
   {
     m_lexer.next_sym();
-    return match(type);
+    match(type);
   }
 
-  size_t match(std::initializer_list<TOKEN_TYPE>);
-  inline size_t match_adv(std::initializer_list<TOKEN_TYPE> l)
+  void match(std::initializer_list<TOKEN_TYPE>);
+  inline void match_adv(std::initializer_list<TOKEN_TYPE> l)
   {
     m_lexer.next_sym();
     return match(l);
@@ -57,8 +57,6 @@ public:
   inline bool check(TOKEN_TYPE type){
     return m_lexer.getToken().m_type == type;
   }
-
-  void init_block(Block&);
 
   void parse();
   void program();
@@ -74,6 +72,11 @@ public:
   void procedure_definition();
   void function_definition();
 
+  //
+  Const constant(const Lexeme &); // token containing id of the constant
+  std::unique_ptr<Type> type_eval(const Lexeme&);
+  std::unique_ptr<Enum> enum_type(const Lexeme&);
+  std::vector<Lexeme> id_list();
 };
 
 }

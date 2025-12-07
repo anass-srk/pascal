@@ -1,6 +1,11 @@
 add_executable(
   unit_tests 
-  Lexer.cpp
+  ../src/Lexer.cpp
+  Lexer.hpp
+  ../src/Semantics.cpp
+  ../src/Parser.cpp
+  Parser.hpp
+  Main.cpp
 )
 
 target_link_libraries(
