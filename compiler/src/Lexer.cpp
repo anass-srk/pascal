@@ -506,7 +506,7 @@ const Lexeme &Lexer::next_sym()
     if (m_current_char == '.')
     {
       m_token.m_id = "..";
-      m_token.m_type = TOKEN_TYPE::DOTDOT_TOKEN;
+      m_token.m_type = TOKEN_TYPE::RANGE_TOKEN;
     }
     else
     {

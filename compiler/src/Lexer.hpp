@@ -67,7 +67,7 @@ enum class TOKEN_TYPE : int
   POINTER_TOKEN,
   AT_TOKEN,
   DOT_TOKEN,
-  DOTDOT_TOKEN,
+  RANGE_TOKEN,
   TRUE_TOKEN,
   FALSE_TOKEN,
   ID_TOKEN,
@@ -156,14 +156,12 @@ class Lexer
   size_t m_line;
 
   const static std::unordered_map<std::string, TOKEN_TYPE> keywords;
-  static constexpr size_t id_max_len = 255;
 
   void read_char();
   int peek();
   void read_word();
   void read_string();
   void read_number();
-  void lexer_error(LEXER_ERROR le);
   void skip_comment();
 
 public:

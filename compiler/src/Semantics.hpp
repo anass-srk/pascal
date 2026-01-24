@@ -95,7 +95,7 @@ struct Function;
 
 struct Const
 {
-  // A const doesn't always have an actaul name (when unamed, points to constant)
+  // A const doesn't always have an actual name (when unamed, points to constant)
   std::string_view m_name;
   size_t m_line, m_col;
   std::variant<Int, Real, std::string, char, bool> m_val;

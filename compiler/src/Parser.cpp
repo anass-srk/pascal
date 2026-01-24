@@ -419,7 +419,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
       if (!first && !second){ //Subrange (unamed as well)
         auto beg_token = m_lexer.getToken();
         Const beg = constant(beg_token);
-        match_adv(TOKEN_TYPE::DOTDOT_TOKEN);
+        match_adv(TOKEN_TYPE::RANGE_TOKEN);
         Const end = constant(m_lexer.next_sym());
 
         types.emplace_back(
@@ -466,7 +466,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
   auto const beg_token = m_lexer.getToken();
   Const beg = constant(beg_token);
-  match_adv(TOKEN_TYPE::DOTDOT_TOKEN);
+  match_adv(TOKEN_TYPE::RANGE_TOKEN);
   Const end = constant(m_lexer.next_sym());
 
   return std::make_unique<Subrange>(token.m_id, token.m_line, token.m_col, std::move(beg), std::move(end));
