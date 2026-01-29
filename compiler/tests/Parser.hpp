@@ -300,5 +300,82 @@ TEST(ParserTest, Subranges){
 }
 
 TEST(ParserTest, Arrays){
-  
+  Parser parser(R"(
+    program Test;
+    label a, b123; Const v = 2; v2 = -1;_1 = +v; h = 'h'; 
+    hello = "Hello\n";PI=3.14;b = true; type t = Int; enum = (Blue, Red, Green);
+    enum2 = (Monday); sub = 1..10; y = sub; ar1 = array [y] of Int; 
+    ar2 = array [Blue..Green] of Char; ar_ = array [1..4, 1..4] of enum;
+    ar3 = array [1..4, 1..4] of array [0..5] of Bool;
+    ar4 = array [(small, medium, big), sub] of String;
+    .)");
+  parser.parse();
+
+  auto check_subrange = []<typename T>(const Subrange* subrange, T a, T b) {
+    EXPECT_EQ(std::get<T>(subrange->m_beg.m_val), a);
+    EXPECT_EQ(std::get<T>(subrange->m_end.m_val), b);
+  };
+
+  auto check_enum = [](const Enum* e, std::initializer_list<std::pair<std::string_view, Int>> enum_vals){
+
+    EXPECT_EQ(e->m_values.size(), enum_vals.size());
+    for(auto const [name, val] : enum_vals)
+    {
+      EXPECT_TRUE(e->m_values.contains(name));
+      EXPECT_EQ(e->m_values.at(name), val);
+    }
+  };
+
+  auto ar1 = static_cast<const Array *>(Block::get("ar1", parser.m_current_block->m_types));
+  EXPECT_EQ(ar1->m_type, TYPE_CAT::TC_ARRAY);
+  EXPECT_EQ(ar1->m_itypes.size(), 1);
+  EXPECT_EQ(ar1->m_itypes[0]->m_name, "sub");
+  EXPECT_EQ(ar1->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+  EXPECT_EQ(ar1->m_etype->m_name, "Int");
+  EXPECT_EQ(ar1->m_etype->m_type, TYPE_CAT::TC_BASIC);
+
+  auto ar2 = static_cast<const Array *>(Block::get("ar2", parser.m_current_block->m_types));
+  EXPECT_EQ(ar2->m_type, TYPE_CAT::TC_ARRAY);
+  EXPECT_EQ(ar2->m_itypes.size(), 1);
+  EXPECT_EQ(std::get<Int>(static_cast<const Subrange *>(ar2->m_itypes[0])->m_beg.m_val), 0);
+  check_subrange(static_cast<const Subrange*>(ar2->m_itypes[0]), Int(0), Int(2));
+  EXPECT_EQ(ar2->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+  EXPECT_EQ(ar2->m_etype->m_name, "Char");
+  EXPECT_EQ(ar2->m_etype->m_type, TYPE_CAT::TC_BASIC);
+
+  auto ar_ = static_cast<const Array *>(Block::get("ar_", parser.m_current_block->m_types));
+  EXPECT_EQ(ar_->m_type, TYPE_CAT::TC_ARRAY);
+  EXPECT_EQ(ar_->m_itypes.size(), 2);
+  check_subrange(static_cast<const Subrange *>(ar_->m_itypes[0]), Int(1), Int(4));
+  check_subrange(static_cast<const Subrange *>(ar_->m_itypes[1]), Int(1), Int(4));
+  EXPECT_EQ(ar_->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+  EXPECT_EQ(ar_->m_etype->m_name, "enum");
+  EXPECT_EQ(ar_->m_etype->m_type, TYPE_CAT::TC_ENUM);
+
+  auto ar4 = static_cast<const Array *>(Block::get("ar4", parser.m_current_block->m_types));
+  EXPECT_EQ(ar4->m_type, TYPE_CAT::TC_ARRAY);
+  EXPECT_EQ(ar4->m_itypes.size(), 2);
+  check_enum(
+    static_cast<const Enum*>(ar4->m_itypes[0]),
+    {
+      {"small", Int(0)},
+      {"medium", Int(1)},
+      {"big", Int(2)}
+    }
+  );
+  EXPECT_EQ(ar4->m_itypes[1]->m_name, "sub");
+  EXPECT_EQ(ar4->m_etype->m_name, "String");
+  EXPECT_EQ(ar4->m_etype->m_type, TYPE_CAT::TC_BASIC);
+
+  auto ar3 = static_cast<const Array *>(Block::get("ar3", parser.m_current_block->m_types));
+  EXPECT_EQ(ar3->m_type, TYPE_CAT::TC_ARRAY);
+  EXPECT_EQ(ar3->m_itypes.size(), 2);
+  check_subrange(static_cast<const Subrange *>(ar3->m_itypes[0]), Int(1), Int(4));
+  check_subrange(static_cast<const Subrange *>(ar3->m_itypes[1]), Int(1), Int(4));
+  auto _ar = static_cast<const Array *>(ar3->m_etype);
+  EXPECT_EQ(_ar->m_type, TYPE_CAT::TC_ARRAY);
+  EXPECT_EQ(_ar->m_itypes.size(), 1);
+  check_subrange(static_cast<const Subrange *>(_ar->m_itypes[0]), Int(0), Int(5));
+  EXPECT_EQ(_ar->m_etype->m_name, "Bool");
+  EXPECT_EQ(_ar->m_etype->m_type, TYPE_CAT::TC_BASIC);
 }
