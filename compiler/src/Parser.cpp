@@ -72,7 +72,6 @@ void Parser::declaration()
   if(check(TOKEN_TYPE::LABEL_TOKEN))
   {
     label_declaration();
-    adv();
   }
   if(check(TOKEN_TYPE::CONST_TOKEN))
   {
@@ -112,6 +111,7 @@ void Parser::label_declaration(){
     adv();
   }while (check(TOKEN_TYPE::COMMA_TOKEN));
   match(TOKEN_TYPE::SEMI_TOKEN);
+  adv();
 }
 
 void Parser::const_definition()
@@ -242,6 +242,7 @@ Const Parser::constant(const Lexeme& token)
       }
 
       if(auto const_val = Block::get(id,current->m_consts); const_val != nullptr){
+        // Only ints and reals can be negative
         if(sign && const_val->m_cat != CONST_CAT::CC_INT && const_val->m_cat != CONST_CAT::CC_REAL){
           throw SemanticException(
             SEMANTIC_ERROR::SE_INVALID_OP,
@@ -397,9 +398,8 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
         Block *current = m_current_block;
         
         do{
-          if(auto it = current->m_types.find(id); it != current->m_types.end() 
-          && (it->second->m_type == TYPE_CAT::TC_ENUM || it->second->m_type == TYPE_CAT::TC_SUBRANGE)){
-            types.emplace_back(it->second.get());
+          if(auto t = Block::get(id, current->m_types); t && t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE){
+            types.emplace_back(t);
             first = true;
             break;
           }
@@ -441,9 +441,9 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
       Block *current = m_current_block;
 
       do{
-        if(auto it = current->m_types.find(id); it != current->m_types.end()){
+        if(auto t = Block::get(id, current->m_types); t){
           return std::make_unique<Array>(
-            token.m_id, token.m_line, token.m_col, std::move(types), it->second.get()
+            token.m_id, token.m_line, token.m_col, std::move(types), t
           );
         }
       

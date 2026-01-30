@@ -185,7 +185,7 @@ void Block::check_used_id(const Lexeme &token, const std::unordered_map<std::str
   }
 
 }
-
+//Types cannot be shadowed as opposed to constants, vars...
 void Block::check_used_id(const Lexeme& token)
 {
   check_used_id(token, m_labels);
