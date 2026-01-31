@@ -20,7 +20,8 @@ enum class SEMANTIC_ERROR
   SE_MISSING_ID,
   SE_INVALID_OP,
   SE_INVALID_SUBRANGE,
-  SE_INVALID_ENUM
+  SE_INVALID_ENUM,
+  SE_AMBIGUOUS_TAG_VAR
 };
 
 class SemanticException{
@@ -169,7 +170,8 @@ private:
 
 struct Subrange : Type
 {
-  Const m_beg, m_end; // Must contain the same type
+  Int m_beg, m_end; // Must contain the same type
+  CONST_CAT m_cat;
   Subrange(
     const std::string_view& name, size_t line, size_t col,
     Const&& beg, Const&& end
@@ -190,7 +192,7 @@ struct Var
 {
   std::string_view m_name;
   size_t m_line, m_col;
-  Type *m_type;
+  const Type *m_type;
 };
 
 struct Record : Type
@@ -200,6 +202,9 @@ struct Record : Type
   std::unordered_map<std::string_view,Record*> m_variants;
 
   Record(const std::string_view &name, size_t line, size_t col) : Type(name, line, col, TYPE_CAT::TC_RECORD) {}
+
+  void check_duplicate_id(const Lexeme& rec, const Lexeme& name);
+
 };
 
 struct FunctionType : Type

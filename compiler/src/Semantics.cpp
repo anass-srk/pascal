@@ -68,30 +68,28 @@ Const::Const(std::string_view name, size_t line, size_t col, T value, const Bloc
 Subrange::Subrange(
   const std::string_view& name, size_t line, size_t col,
   Const&& beg, Const&& end 
-) : Type(name, line, col, TYPE_CAT::TC_SUBRANGE), m_beg(std::move(beg)), m_end(std::move(end)) {
-  if(m_beg.m_type != m_end.m_type){
+) : Type(name, line, col, TYPE_CAT::TC_SUBRANGE) {
+  if(beg.m_type != end.m_type){
     throw SemanticException(
       SEMANTIC_ERROR::SE_SUBRANGE_TYPES_MISMATCH,
       std::format(
         "Semantic error: Subrange type must be made using 2 constants of the same type. Found {} and {} !",
-        m_beg.m_type->to_string(), m_end.m_type->to_string()
+        beg.m_type->to_string(), end.m_type->to_string()
       ),
-      m_beg.m_line,
-      m_beg.m_col
+      beg.m_line,
+      beg.m_col
     );
   }
 
-  Int beg_value, end_value;
-
-  switch(m_beg.m_cat){
+  switch(beg.m_cat){
     case CONST_CAT::CC_CHAR:
-      beg_value = std::get<char>(m_beg.m_val);
-      end_value = std::get<char>(m_end.m_val);
+      m_beg = std::get<char>(beg.m_val);
+      m_end = std::get<char>(end.m_val);
       break;
     case CONST_CAT::CC_ENUM:
     case CONST_CAT::CC_INT:
-      beg_value = std::get<Int>(m_beg.m_val);
-      end_value = std::get<Int>(m_end.m_val);
+      m_beg = std::get<Int>(beg.m_val);
+      m_end = std::get<Int>(end.m_val);
       break;
     break;
     default:
@@ -99,24 +97,26 @@ Subrange::Subrange(
         SEMANTIC_ERROR::SE_SUBRANGE_TYPES_MISMATCH,
         std::format(
           "Semantic error: Subrange type \"{}\" can be made only using chars, enums or ints (constants) !",
-          m_beg.m_type->to_string()
+          beg.m_type->to_string()
         ),
         m_line,
         m_col
       );
   }
 
-  if (end_value <= beg_value){
+  if (m_end <= m_beg){
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_SUBRANGE,
       std::format(
         "Semantic error: Subrange type \"{}\" 's beginning ({}) is greater or equals than its end ({}) !",
-        m_beg.m_type->to_string(), beg_value, end_value
+        beg.m_type->to_string(), m_beg, m_end
       ),
       m_line,
       m_col
     );
   }
+
+  m_cat = beg.m_cat;
 
 }
 
@@ -221,4 +221,25 @@ template const Const* Block::get(std::string_view, const std::unordered_map<std:
 template const Var* Block::get(std::string_view, const std::unordered_map<std::string_view, Var>&);
 template const Function* Block::get(std::string_view, const std::unordered_map<std::string_view, Function>&);
 template const EnumValue* Block::get(std::string_view, const std::unordered_map<std::string_view, EnumValue> &);
+
+void Record::check_duplicate_id(const Lexeme& rec, const Lexeme& name){
+  if(m_members.contains(name.m_id))
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_DUPLICATE_ID,
+      std::format(
+        "Semantic error: duplicate record member id '{}' found at ({},{}) and ({},{}) !",
+        name.m_id,
+        name.m_line,
+        name.m_col,
+        rec.m_line,
+        rec.m_col),
+      name.m_line,
+      name.m_col
+    );
+  
+  for(auto [_,record] : m_variants){
+    record->check_duplicate_id(rec, name);
+  }
+}
+
 };

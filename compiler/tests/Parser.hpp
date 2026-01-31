@@ -246,7 +246,7 @@ TEST(ParserTest, Aliases){
 
 TEST(ParserTest, Subranges){
 
-  auto test = [](const char* code, std::initializer_list<std::pair<std::string_view, std::pair<ConstType, ConstType>>> l){
+  auto test = [](const char* code, std::initializer_list<std::pair<std::string_view, std::pair<Int, Int>>> l){
     Parser p(std::string("program TestConst; ") + code + '.');
     p.parse();
 
@@ -256,8 +256,8 @@ TEST(ParserTest, Subranges){
       EXPECT_EQ(_type->m_type, TYPE_CAT::TC_SUBRANGE);
 
       const Subrange* sub = static_cast<const Subrange*>(_type);
-      EXPECT_EQ(sub->m_beg.m_val, vals.first);
-      EXPECT_EQ(sub->m_end.m_val, vals.second);
+      EXPECT_EQ(sub->m_beg, vals.first);
+      EXPECT_EQ(sub->m_end, vals.second);
     }
   };
 
@@ -312,8 +312,8 @@ TEST(ParserTest, Arrays){
   parser.parse();
 
   auto check_subrange = []<typename T>(const Subrange* subrange, T a, T b) {
-    EXPECT_EQ(std::get<T>(subrange->m_beg.m_val), a);
-    EXPECT_EQ(std::get<T>(subrange->m_end.m_val), b);
+    EXPECT_EQ(subrange->m_beg, a);
+    EXPECT_EQ(subrange->m_end, b);
   };
 
   auto check_enum = [](const Enum* e, std::initializer_list<std::pair<std::string_view, Int>> enum_vals){
@@ -337,7 +337,6 @@ TEST(ParserTest, Arrays){
   auto ar2 = static_cast<const Array *>(Block::get("ar2", parser.m_current_block->m_types));
   EXPECT_EQ(ar2->m_type, TYPE_CAT::TC_ARRAY);
   EXPECT_EQ(ar2->m_itypes.size(), 1);
-  EXPECT_EQ(std::get<Int>(static_cast<const Subrange *>(ar2->m_itypes[0])->m_beg.m_val), 0);
   check_subrange(static_cast<const Subrange*>(ar2->m_itypes[0]), Int(0), Int(2));
   EXPECT_EQ(ar2->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
   EXPECT_EQ(ar2->m_etype->m_name, "Char");
