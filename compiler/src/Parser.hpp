@@ -73,10 +73,13 @@ public:
   void function_definition();
 
   //
-  Const constant(const Lexeme &); // token containing id of the constant
+  Const constant(const Lexeme&); // token containing id of the constant
+  const Type* get_type(const Lexeme&, bool); // Includes reading typenames + type_eval
   std::unique_ptr<Type> type_eval(const Lexeme&);
   std::unique_ptr<Enum> enum_type(const Lexeme&);
   std::vector<Lexeme> id_list();
+  std::unique_ptr<Record> field_list(const Lexeme&);
+  std::vector<Const> case_label_list();
 };
 
 }

@@ -319,27 +319,7 @@ void Parser::type_definition()
     match_adv(TOKEN_TYPE::EQ_TOKEN);
     adv();
 
-    std::shared_ptr<Type> type;
-    
-    if(check(TOKEN_TYPE::ID_TOKEN)){
-        const auto id = m_lexer.getToken().m_id;
-        Block *current = m_current_block;
-        
-        do{
-          if(auto it = current->m_types.find(id); it != current->m_types.end()){
-            type = it->second;
-            break;
-          }
-        
-          current = current->m_parent;
-        }while(current);
-    }
-
-    if(type.use_count() == 0){
-      type = type_eval(token);
-    }
-    
-    m_current_block->m_types.emplace(std::make_pair(token.m_id, std::move(type)));
+    get_type(token, true);
 
     match_adv(TOKEN_TYPE::SEMI_TOKEN);
     adv();
@@ -378,6 +358,33 @@ std::unique_ptr<Enum> Parser::enum_type(const Lexeme& token){
   return type;
 }
 
+const Type* Parser::get_type(const Lexeme &token, bool named){
+  if(check(TOKEN_TYPE::ID_TOKEN)){
+    const auto id = m_lexer.getToken().m_id;
+    Block *current = m_current_block;
+    
+    do{
+      if(auto t = current->m_types.find(id); t != current->m_types.end()){
+        if (named)
+          return m_current_block->m_types.emplace(std::make_pair(token.m_id, t->second)).first->second.get();
+        else 
+          return t->second.get();
+        break;
+      }
+    
+      current = current->m_parent;
+    }while(current);
+  }
+
+  auto type = type_eval(token);
+  
+  if(named){
+    return m_current_block->m_types.emplace(std::make_pair(token.m_id, std::move(type))).first->second.get();
+  }else{ 
+    return m_current_block->m_unamed_types.emplace_back(std::move(type)).get();
+  }
+}
+
 std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
   if(check(TOKEN_TYPE::LP_TOKEN)){ // Enum
@@ -398,7 +405,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
         Block *current = m_current_block;
         
         do{
-          if(auto t = Block::get(id, current->m_types); t && t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE){
+          if(auto t = Block::get(id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE)){
             types.emplace_back(t);
             first = true;
             break;
@@ -461,7 +468,9 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
   }
 
   else if(check(TOKEN_TYPE::RECORD_TOKEN)){
-
+    auto record = field_list(token);
+    match(TOKEN_TYPE::END_TOKEN);
+    return record;
   }
 
   auto const beg_token = m_lexer.getToken();
@@ -470,6 +479,179 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
   Const end = constant(m_lexer.next_sym());
 
   return std::make_unique<Subrange>(token.m_id, token.m_line, token.m_col, std::move(beg), std::move(end));
+}
+
+std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
+  std::unique_ptr<Record> record = std::make_unique<Record>(token.m_id, token.m_line, token.m_col);
+  do{
+    adv();
+    if(check(TOKEN_TYPE::CASE_TOKEN)) break; // Move to variant part
+    auto var_names = id_list();
+    match(TOKEN_TYPE::COLON_TOKEN);
+    auto type = get_type(token, false);
+    adv();
+
+    for(const auto& name : var_names){
+      record->check_duplicate_id(token, name);
+      record->m_members[name.m_id] = (Var){name.m_id, name.m_line, name.m_col, type};
+    }
+
+  }while(check(TOKEN_TYPE::SEMI_TOKEN));
+
+  if(!check(TOKEN_TYPE::CASE_TOKEN)) return record;
+
+  match(TOKEN_TYPE::ID_TOKEN);
+
+  const auto id = m_lexer.getToken().m_id;
+
+  const Type* type = nullptr;
+  const Var* var = nullptr;
+
+  {
+    Block *current = m_current_block;
+    do{
+      if(auto t = Block::get(id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE) ){
+        type = t;
+      }
+    }while(current);
+  }
+
+  if(type){ // tag variable not declared explicitly
+    for(const auto &[name, v] : record->m_members){
+      if(v.m_type == type){
+        if(var){ // Already found a tag
+          const auto line = m_lexer.getToken().m_line;
+          const auto col = m_lexer.getToken().m_col;
+          throw SemanticException(
+            SEMANTIC_ERROR::SE_AMBIGUOUS_TAG_VAR,
+            std::format(
+              "Semantic error: Ambiguous tag variable for the record '{}' ({} or {} ?) at ({},{}) !\n",
+              record->m_name, name, var->m_name, line, col
+            ),
+            line, col
+          );
+        }
+        var = &v;
+      }
+    }
+    if(!var){
+      const auto line = m_lexer.getToken().m_line;
+      const auto col = m_lexer.getToken().m_col;
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_MISSING_ID,
+        std::format(
+          "Semantic error: Missing tag variable for the record '{}' at ({},{}) !\n",
+          record->m_name, line, col),
+        line, col
+      );
+    }
+  }else{
+    if(record->m_members.contains(id)){
+      const auto line = m_lexer.getToken().m_line;
+      const auto col = m_lexer.getToken().m_col;
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_DUPLICATE_ID,
+        std::format(
+          "Semantic error: tag variable name '{}' is already for the record '{}' at ({},{}) !\n",
+          id, record->m_name, line, col),
+        line, col);
+    }
+    
+    const auto var_line = m_lexer.getToken().m_line;
+    const auto var_col = m_lexer.getToken().m_col;
+    
+    match_adv(TOKEN_TYPE::COLON_TOKEN);
+    match_adv(TOKEN_TYPE::ID_TOKEN);
+    const auto type_id = m_lexer.getToken().m_id;
+    {
+      Block *current = m_current_block;
+      do{
+        if (auto t = Block::get(type_id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE)){
+          type = t;
+        }
+      } while (current);
+    }
+    if(!type){
+      const auto line = m_lexer.getToken().m_line;
+      const auto col = m_lexer.getToken().m_col;
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_MISSING_ID,
+        std::format(
+          "Semantic error: tag variable type '{}' for the record '{}' at ({},{}) is not defined !\n",
+          type_id, record->m_name, line, col),
+        line, col
+      );
+    }
+    var = &(record->m_members[id] = (Var){id, var_line, var_col, type}); 
+  }
+
+  match_adv(TOKEN_TYPE::OF_TOKEN);
+
+  do{
+    adv();
+    auto constants = case_label_list();
+
+    if(type->m_type == TYPE_CAT::TC_ENUM){
+      for (const auto &c : constants){
+        if (c.m_type != type){
+          throw SemanticException(
+            SEMANTIC_ERROR::SE_MISSING_ID,
+            std::format(
+              "Semantic error: case label '{}' for the record '{}' at ({},{}) is not an enum of the tag type '{}' at ({},{}) !\n",
+              c.m_name, record->m_name, c.m_line, c.m_col, type->m_name, type->m_line, type->m_col),
+            c.m_line, c.m_col
+          );
+        }
+      }
+    }else{ // Type is a subrange
+      auto sub = static_cast<const Subrange*>(type);
+      for(const auto& c : constants){
+        if(c.m_cat != sub->m_cat){ // Char, Enum or Int
+          throw SemanticException(
+            SEMANTIC_ERROR::SE_MISSING_ID,
+            std::format(
+              "Semantic error: case label '{}' for the record '{}' at ({},{}) is not a subrange of the tag type '{}' at ({},{}) !\n",
+              c.m_name, record->m_name, c.m_line, c.m_col, type->m_name, type->m_line, type->m_col),
+            c.m_line, c.m_col
+          );
+        }
+        const Int val = (std::holds_alternative<char>(c.m_val) ? static_cast<Int>(std::get<char>(c.m_val)) : std::get<Int>(c.m_val));
+        if(val < sub->m_beg || val > sub->m_end){
+          throw SemanticException(
+            SEMANTIC_ERROR::SE_MISSING_ID,
+            std::format(
+              "Semantic error: case label '{}' for the record '{}' at ({},{}) is not in the subrange ({} <= {}) of the tag type '{}' at ({},{}) !\n",
+              c.m_name, record->m_name, c.m_line, c.m_col, sub->m_beg, sub->m_end, type->m_name, type->m_line, type->m_col),
+            c.m_line, c.m_col
+          );
+        }
+      }
+    }
+
+    match(TOKEN_TYPE::COLON_TOKEN);
+    match_adv(TOKEN_TYPE::LP_TOKEN);
+    auto variant = field_list(m_lexer.getToken());
+    match(TOKEN_TYPE::RP_TOKEN);
+
+    record->m_variants.push_back(std::move(variant));
+
+  }while(check(TOKEN_TYPE::SEMI_TOKEN));
+
+  return record;
+}
+
+std::vector<Const> Parser::case_label_list(){
+  std::vector<Const> v;
+
+  v.push_back(constant(m_lexer.getToken()));
+  adv();
+  while(check(TOKEN_TYPE::COMMA_TOKEN)){
+    adv();
+    v.push_back(constant(m_lexer.getToken()));
+    adv();
+  }
+
+  return v;
 }
 
 void Parser::statement()

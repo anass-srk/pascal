@@ -199,7 +199,7 @@ struct Record : Type
 {
 
   std::unordered_map<std::string_view,Var> m_members;
-  std::unordered_map<std::string_view,Record*> m_variants;
+  std::vector<std::unique_ptr<Record>> m_variants;
 
   Record(const std::string_view &name, size_t line, size_t col) : Type(name, line, col, TYPE_CAT::TC_RECORD) {}
 

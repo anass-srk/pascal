@@ -237,7 +237,7 @@ void Record::check_duplicate_id(const Lexeme& rec, const Lexeme& name){
       name.m_col
     );
   
-  for(auto [_,record] : m_variants){
+  for(const auto& record : m_variants){
     record->check_duplicate_id(rec, name);
   }
 }
