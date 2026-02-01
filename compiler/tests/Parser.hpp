@@ -378,3 +378,124 @@ TEST(ParserTest, Arrays){
   EXPECT_EQ(_ar->m_etype->m_name, "Bool");
   EXPECT_EQ(_ar->m_etype->m_type, TYPE_CAT::TC_BASIC);
 }
+
+TEST(ParserTest, Records){
+  Parser parser(R"(
+    program Test;
+    label a, b123; Const v = 2; v2 = -1;_1 = +v; h = 'h'; 
+    hello = "Hello\n";PI=3.14;b = true; type t = Int; enum = (Blue, Red, Green);
+    enum2 = (Monday); sub = 1..10; y = sub; ar1 = array [y] of Int; 
+    ar2 = array [Blue..Green] of Char; ar_ = array [1..4, 1..4] of enum;
+    person = record 
+      name: String;
+      age, birthday: Int
+    end ;
+    Point = record
+      x, y: Int;
+    end;
+    Address = record
+      Street: String;
+      City: String
+    end;
+    Person = record
+      Name: String;
+      Addr: Address
+    end;
+    ShapeKind = (Circle, Rectangle);
+    Shape = record
+      case Kind: ShapeKind of
+        Circle: (Radius: Real);
+        Rectangle: (Width, Height: Int)
+    end;
+    VariantType = 0..3;
+    Variant = record
+      name: String;
+      kind: VariantType
+      case VariantType of
+        0: (val1: Int);
+        1: (val2: Real);
+        2, 3: (val3: array [-2..2] of Char)
+    end;
+    .)");
+  parser.parse();
+
+  auto check = [&](std::string_view id, std::initializer_list<std::pair<std::string_view, std::string_view>> l){
+    const Record* rec = nullptr;
+    if(auto it = parser.m_current_block->m_types.find(id); it != parser.m_current_block->m_types.end()){
+      rec =  static_cast<const Record*>(it->second.get());
+    }
+
+    EXPECT_NE(rec, nullptr);
+
+    for(const auto& [name, type_id] : l){
+      auto it = rec->m_members.find(name);
+      EXPECT_NE(it, rec->m_members.end());
+
+      auto type = parser.m_current_block->m_types.find(type_id);
+      EXPECT_NE(type, parser.m_current_block->m_types.end());
+
+      EXPECT_EQ(it->second.m_type, type->second.get());
+    }
+
+  };
+
+  check("person",{
+    {"name", "String"},
+    {"age", "Int"},
+    {"birthday", "Int"}
+  });
+
+  check("Point",{
+    {"x", "Int"},
+    {"y", "Int"}
+  });
+
+  check("Address",{
+    {"Street", "String"},
+    {"City", "String"}
+  });
+
+  check("Person",{
+    {"Name", "String"},
+    {"Addr", "Address"}
+  });
+
+  check("Shape",{
+    {"Kind", "ShapeKind"},
+    {"Radius", "Real"},
+    {"Width", "Int"},
+    {"Height", "Int"}
+  });
+
+  check("Variant",{
+      {"name", "String"},
+      {"kind", "VariantType"},
+      {"val1", "Int"},
+      {"val2", "Real"}
+  });
+
+  {
+    const Record* rec = nullptr;
+    if(auto it = parser.m_current_block->m_types.find("Variant"); it != parser.m_current_block->m_types.end()){
+      rec = static_cast<const Record*>(it->second.get());
+    }
+    EXPECT_NE(rec, nullptr);
+
+    const Array* arr = nullptr;
+    if(auto it = rec->m_members.find("val3"); it != rec->m_members.end()){
+      EXPECT_NE(it->second.m_type, nullptr);
+      EXPECT_EQ(it->second.m_type->m_type, TYPE_CAT::TC_ARRAY);
+      arr = static_cast<const Array*>(it->second.m_type);
+    }
+    EXPECT_NE(arr, nullptr);
+
+    EXPECT_EQ(arr->m_itypes.size(), 1);
+    EXPECT_EQ(arr->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+    auto sub = static_cast<const Subrange*>(arr->m_itypes[0]);
+    EXPECT_EQ(sub->m_beg, -2);
+    EXPECT_EQ(sub->m_end, 2);
+    
+    EXPECT_EQ(arr->m_etype->m_name, "Char");
+  }
+
+}

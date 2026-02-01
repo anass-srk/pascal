@@ -485,9 +485,10 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
   std::unique_ptr<Record> record = std::make_unique<Record>(token.m_id, token.m_line, token.m_col);
   do{
     adv();
-    if(check(TOKEN_TYPE::CASE_TOKEN)) break; // Move to variant part
+    if(check(TOKEN_TYPE::CASE_TOKEN) || check(TOKEN_TYPE::END_TOKEN)) break; // Move to variant part or quit
     auto var_names = id_list();
     match(TOKEN_TYPE::COLON_TOKEN);
+    adv();
     auto type = get_type(token, false);
     adv();
 
@@ -500,6 +501,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
 
   if(!check(TOKEN_TYPE::CASE_TOKEN)) return record;
 
+  adv();
   match(TOKEN_TYPE::ID_TOKEN);
 
   const auto id = m_lexer.getToken().m_id;
@@ -513,6 +515,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
       if(auto t = Block::get(id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE) ){
         type = t;
       }
+      current = current->m_parent;
     }while(current);
   }
 
@@ -569,6 +572,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
         if (auto t = Block::get(type_id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE)){
           type = t;
         }
+        current = current->m_parent;
       } while (current);
     }
     if(!type){
@@ -632,8 +636,12 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     match_adv(TOKEN_TYPE::LP_TOKEN);
     auto variant = field_list(m_lexer.getToken());
     match(TOKEN_TYPE::RP_TOKEN);
+    adv();
 
-    record->m_variants.push_back(std::move(variant));
+    for (const auto &[id,var] : variant->m_members){
+      record->check_duplicate_id(token, var);
+      record->m_members[id] = var;
+    }
 
   }while(check(TOKEN_TYPE::SEMI_TOKEN));
 

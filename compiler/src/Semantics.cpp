@@ -236,10 +236,21 @@ void Record::check_duplicate_id(const Lexeme& rec, const Lexeme& name){
       name.m_line,
       name.m_col
     );
-  
-  for(const auto& record : m_variants){
-    record->check_duplicate_id(rec, name);
-  }
+}
+void Record::check_duplicate_id(const Lexeme& rec, const Var& var){
+  if(m_members.contains(var.m_name))
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_DUPLICATE_ID,
+      std::format(
+        "Semantic error: duplicate record member id '{}' found at ({},{}) and ({},{}) !",
+        var.m_name,
+        var.m_line,
+        var.m_col,
+        rec.m_line,
+        rec.m_col),
+      var.m_line,
+      var.m_col
+    );
 }
 
 };

@@ -199,12 +199,11 @@ struct Record : Type
 {
 
   std::unordered_map<std::string_view,Var> m_members;
-  std::vector<std::unique_ptr<Record>> m_variants;
 
   Record(const std::string_view &name, size_t line, size_t col) : Type(name, line, col, TYPE_CAT::TC_RECORD) {}
 
   void check_duplicate_id(const Lexeme& rec, const Lexeme& name);
-
+  void check_duplicate_id(const Lexeme &rec, const Var& var);
 };
 
 struct FunctionType : Type
