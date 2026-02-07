@@ -18,3 +18,4 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 
 add_subdirectory(compiler)
+add_subdirectory(vm)
