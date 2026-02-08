@@ -148,6 +148,10 @@ namespace pascal_vm
 
     void dump_state() const;
 
+    // For testing for now
+    inline size_t size() const {return code.size();};
+    inline uint8_t* data() const {return code.data();};
+
   private:
 
 
@@ -268,6 +272,7 @@ namespace pascal_vm
     inline void add_dump()
     {
       add_value(static_cast<uint8_t>(OPCODE::DMP));
+      add_value<uint8_t>(0);
     }
 
   private:
@@ -301,6 +306,7 @@ namespace pascal_vm
     }
     
     // To be used with jmp instructions, with 1 byte padding after the opcode and before the offset
+    // Therefore, adding a jmp instructions + its operands uses 6 bytes
     inline int32_t fetch_offset() const
     {
       int32_t val;
