@@ -2,24 +2,24 @@
 
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #include <array>
+#include <set>
 
 namespace pascal_vm
 {
   template <typename T, typename... U>
   concept one_of = (std::is_same_v<T, U> || ...);
 
-  using std::uint64_t;
-  using std::int8_t;
-  using std::uint8_t;
-
   template <typename T>
-  concept Type = std::is_same_v<T, int8_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double>;
+  concept Type = std::is_same_v<T, bool> || std::is_same_v<T, int8_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double>;
 
   // --- Opcodes (1 Byte) ---
   // TODO: Add versions that take intermediate values
-  enum class OPCODE : int8_t
+  enum class OPCODE : uint8_t
   {
+    NOP,
+
     // Load/Store
     LOAD_I,
     LOAD_D,
@@ -39,21 +39,46 @@ namespace pascal_vm
     MUL_I,
     DIV_I,
     MOD_I,
+    // Intermidiate version
+    ADDI_I,
+    SUBI_I,
+    MULI_I,
+    DIVI_I,
+    MODI_I,
+
+    // Arithmetic (Char)
+    ADD_C,
+    SUB_C,
+    MUL_C,
+    DIV_C,
+    MOD_C,
+    // Intermidiate version
+    ADDI_C,
+    SUBI_C,
+    MULI_C,
+    DIVI_C,
+    MODI_C,
+
     // Arithmetic (Double)
     ADD_D,
     SUB_D,
     MUL_D,
     DIV_D,
-    // Arithmetic (Char)
-    ADD_B,
-    SUB_B,
-    MUL_B,
-    DIV_B,
-    MOD_B,
+    // Intermidiate version
+    ADDI_D,
+    SUBI_D,
+    MULI_D,
+    DIVI_D,
+    MODI_D,
+
     // Comparison
     CMP_I,
     CMP_D,
-    CMP_B,
+    CMP_C,
+    CMPI_I,
+    CMPI_D,
+    CMPI_C,
+
     // Jumps
     JMP,
     JLT,
@@ -63,6 +88,7 @@ namespace pascal_vm
     JEQ,
     JNE,
 
+    DMP,
     HALT
   };
 
@@ -97,9 +123,15 @@ namespace pascal_vm
   class VM
   {
     static constexpr size_t NUM_REGISTERS = 16;
-    using RegValue = std::uint64_t;
+    using RegValue = union {
+      uint64_t u;
+      int64_t i;
+      double d;
+      char c;
+      bool b;
+    };
 
-    std::vector<uint8_t> code;
+    mutable std::vector<uint8_t> code;
     mutable std::array<RegValue, NUM_REGISTERS> registers;
     mutable std::vector<RegValue> stack; // Runtime Stack
     mutable Flags flags;
@@ -112,7 +144,7 @@ namespace pascal_vm
     // Runtime Execution
     void load_program(const std::vector<uint8_t> &bytecode);
 
-    void run();
+    void run() const;
 
     void dump_state() const;
 
@@ -134,6 +166,8 @@ namespace pascal_vm
       }
     }
 
+  public:
+
     // Instructions
 
     using LoadMap = TypeToEnumMap<
@@ -145,9 +179,13 @@ namespace pascal_vm
     template <Type T>
     void add_load(uint8_t reg, T imm)
     {
-      add_value(LoadMap::get<T>());
+      add_value(static_cast<uint8_t>(LoadMap::get<T>()));
       add_value(reg);
       add_value(imm);
+      if(sizeof(T) == 1)
+      {
+        add_value<uint8_t>(0);
+      }
     }
 
     using StoreMap = TypeToEnumMap<
@@ -159,21 +197,77 @@ namespace pascal_vm
     template <Type T>
     void add_store(uint8_t reg, uint64_t addr)
     {
-      add_value(StoreMap::get<T>());
+      add_value(static_cast<uint8_t>(StoreMap::get<T>()));
       add_value(reg);
       add_value(addr);
     }
 
     void add_mov(uint8_t dest, uint8_t src)
     {
-      add_value(static_cast<int8_t>(OPCODE::MOV));
+      add_value(static_cast<uint8_t>(OPCODE::MOV));
       add_value(dest);
       add_value(src);
+      add_value<uint8_t>(0);
     }
 
     void add_halt()
     {
-      add_value(static_cast<int8_t>(OPCODE::HALT));
+      add_value(static_cast<uint8_t>(OPCODE::HALT));
+    }
+
+
+    inline void add_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(dest);
+      add_value(src1);
+      add_value(src2);
+    }
+
+    template <Type T>
+    inline void add_op_inter(OPCODE op, uint8_t dest, uint8_t src, T imm)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(dest);
+      add_value(src);
+      if constexpr (sizeof(T) > 1)
+      {
+        add_value<uint8_t>(0);
+      }
+      add_value(imm);
+    }
+
+    inline void add_cmp(OPCODE op, uint8_t a, uint8_t b)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(a);
+      add_value(b);
+      add_value<uint8_t>(0);
+    }
+
+    template <Type T>
+    inline void add_cmp_inter(OPCODE op, uint8_t a, T b)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(a);
+      add_value(b);
+      if constexpr (sizeof(T) == 1)
+      {
+        add_value<uint8_t>(0);
+      }
+    }
+
+    inline uint64_t add_jmp(OPCODE op, int32_t offset)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value<uint8_t>(0);
+      add_value(offset);
+      return code.size() - sizeof(offset);
+    }
+
+    inline void add_dump()
+    {
+      add_value(static_cast<uint8_t>(OPCODE::DMP));
     }
 
   private:
@@ -188,10 +282,19 @@ namespace pascal_vm
     {
       return code[pc++];
     }
-    
-    inline int64_t fetch_int64() const
+
+    template <Type T>
+    inline T fetch_value() const
     {
-      int64_t val;
+      T val;
+      std::memcpy(&val, &code[pc], sizeof(T));
+      pc += sizeof(T);
+      return val;
+    }
+    
+    inline uint64_t fetch_addr() const
+    {
+      uint64_t val;
       std::memcpy(&val, &code[pc], 8);
       pc += 8;
       return val;
@@ -201,13 +304,11 @@ namespace pascal_vm
     inline int32_t fetch_offset() const
     {
       int32_t val;
-      std::memcpy(&val, &code[++pc], 4);
+      std::memcpy(&val, &code[pc], 4);
       pc += 4;
       return val;
     }
 
-    // Execution
-    void step() const;
   };
 
 }
