@@ -49,10 +49,14 @@ void VM::dump_state() const
   fetch_byte(); \
   const int32_t offset = fetch_offset();
 
-#define get_load_args(T) \
+#define get_load_args_inter(T) \
   const uint8_t reg = fetch_reg();  \
   const T val = fetch_value<T>(); \
   if constexpr(sizeof(T) == 1) fetch_byte();
+
+#define get_load_args()  \
+  const uint8_t reg = fetch_reg();  \
+  const uint64_t addr = fetch_addr();
 
 #define get_store_args() \
   const uint8_t reg = fetch_reg();  \
@@ -70,32 +74,51 @@ void VM::run() const
     case OPCODE::NOP:{
       continue;
     }break;
+    case OPCODE::MOV:{
+      const uint8_t dest = fetch_reg();
+      const uint8_t src = fetch_reg();
+      fetch_byte();
+      registers[dest].u = registers[src].u;
+    }break;
 
-    case OPCODE::LOAD_I:{
-      get_load_args(int64_t)
+    case OPCODE::LOADI_I:{
+      get_load_args_inter(int64_t)
       registers[reg].i = val;
     }break;
-    case OPCODE::LOAD_B:{
-      get_load_args(int8_t)
+    case OPCODE::LOADI_B:{
+      get_load_args_inter(int8_t)
       registers[reg].c = val;
     }break;
-    case OPCODE::LOAD_D:{
-      get_load_args(double)
+    case OPCODE::LOADI_D:{
+      get_load_args_inter(double)
       registers[reg].d = val;
+    }break;
+
+    case OPCODE::LOAD_I:{
+      get_load_args()
+      std::memcpy(&registers[reg].i, &stack[addr], 8);
+    }break;
+    case OPCODE::LOAD_B:{
+      get_load_args()
+      std::memcpy(&registers[reg].c, &stack[addr], 1);
+    }break;
+    case OPCODE::LOAD_D:{
+      get_load_args()
+      std::memcpy(&registers[reg].d, &stack[addr], 8);
     }break;
     
     
     case OPCODE::STORE_I:{
       get_store_args()
-      std::memcpy(&code[addr], &registers[reg].i, 8);
+      std::memcpy(&stack[addr], &registers[reg].i, 8);
     }break;
     case OPCODE::STORE_B:{
       get_store_args()
-      std::memcpy(&code[addr], &registers[reg].b, 1);
+      std::memcpy(&stack[addr], &registers[reg].b, 1);
     }break;
     case OPCODE::STORE_D:{
       get_store_args()
-      std::memcpy(&code[addr], &registers[reg].d, 8);
+      std::memcpy(&stack[addr], &registers[reg].d, 8);
     }break;
     
     

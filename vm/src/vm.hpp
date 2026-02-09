@@ -24,6 +24,10 @@ namespace pascal_vm
     LOAD_I,
     LOAD_D,
     LOAD_B,
+    // Intermediate
+    LOADI_I,
+    LOADI_D,
+    LOADI_B,
     MOV,
     STORE_I,
     STORE_D,
@@ -131,9 +135,9 @@ namespace pascal_vm
       bool b;
     };
 
-    mutable std::vector<uint8_t> code;
+    std::vector<uint8_t> code;
     mutable std::array<RegValue, NUM_REGISTERS> registers;
-    mutable std::vector<RegValue> stack; // Runtime Stack
+    mutable std::vector<uint8_t> stack; // Runtime Stack
     mutable Flags flags;
     mutable size_t pc = 0;
 
@@ -142,19 +146,14 @@ namespace pascal_vm
     VM();
 
     // Runtime Execution
-    void load_program(const std::vector<uint8_t> &bytecode);
+    // void load_program(const std::vector<uint8_t> &bytecode);
 
     void run() const;
 
     void dump_state() const;
 
-    // For testing for now
-    inline size_t size() const {return code.size();};
-    inline uint8_t* data() const {return code.data();};
-
   private:
-
-
+    
     // Helper for Instructions
     template <typename T>
     inline void add_value(T v) requires one_of<T, uint8_t, int8_t, int32_t, int64_t, uint64_t, double>
@@ -172,16 +171,30 @@ namespace pascal_vm
 
   public:
 
-    // Instructions
+    // Helper for vars
+    template <typename T>
+    inline void add_var(T v) requires one_of<T, uint8_t, int8_t, int32_t, int64_t, uint64_t, double>
+    {
+      if constexpr (sizeof(T) == 1)
+      {
+        stack.push_back(static_cast<uint8_t>(v));
+      }
+      else
+      {
+        const uint8_t *p = reinterpret_cast<const uint8_t*>(&v);
+        stack.insert(stack.end(), p, p + sizeof(T));
+      }
+    }
 
+    // Instructions
     using LoadMap = TypeToEnumMap<
-      TypeEnum<int8_t, OPCODE::LOAD_B>,
-      TypeEnum<int64_t, OPCODE::LOAD_I>,
-      TypeEnum<double, OPCODE::LOAD_D>
+      TypeEnum<int8_t, OPCODE::LOADI_B>,
+      TypeEnum<int64_t, OPCODE::LOADI_I>,
+      TypeEnum<double, OPCODE::LOADI_D>
     >;
 
     template <Type T>
-    void add_load(uint8_t reg, T imm)
+    void add_load_inter(uint8_t reg, T imm)
     {
       add_value(static_cast<uint8_t>(LoadMap::get<T>()));
       add_value(reg);
@@ -190,6 +203,13 @@ namespace pascal_vm
       {
         add_value<uint8_t>(0);
       }
+    }
+
+    void add_load(OPCODE op, uint8_t reg, uint64_t addr)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(reg);
+      add_value(addr);
     }
 
     using StoreMap = TypeToEnumMap<
