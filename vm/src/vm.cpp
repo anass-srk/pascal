@@ -11,7 +11,7 @@ VM::VM() : registers({}), flags({})
 
 void VM::dump_state() const
 {
-  std::cout << "################################\n";
+  std::cout << "\n################################\n";
   std::cout << "PC : " << std::right << std::setfill('0') <<  std::setw(10) << pc << std::setfill(' '); 
   std::cout << "    FLAGS(Z, N)    " << '(' << (flags.Z == true) << ", " << (flags.N == true) << ')' << '\n' ;
   std::cout << std::left;  
@@ -22,45 +22,54 @@ void VM::dump_state() const
     const auto& r = registers[i];
     std::cout << std::setw(8) << "R" + std::to_string(i) << std::setw(8) << int(r.c) << std::setw(8) << r.i << std::setw(8) << r.d << '\n';
   }
+  std::cout << '\n';
 }
 
 #define get_op_args() \
   const uint8_t dest = fetch_reg(); \
   const uint8_t src1 = fetch_reg(); \
-  const uint8_t src2 = fetch_reg();
+  const uint8_t src2 = fetch_reg(); \
+  print_op(opcode, dest, src1, src2, std::optional<int64_t>({}));
 
 #define get_op_args_inter(T)  \
   const uint8_t dest = fetch_reg(); \
   const uint8_t src = fetch_reg();  \
   if constexpr (sizeof(T) > 1) fetch_byte(); \
-  const T val = fetch_value<T>();
+  const T val = fetch_value<T>(); \
+  print_op(opcode, dest, src, -1, std::optional(val));
 
 #define get_cmp_args() \
   const uint8_t a = fetch_reg();  \
   const uint8_t b = fetch_reg();  \
-  fetch_byte();
+  fetch_byte(); \
+  print_op(opcode, a, b, -1, std::optional<int64_t>({}));
 
 #define get_cmp_args_inter(T)  \
   const uint8_t a = fetch_reg();  \
   const T b = fetch_value<T>();   \
-  if constexpr (sizeof(T) == 1) fetch_byte();
+  if constexpr (sizeof(T) == 1) fetch_byte(); \
+  print_op(opcode, a, -1, -1, std::optional(b));
 
 #define get_jmp_args()  \
   fetch_byte(); \
-  const int32_t offset = fetch_offset();
+  const int32_t offset = fetch_offset();  \
+  print_op(opcode, -1, -1, -1, std::optional(offset));
 
 #define get_load_args_inter(T) \
   const uint8_t reg = fetch_reg();  \
   const T val = fetch_value<T>(); \
-  if constexpr(sizeof(T) == 1) fetch_byte();
+  if constexpr(sizeof(T) == 1) fetch_byte(); \
+  print_op(opcode, reg, -1, -1, std::optional(val));
 
 #define get_load_args()  \
   const uint8_t reg = fetch_reg();  \
-  const uint64_t addr = fetch_addr();
+  const uint64_t addr = fetch_addr();\
+  print_op(opcode, reg, -1, -1, std::optional(addr));
 
 #define get_store_args() \
   const uint8_t reg = fetch_reg();  \
-  const uint64_t addr = fetch_addr();
+  const uint64_t addr = fetch_addr();\
+  print_op(opcode, reg, -1, -1, std::optional(addr));
 
 void VM::run() const
 {
@@ -79,6 +88,7 @@ void VM::run() const
       const uint8_t src = fetch_reg();
       fetch_byte();
       registers[dest].u = registers[src].u;
+      print_op(opcode, dest, src, -1, std::optional<int8_t>{});
     }break;
 
     case OPCODE::LOADI_I:{

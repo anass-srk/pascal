@@ -4,7 +4,8 @@
 #include <iostream>
 #include <iomanip>
 #include <array>
-#include <set>
+#include <string>
+#include <optional>
 
 namespace pascal_vm
 {
@@ -95,6 +96,88 @@ namespace pascal_vm
     DMP,
     HALT
   };
+
+  inline const char* OPCODE_NAMES[] =
+  {
+    "NOP",
+    "LOAD_I",
+    "LOAD_D",
+    "LOAD_B",
+    "LOADI_I",
+    "LOADI_D",
+    "LOADI_B",
+    "MOV",
+    "STORE_I",
+    "STORE_D",
+    "STORE_B",
+    "PUSH",
+    "POP",
+    "ADD_I",
+    "SUB_I",
+    "MUL_I",
+    "DIV_I",
+    "MOD_I",
+    "ADDI_I",
+    "SUBI_I",
+    "MULI_I",
+    "DIVI_I",
+    "MODI_I",
+    "ADD_C",
+    "SUB_C",
+    "MUL_C",
+    "DIV_C",
+    "MOD_C",
+    "ADDI_C",
+    "SUBI_C",
+    "MULI_C",
+    "DIVI_C",
+    "MODI_C",
+    "ADD_D",
+    "SUB_D",
+    "MUL_D",
+    "DIV_D",
+    "ADDI_D",
+    "SUBI_D",
+    "MULI_D",
+    "DIVI_D",
+    "MODI_D",
+    "CMP_I",
+    "CMP_D",
+    "CMP_C",
+    "CMPI_I",
+    "CMPI_D",
+    "CMPI_C",
+    "JMP",
+    "JLT",
+    "JGT",
+    "JLE",
+    "JGE",
+    "JEQ",
+    "JNE",
+    "DMP",
+    "HALT"
+  };
+
+#ifdef DEBUG_VM
+  constexpr bool DEBUG_PRINT_OP = true;
+#else
+  constexpr bool DEBUG_PRINT_OP = false;
+#endif
+
+  inline const char* REG_NAMES[16] = {"R0","R1","R2","R3","R4","R5","R6","R7","R8","R9","R10","R11","R12","R13","R14","R15"};
+
+  template <typename T>
+  void print_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2, std::optional<T> val)
+  requires (std::integral<T> || std::floating_point<T>)
+  {
+    if constexpr (!DEBUG_PRINT_OP) return;
+    std::cout << '\n' << std::left << std::setw(8) << OPCODE_NAMES[static_cast<uint8_t>(op)] << 
+    std::setw(8) << (dest == 255 ? "NAN" : REG_NAMES[dest]) << 
+    std::setw(8) << (src1 == 255 ? "NAN" : REG_NAMES[src1]) << 
+    std::setw(8) << (src2 == 255 ? "NAN" : REG_NAMES[src2]) << std::setw(8);
+    if (val.has_value()) std::cout << val.value() << '\n';
+    else std::cout << "NAN" << '\n';
+  }
 
   template <typename Key, OPCODE Value>
   struct TypeEnum
