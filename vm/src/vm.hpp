@@ -113,8 +113,10 @@ namespace pascal_vm
     "STORE_I",
     "STORE_D",
     "STORE_B",
-    "PUSH",
-    "POP",
+    "PUSHB",
+    "PUSHQ",
+    "POPB",
+    "POPQ",
     "ADD_I",
     "SUB_I",
     "MUL_I",
@@ -219,6 +221,7 @@ namespace pascal_vm
       double d;
       char c;
       bool b;
+      uint8_t byte;
     };
 
     std::vector<uint8_t> code;
@@ -263,7 +266,7 @@ namespace pascal_vm
 
     // Helper for vars
     template <typename T>
-    inline void add_var(T v) requires one_of<T, uint8_t, int8_t, int32_t, int64_t, uint64_t, double>
+    inline void add_var(T v) const requires one_of<T, uint8_t, int8_t, int32_t, int64_t, uint64_t, double>
     {
       if constexpr (sizeof(T) == 1)
       {
@@ -394,6 +397,18 @@ namespace pascal_vm
     {
       add_value(static_cast<uint8_t>(OPCODE::DMP));
       add_value<uint8_t>(0);
+    }
+
+    inline void add_push(OPCODE op, uint8_t reg)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(reg);
+    }
+
+    inline void add_pop(OPCODE op, uint8_t reg)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(reg);
     }
 
   private:

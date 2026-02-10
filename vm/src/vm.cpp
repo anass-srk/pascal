@@ -71,6 +71,14 @@ void VM::dump_state() const
   const uint64_t addr = fetch_addr();\
   print_op(opcode, reg, -1, -1, std::optional(addr));
 
+#define get_push_args() \
+  const uint8_t reg = fetch_reg();  \
+  print_op(opcode, reg, -1, -1, std::optional<int64_t>{});
+
+#define get_pop_args()  \
+  const uint8_t reg = fetch_reg();  \
+  print_op(opcode, reg, -1, -1, std::optional<int64_t>{});
+
 void VM::run() const
 {
   while(true)
@@ -212,6 +220,25 @@ void VM::run() const
     case OPCODE::JLE:{
       get_jmp_args()
       if(flags.Z || flags.N) pc += offset;
+    }break;
+
+    case OPCODE::PUSHB:{
+      get_push_args()
+      add_var<int8_t>(registers[reg].c);
+    }break;
+    case OPCODE::PUSHQ:{
+      get_push_args()
+      add_var<int64_t>(registers[reg].i);
+    }break;
+    case OPCODE::POPB:{
+      get_pop_args()
+      registers[reg].byte = stack.back();
+      stack.pop_back();
+    }break;
+    case OPCODE::POPQ:{
+      get_pop_args()
+      std::memcpy(&registers[reg].i, &stack[stack.size()-8], 8);
+      stack.resize(stack.size() - 8);
     }break;
 
     case OPCODE::DMP:{
