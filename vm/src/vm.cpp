@@ -79,6 +79,15 @@ void VM::dump_state() const
   const uint8_t reg = fetch_reg();  \
   print_op(opcode, reg, -1, -1, std::optional<int8_t>{});
 
+#define get_io_args() \
+  const uint8_t reg = fetch_reg();  \
+  print_op(opcode, reg, -1, -1, std::optional<uint8_t>{});
+
+#define get_io_string_args()           \
+  const uint8_t reg = fetch_reg();           \
+  const auto len = fetch_value<uint32_t>(); \
+  print_op(opcode, reg, -1, -1, std::optional(len));
+
 void VM::run() const
 {
   while(true)
@@ -266,6 +275,50 @@ void VM::run() const
       pc = ret_addr;
 
       print_op(OPCODE::RET, -1, -1, -1, std::optional(func_stack_size), std::optional(ret_addr));
+    }break;
+
+    case OPCODE::READ_I:{
+      get_io_args()
+      std::cin >> registers[reg].i;
+    }break;
+    case OPCODE::READ_C:{
+      get_io_args()
+      std::cin >> registers[reg].c;
+    }break;
+    case OPCODE::READ_D:{
+      get_io_args()
+      std::cin >> registers[reg].d;
+    }break;
+    case OPCODE::READ_S:{
+      get_io_string_args()
+      std::string tmp;
+      std::cin >> tmp;
+      char *str = reinterpret_cast<char *>(stack.data() + registers[reg].u);
+      if(tmp.length() >= len){
+        std::memcpy(str, tmp.data(), len);
+      }else{
+        std::memcpy(str, tmp.data(), tmp.length());
+        str[tmp.length()+1] = '\0';
+      }
+    }break;
+    case OPCODE::WRITE_I:{
+      get_io_args()
+      std::cout << registers[reg].i;
+    }break;
+    case OPCODE::WRITE_C:{
+      get_io_args()
+      std::cout << registers[reg].c;
+    }break;
+    case OPCODE::WRITE_D:{
+      get_io_args()
+      std::cout << registers[reg].d;
+    }break;
+    case OPCODE::WRITE_S:{
+      get_io_string_args()
+      const char *str = reinterpret_cast<char *>(stack.data() + registers[reg].u);
+      for(uint32_t i = 0;i < len && str[i] != '\0';++i){
+        std::cout << str[i];
+      }
     }break;
 
     case OPCODE::DMP:{

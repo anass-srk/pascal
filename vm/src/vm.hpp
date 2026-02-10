@@ -14,7 +14,7 @@ namespace pascal_vm
   concept one_of = (std::is_same_v<T, U> || ...);
 
   template <typename T>
-  concept Type = std::is_same_v<T, bool> || std::is_same_v<T, int8_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double>;
+  concept VarType = std::integral<T> || std::floating_point<T>;
 
   // --- Opcodes (1 Byte) ---
   // TODO: Add versions that take intermediate values
@@ -100,6 +100,16 @@ namespace pascal_vm
     JEQ,
     JNE,
 
+    // Basic IO
+    READ_C,
+    READ_I,
+    READ_D,
+    READ_S,
+    WRITE_C,
+    WRITE_I,
+    WRITE_D,
+    WRITE_S,
+
     DMP,
     HALT
   };
@@ -165,11 +175,19 @@ namespace pascal_vm
     "JGE",
     "JEQ",
     "JNE",
+    "READ_C",
+    "READ_I",
+    "READ_D",
+    "READ_S",
+    "WRITE_C",
+    "WRITE_I",
+    "WRITE_D",
+    "WRITE_S",
     "DMP",
     "HALT"
   };
 
-#ifdef DEBUG_VM
+#if DEBUG_VM
   constexpr bool DEBUG_PRINT_OP = true;
 #else
   constexpr bool DEBUG_PRINT_OP = false;
@@ -177,9 +195,8 @@ namespace pascal_vm
 
   inline const char* REG_NAMES[16] = {"R0","R1","R2","R3","R4","R5","R6","R7","R8","R9","R10","R11","R12","R13","R14","R15"};
 
-  template <typename T, typename U = T>
-  void print_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2, std::optional<T> val1, std::optional<U> val2 = std::nullopt)
-  requires ((std::integral<T> || std::floating_point<T>) && (std::integral<U> || std::floating_point<U>))
+  template <VarType T, VarType U = T>
+  static void print_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2, std::optional<T> val1, std::optional<U> val2 = std::nullopt)
   {
     if constexpr (!DEBUG_PRINT_OP) return;
     std::cout << std::left <<
@@ -193,31 +210,11 @@ namespace pascal_vm
     else std::cout << "NAN" << '\n';
   }
 
-  void print_pc(size_t pc)
+  static void print_pc(size_t pc)
   {
     if constexpr (DEBUG_PRINT_OP)
       std::cout << std::left << std::setw(8) << pc;
   }
-
-  template <typename Key, OPCODE Value>
-  struct TypeEnum
-  {
-    using key = Key;
-    static constexpr OPCODE value = Value;
-  };
-
-  template <typename P, typename... Ps>
-  struct TypeToEnumMap
-  {
-    template <typename T>
-    static constexpr OPCODE get()
-    {
-      if constexpr (std::is_same_v<typename P::key, T>)
-        return P::value;
-      else
-        return TypeToEnumMap<Ps...>::template get<T>();
-    }
-  };
 
   // --- CPU Flags ---
   struct Flags
@@ -263,8 +260,8 @@ namespace pascal_vm
   private:
     
     // Helper for Instructions
-    template <typename T>
-    inline void add_value(T v) requires one_of<T, uint8_t, int8_t, int32_t, uint32_t, int64_t, uint64_t, double>
+    template <VarType T>
+    inline void add_value(T v)
     {
       if constexpr (sizeof(T) == 1)
       {
@@ -280,8 +277,8 @@ namespace pascal_vm
   public:
 
     // Helper for vars
-    template <typename T>
-    inline void add_var(T v) const requires one_of<T, uint8_t, int8_t, int32_t, uint32_t, int64_t, uint64_t, double>
+    template <VarType T>
+    inline void add_var(T v) const
     {
       if constexpr (sizeof(T) == 1)
       {
@@ -295,16 +292,11 @@ namespace pascal_vm
     }
 
     // Instructions
-    using LoadMap = TypeToEnumMap<
-      TypeEnum<int8_t, OPCODE::LOADI_B>,
-      TypeEnum<int64_t, OPCODE::LOADI_I>,
-      TypeEnum<double, OPCODE::LOADI_D>
-    >;
 
-    template <Type T>
-    void add_load_inter(uint8_t reg, T imm)
+    template <VarType T>
+    void add_load_inter(OPCODE op, uint8_t reg, T imm)
     {
-      add_value(static_cast<uint8_t>(LoadMap::get<T>()));
+      add_value(static_cast<uint8_t>(op));
       add_value(reg);
       add_value(imm);
       if(sizeof(T) == 1)
@@ -320,16 +312,10 @@ namespace pascal_vm
       add_value(addr);
     }
 
-    using StoreMap = TypeToEnumMap<
-      TypeEnum<int8_t, OPCODE::STORE_B>,
-      TypeEnum<int64_t, OPCODE::STORE_I>,
-      TypeEnum<double, OPCODE::STORE_D>
-    >;
-
-    template <Type T>
-    void add_store(uint8_t reg, uint64_t addr)
+    template <VarType T>
+    void add_store(OPCODE op, uint8_t reg, uint64_t addr)
     {
-      add_value(static_cast<uint8_t>(StoreMap::get<T>()));
+      add_value(static_cast<uint8_t>(op));
       add_value(reg);
       add_value(addr);
     }
@@ -356,7 +342,7 @@ namespace pascal_vm
       add_value(src2);
     }
 
-    template <Type T>
+    template <VarType T>
     inline void add_op_inter(OPCODE op, uint8_t dest, uint8_t src, T imm)
     {
       add_value(static_cast<uint8_t>(op));
@@ -377,7 +363,7 @@ namespace pascal_vm
       add_value<uint8_t>(0);
     }
 
-    template <Type T>
+    template <VarType T>
     inline void add_cmp_inter(OPCODE op, uint8_t a, T b)
     {
       add_value(static_cast<uint8_t>(op));
@@ -441,6 +427,32 @@ namespace pascal_vm
       add_value(func_stack_size);
     }
 
+    inline void add_read(OPCODE opcode, uint8_t reg)
+    {
+      add_value(static_cast<uint8_t>(opcode));
+      add_value(reg);
+    }
+
+    inline void add_read(OPCODE opcode, uint8_t reg, uint32_t len) // for array of chars
+    {
+      add_value(static_cast<uint8_t>(opcode));
+      add_value(reg);
+      add_value(len);
+    }
+
+    inline void add_write(OPCODE opcode, uint8_t reg)
+    {
+      add_value(static_cast<uint8_t>(opcode));
+      add_value(reg);
+    }
+
+    inline void add_write(OPCODE opcode, uint8_t reg, uint32_t len) // for array of chars
+    {
+      add_value(static_cast<uint8_t>(opcode));
+      add_value(reg);
+      add_value(len);
+    }
+
   private:
 
     // Fetching
@@ -454,8 +466,8 @@ namespace pascal_vm
       return code[pc++];
     }
 
-    template <typename T>
-    inline T fetch_value() const requires one_of<T, bool, int8_t, int64_t, uint32_t, uint64_t, double>
+    template <VarType T>
+    inline T fetch_value() const
     {
       T val;
       std::memcpy(&val, &code[pc], sizeof(T));
