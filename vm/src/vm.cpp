@@ -29,7 +29,7 @@ void VM::dump_state() const
   const uint8_t dest = fetch_reg(); \
   const uint8_t src1 = fetch_reg(); \
   const uint8_t src2 = fetch_reg(); \
-  print_op(opcode, dest, src1, src2, std::optional<int64_t>{});
+  print_op(opcode, dest, src1, src2, std::optional<int8_t>{});
 
 #define get_op_args_inter(T)  \
   const uint8_t dest = fetch_reg(); \
@@ -42,7 +42,7 @@ void VM::dump_state() const
   const uint8_t a = fetch_reg();  \
   const uint8_t b = fetch_reg();  \
   fetch_byte(); \
-  print_op(opcode, a, b, -1, std::optional<int64_t>{});
+  print_op(opcode, a, b, -1, std::optional<int8_t>{});
 
 #define get_cmp_args_inter(T)  \
   const uint8_t a = fetch_reg();  \
@@ -73,17 +73,17 @@ void VM::dump_state() const
 
 #define get_push_args() \
   const uint8_t reg = fetch_reg();  \
-  print_op(opcode, reg, -1, -1, std::optional<int64_t>{});
+  print_op(opcode, reg, -1, -1, std::optional<int8_t>{});
 
 #define get_pop_args()  \
   const uint8_t reg = fetch_reg();  \
-  print_op(opcode, reg, -1, -1, std::optional<int64_t>{});
+  print_op(opcode, reg, -1, -1, std::optional<int8_t>{});
 
 void VM::run() const
 {
   while(true)
   {
-  
+  print_pc(pc);
   auto opcode = static_cast<OPCODE>(fetch_byte());
   switch(opcode)
   {
@@ -239,6 +239,33 @@ void VM::run() const
       get_pop_args()
       std::memcpy(&registers[reg].i, &stack[stack.size()-8], 8);
       stack.resize(stack.size() - 8);
+    }break;
+
+    // stack shape : ret_addr | args | function vars
+    case OPCODE::CALL:{
+      fetch_byte();
+      const auto addr_offset = fetch_value<uint32_t>();
+      const auto func_addr = fetch_value<size_t>();
+      print_op(OPCODE::CALL, -1, -1, -1, std::optional(addr_offset), std::optional(func_addr));
+
+
+      std::memcpy(&stack[stack.size() - addr_offset - 8], &pc, 8); 
+      // return address on the vars stack is pc (now pointing at next instruction)
+      pc = func_addr;
+    }break;
+
+    case OPCODE::RET:{
+      fetch_byte();
+      const auto func_stack_size = fetch_value<uint32_t>();
+
+      stack.resize(stack.size() - func_stack_size);
+
+      size_t ret_addr;
+      std::memcpy(&ret_addr, &stack[stack.size() - 8], 8);
+      stack.resize(stack.size() - 8);
+      pc = ret_addr;
+
+      print_op(OPCODE::RET, -1, -1, -1, std::optional(func_stack_size), std::optional(ret_addr));
     }break;
 
     case OPCODE::DMP:{

@@ -35,11 +35,15 @@ namespace pascal_vm
     STORE_D,
     STORE_B,
 
-    // Stack Operations (for intermediate values for functions)
+    // Stack Operations (from registers)
     PUSHB,
     PUSHQ,
     POPB,
     POPQ,
+
+    // Function Operations (stack shape : ret_addr | args | function vars)
+    CALL, // takes argument to unwind the stack
+    RET,  // takes function stack size
 
     // Arithmetic (Int)
     ADD_I,
@@ -117,6 +121,8 @@ namespace pascal_vm
     "PUSHQ",
     "POPB",
     "POPQ",
+    "CALL",
+    "RET",
     "ADD_I",
     "SUB_I",
     "MUL_I",
@@ -171,17 +177,26 @@ namespace pascal_vm
 
   inline const char* REG_NAMES[16] = {"R0","R1","R2","R3","R4","R5","R6","R7","R8","R9","R10","R11","R12","R13","R14","R15"};
 
-  template <typename T>
-  void print_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2, std::optional<T> val)
-  requires (std::integral<T> || std::floating_point<T>)
+  template <typename T, typename U = T>
+  void print_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2, std::optional<T> val1, std::optional<U> val2 = std::nullopt)
+  requires ((std::integral<T> || std::floating_point<T>) && (std::integral<U> || std::floating_point<U>))
   {
     if constexpr (!DEBUG_PRINT_OP) return;
-    std::cout << '\n' << std::left << std::setw(8) << OPCODE_NAMES[static_cast<uint8_t>(op)] << 
+    std::cout << std::left <<
+    std::setw(8) << OPCODE_NAMES[static_cast<uint8_t>(op)] << 
     std::setw(8) << (dest == 255 ? "NAN" : REG_NAMES[dest]) << 
     std::setw(8) << (src1 == 255 ? "NAN" : REG_NAMES[src1]) << 
     std::setw(8) << (src2 == 255 ? "NAN" : REG_NAMES[src2]) << std::setw(8);
-    if (val.has_value()) std::cout << val.value() << '\n';
+    if (val1.has_value()) std::cout << val1.value() << std::setw(8);
+    else std::cout << "NAN" << std::setw(8);
+    if (val2.has_value()) std::cout << val2.value() << '\n';
     else std::cout << "NAN" << '\n';
+  }
+
+  void print_pc(size_t pc)
+  {
+    if constexpr (DEBUG_PRINT_OP)
+      std::cout << std::left << std::setw(8) << pc;
   }
 
   template <typename Key, OPCODE Value>
@@ -249,7 +264,7 @@ namespace pascal_vm
     
     // Helper for Instructions
     template <typename T>
-    inline void add_value(T v) requires one_of<T, uint8_t, int8_t, int32_t, int64_t, uint64_t, double>
+    inline void add_value(T v) requires one_of<T, uint8_t, int8_t, int32_t, uint32_t, int64_t, uint64_t, double>
     {
       if constexpr (sizeof(T) == 1)
       {
@@ -266,7 +281,7 @@ namespace pascal_vm
 
     // Helper for vars
     template <typename T>
-    inline void add_var(T v) const requires one_of<T, uint8_t, int8_t, int32_t, int64_t, uint64_t, double>
+    inline void add_var(T v) const requires one_of<T, uint8_t, int8_t, int32_t, uint32_t, int64_t, uint64_t, double>
     {
       if constexpr (sizeof(T) == 1)
       {
@@ -411,6 +426,21 @@ namespace pascal_vm
       add_value(reg);
     }
 
+    inline void add_call(uint32_t addr_offset, size_t func_addr)
+    {
+      add_value(static_cast<uint8_t>(OPCODE::CALL));
+      add_value<uint8_t>(0);
+      add_value(addr_offset);
+      add_value(func_addr);
+    }
+
+    inline void add_ret(uint32_t func_stack_size)
+    {
+      add_value(static_cast<uint8_t>(OPCODE::RET));
+      add_value<uint8_t>(0);
+      add_value(func_stack_size);
+    }
+
   private:
 
     // Fetching
@@ -424,8 +454,8 @@ namespace pascal_vm
       return code[pc++];
     }
 
-    template <Type T>
-    inline T fetch_value() const
+    template <typename T>
+    inline T fetch_value() const requires one_of<T, bool, int8_t, int64_t, uint32_t, uint64_t, double>
     {
       T val;
       std::memcpy(&val, &code[pc], sizeof(T));
