@@ -6,6 +6,7 @@
 #include <array>
 #include <string>
 #include <optional>
+#include <algorithm>
 
 namespace pascal_vm
 {
@@ -35,8 +36,10 @@ namespace pascal_vm
     STORE_B,
 
     // Stack Operations (for intermediate values for functions)
-    PUSH,
-    POP,
+    PUSHB,
+    PUSHQ,
+    POPB,
+    POPQ,
 
     // Arithmetic (Int)
     ADD_I,
@@ -223,6 +226,7 @@ namespace pascal_vm
     mutable std::vector<uint8_t> stack; // Runtime Stack
     mutable Flags flags;
     mutable size_t pc = 0;
+    std::vector<size_t> jmp_locs;
 
   public:
     
@@ -230,6 +234,9 @@ namespace pascal_vm
 
     // Runtime Execution
     // void load_program(const std::vector<uint8_t> &bytecode);
+
+    size_t get_current_location() const {return code.size();}
+    std::vector<uint8_t>& data() const {return stack;}
 
     void run() const;
 
@@ -364,12 +371,23 @@ namespace pascal_vm
       }
     }
 
-    inline uint64_t add_jmp(OPCODE op, int32_t offset)
+    inline size_t add_jmp(OPCODE op)
     {
+      const size_t size = code.size();
+      jmp_locs.push_back(size);
       add_value(static_cast<uint8_t>(op));
       add_value<uint8_t>(0);
-      add_value(offset);
-      return code.size() - sizeof(offset);
+      add_value<int32_t>(0);
+      return size;
+    }
+
+    inline bool conf_jmp(size_t jmp, size_t loc)
+    {
+      if(jmp+6 > code.size() || loc > code.size()) return false;
+      if (!std::binary_search(jmp_locs.begin(), jmp_locs.end(), jmp)) return false;
+      const int32_t offset = -(int32_t)(jmp - loc) - 6;
+      std::memcpy(&code[jmp+2], &offset, sizeof(offset));
+      return true;
     }
 
     inline void add_dump()

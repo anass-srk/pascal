@@ -29,7 +29,7 @@ void VM::dump_state() const
   const uint8_t dest = fetch_reg(); \
   const uint8_t src1 = fetch_reg(); \
   const uint8_t src2 = fetch_reg(); \
-  print_op(opcode, dest, src1, src2, std::optional<int64_t>({}));
+  print_op(opcode, dest, src1, src2, std::optional<int64_t>{});
 
 #define get_op_args_inter(T)  \
   const uint8_t dest = fetch_reg(); \
@@ -42,7 +42,7 @@ void VM::dump_state() const
   const uint8_t a = fetch_reg();  \
   const uint8_t b = fetch_reg();  \
   fetch_byte(); \
-  print_op(opcode, a, b, -1, std::optional<int64_t>({}));
+  print_op(opcode, a, b, -1, std::optional<int64_t>{});
 
 #define get_cmp_args_inter(T)  \
   const uint8_t a = fetch_reg();  \
