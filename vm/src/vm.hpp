@@ -23,17 +23,14 @@ namespace pascal_vm
     NOP,
 
     // Load/Store
-    LOAD_I,
-    LOAD_D,
-    LOAD_B,
+    LOADQ,
+    LOADB,
     // Intermediate
-    LOADI_I,
-    LOADI_D,
-    LOADI_B,
+    LOADIQ,
+    LOADIB,
     MOV,
-    STORE_I,
-    STORE_D,
-    STORE_B,
+    STOREQ,
+    STOREB,
 
     // Stack Operations (from registers)
     PUSHB,
@@ -117,16 +114,13 @@ namespace pascal_vm
   inline const char* OPCODE_NAMES[] =
   {
     "NOP",
-    "LOAD_I",
-    "LOAD_D",
-    "LOAD_B",
-    "LOADI_I",
-    "LOADI_D",
-    "LOADI_B",
+    "LOADQ",
+    "LOADB",
+    "LOADIQ",
+    "LOADIB",
     "MOV",
-    "STORE_I",
-    "STORE_D",
-    "STORE_B",
+    "STOREQ",
+    "STOREB",
     "PUSHB",
     "PUSHQ",
     "POPB",
@@ -252,6 +246,7 @@ namespace pascal_vm
 
     size_t get_current_location() const {return code.size();}
     std::vector<uint8_t>& data() const {return stack;}
+    const RegValue& get_register(uint8_t i) const {return registers[i];};
 
     void run() const;
 
@@ -312,7 +307,6 @@ namespace pascal_vm
       add_value(addr);
     }
 
-    template <VarType T>
     void add_store(OPCODE op, uint8_t reg, uint64_t addr)
     {
       add_value(static_cast<uint8_t>(op));

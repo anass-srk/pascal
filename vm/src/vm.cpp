@@ -109,44 +109,32 @@ void VM::run() const
       print_op(opcode, dest, src, -1, std::optional<int8_t>{});
     }break;
 
-    case OPCODE::LOADI_I:{
-      get_load_args_inter(int64_t)
-      registers[reg].i = val;
+    case OPCODE::LOADIB:{
+      get_load_args_inter(uint8_t)
+      registers[reg].byte = val;
     }break;
-    case OPCODE::LOADI_B:{
-      get_load_args_inter(int8_t)
-      registers[reg].c = val;
-    }break;
-    case OPCODE::LOADI_D:{
-      get_load_args_inter(double)
-      registers[reg].d = val;
+    case OPCODE::LOADIQ:{
+      get_load_args_inter(uint64_t)
+      registers[reg].u = val;
     }break;
 
-    case OPCODE::LOAD_I:{
+    case OPCODE::LOADB:{
       get_load_args()
-      std::memcpy(&registers[reg].i, &stack[addr], 8);
+      std::memcpy(&registers[reg].byte, &stack[addr], 1);
     }break;
-    case OPCODE::LOAD_B:{
+    case OPCODE::LOADQ:{
       get_load_args()
-      std::memcpy(&registers[reg].c, &stack[addr], 1);
-    }break;
-    case OPCODE::LOAD_D:{
-      get_load_args()
-      std::memcpy(&registers[reg].d, &stack[addr], 8);
+      std::memcpy(&registers[reg].u, &stack[addr], 8);
     }break;
     
     
-    case OPCODE::STORE_I:{
+    case OPCODE::STOREB:{
       get_store_args()
-      std::memcpy(&stack[addr], &registers[reg].i, 8);
+      std::memcpy(&stack[addr], &registers[reg].byte, 1);
     }break;
-    case OPCODE::STORE_B:{
+    case OPCODE::STOREQ:{
       get_store_args()
-      std::memcpy(&stack[addr], &registers[reg].b, 1);
-    }break;
-    case OPCODE::STORE_D:{
-      get_store_args()
-      std::memcpy(&stack[addr], &registers[reg].d, 8);
+      std::memcpy(&stack[addr], &registers[reg].u, 8);
     }break;
     
     
