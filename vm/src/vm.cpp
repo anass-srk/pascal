@@ -90,7 +90,8 @@ void VM::dump_state() const
 
 void VM::run() const
 {
-  while(true)
+  bool running = true;
+  while (running)
   {
   print_pc(pc);
   auto opcode = static_cast<OPCODE>(fetch_byte());
@@ -326,11 +327,12 @@ void VM::run() const
       fetch_byte();
     }break;
     case OPCODE::HALT:{
-      exit(EXIT_SUCCESS);
+      running = false;
     }break;
-    default:
+    default:{
       std::cerr << "Invalid opcode : " << static_cast<int>(opcode) << "!!!\n";
-      exit(EXIT_FAILURE);
+      running = false;
+    }break;
   }
 
   }
