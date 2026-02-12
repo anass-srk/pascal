@@ -1,5 +1,5 @@
 add_executable(
-  unit_tests 
+  unit_tests_compiler
   ../src/Lexer.cpp
   Lexer.hpp
   ../src/Semantics.cpp
@@ -9,10 +9,10 @@ add_executable(
 )
 
 target_link_libraries(
-  unit_tests 
+  unit_tests_compiler 
   GTest::gtest_main
 )
 
 #Allows using Google test helper commands
 include(GoogleTest)
-gtest_discover_tests(unit_tests)
+gtest_discover_tests(unit_tests_compiler)
