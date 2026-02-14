@@ -188,7 +188,7 @@ void VM::run() const
     case OPCODE::CMPI_I:{
       get_cmp_args_inter(int64_t)
       flags.N = (registers[a].i < b);
-      flags.Z = (registers[b].i == b);
+      flags.Z = (registers[a].i == b);
     }break;
 
     case OPCODE::JMP:{
@@ -239,16 +239,12 @@ void VM::run() const
       stack.resize(stack.size() - 8);
     }break;
 
-    // stack shape : ret_addr | args | function vars
     case OPCODE::CALL:{
       fetch_byte();
-      const auto addr_offset = fetch_value<uint32_t>();
       const auto func_addr = fetch_value<size_t>();
-      print_op(OPCODE::CALL, -1, -1, -1, std::optional(addr_offset), std::optional(func_addr));
+      print_op(OPCODE::CALL, -1, -1, -1, std::optional(func_addr));
 
-
-      std::memcpy(&stack[stack.size() - addr_offset - 8], &pc, 8); 
-      // return address on the vars stack is pc (now pointing at next instruction)
+      add_var(pc); // return address on the vars stack is pc (now pointing at next instruction)
       pc = func_addr;
     }break;
 

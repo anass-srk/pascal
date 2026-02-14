@@ -78,7 +78,6 @@ namespace pascal_vm
     SUBI_D,
     MULI_D,
     DIVI_D,
-    MODI_D,
 
     // Comparison
     CMP_I,
@@ -155,7 +154,6 @@ namespace pascal_vm
     "SUBI_D",
     "MULI_D",
     "DIVI_D",
-    "MODI_D",
     "CMP_I",
     "CMP_D",
     "CMP_C",
@@ -406,11 +404,11 @@ namespace pascal_vm
       add_value(reg);
     }
 
-    inline void add_call(uint32_t addr_offset, size_t func_addr)
+    // stack shape : args | ret_addr | function vars
+    inline void add_call(size_t func_addr)
     {
       add_value(static_cast<uint8_t>(OPCODE::CALL));
       add_value<uint8_t>(0);
-      add_value(addr_offset);
       add_value(func_addr);
     }
 
