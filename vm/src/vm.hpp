@@ -28,9 +28,13 @@ namespace pascal_vm
     // Intermediate
     LOADIQ,
     LOADIB,
+    LOADLQ,
+    LOADLB,
     MOV,
     STOREQ,
     STOREB,
+    STORELQ,
+    STORELB,
 
     // Stack Operations (from registers)
     PUSHB,
@@ -117,9 +121,13 @@ namespace pascal_vm
     "LOADB",
     "LOADIQ",
     "LOADIB",
+    "LOADLQ",
+    "LOADLB",
     "MOV",
     "STOREQ",
     "STOREB",
+    "STORELQ",
+    "STORELB",
     "PUSHB",
     "PUSHQ",
     "POPB",
@@ -305,11 +313,27 @@ namespace pascal_vm
       add_value(addr);
     }
 
+    // offset < 0 to access arguments (-16 to skip both return address and saved old base pointer value)
+    // offset >= 0 to access function vars in the stack
+    void add_load_local(OPCODE op, uint8_t reg, int32_t offset)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(reg);
+      add_value((offset >= 0 ? offset : offset - 16));
+    }
+
     void add_store(OPCODE op, uint8_t reg, uint64_t addr)
     {
       add_value(static_cast<uint8_t>(op));
       add_value(reg);
       add_value(addr);
+    }
+
+    void add_store_local(OPCODE op, uint8_t reg, int32_t offset)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(reg);
+      add_value((offset >= 0 ? offset : offset - 16));
     }
 
     void add_mov(uint8_t dest, uint8_t src)
@@ -405,6 +429,7 @@ namespace pascal_vm
     }
 
     // stack shape : args | ret_addr | function vars
+    // pushes old base pointer value found in the last register
     inline void add_call(size_t func_addr)
     {
       add_value(static_cast<uint8_t>(OPCODE::CALL));

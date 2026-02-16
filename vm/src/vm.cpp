@@ -71,6 +71,16 @@ void VM::dump_state() const
   const uint64_t addr = fetch_addr();\
   print_op(opcode, reg, -1, -1, std::optional(addr));
 
+#define get_load_local_args() \
+  const uint8_t reg = fetch_reg();  \
+  const int32_t offset = fetch_offset();\
+  print_op(opcode, reg, -1, -1, std::optional(offset));
+
+#define get_store_local_args() \
+  const uint8_t reg = fetch_reg();  \
+  const int32_t offset = fetch_offset();\
+  print_op(opcode, reg, -1, -1, std::optional(offset));
+
 #define get_push_args() \
   const uint8_t reg = fetch_reg();  \
   print_op(opcode, reg, -1, -1, std::optional<int8_t>{});
@@ -127,6 +137,14 @@ void VM::run() const
       std::memcpy(&registers[reg].u, &stack[addr], 8);
     }break;
     
+    case OPCODE::LOADLB:{
+      get_load_local_args()
+      std::memcpy(&registers[reg].byte, &stack[registers[NUM_REGISTERS-1].u + offset], 1);
+    }break;
+    case OPCODE::LOADLQ:{
+      get_load_local_args()
+      std::memcpy(&registers[reg].u, &stack[registers[NUM_REGISTERS-1].u + offset], 8);
+    }break;
     
     case OPCODE::STOREB:{
       get_store_args()
@@ -135,6 +153,15 @@ void VM::run() const
     case OPCODE::STOREQ:{
       get_store_args()
       std::memcpy(&stack[addr], &registers[reg].u, 8);
+    }break;
+
+    case OPCODE::STORELB:{
+      get_store_local_args()
+      std::memcpy(&stack[registers[NUM_REGISTERS-1].u + offset], &registers[reg].byte, 1);
+    }break;
+    case OPCODE::STORELQ:{
+      get_store_local_args()
+      std::memcpy(&stack[registers[NUM_REGISTERS-1].u + offset], &registers[reg].u, 8);
     }break;
     
     
@@ -242,10 +269,12 @@ void VM::run() const
     case OPCODE::CALL:{
       fetch_byte();
       const auto func_addr = fetch_value<size_t>();
-      print_op(OPCODE::CALL, -1, -1, -1, std::optional(func_addr));
+      print_op(OPCODE::CALL, -1, -1, -1, std::optional(func_addr), std::optional(registers[NUM_REGISTERS-1].u));
 
       add_var(pc); // return address on the vars stack is pc (now pointing at next instruction)
       pc = func_addr;
+      add_var(registers[NUM_REGISTERS-1].u);
+      registers[NUM_REGISTERS-1].u = stack.size();
     }break;
 
     case OPCODE::RET:{
@@ -254,9 +283,11 @@ void VM::run() const
 
       stack.resize(stack.size() - func_stack_size);
 
+      std::memcpy(&registers[NUM_REGISTERS-1], &stack[stack.size() - 8], 8);
+
       size_t ret_addr;
-      std::memcpy(&ret_addr, &stack[stack.size() - 8], 8);
-      stack.resize(stack.size() - 8);
+      std::memcpy(&ret_addr, &stack[stack.size() - 16], 8);
+      stack.resize(stack.size() - 16);
       pc = ret_addr;
 
       print_op(OPCODE::RET, -1, -1, -1, std::optional(func_stack_size), std::optional(ret_addr));
