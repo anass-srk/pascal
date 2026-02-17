@@ -253,6 +253,7 @@ namespace pascal_vm
     size_t get_current_location() const {return code.size();}
     std::vector<uint8_t>& data() const {return stack;}
     const RegValue& get_register(uint8_t i) const {return registers[i];};
+    Flags get_flags() const {return flags;}
 
     void run() const;
 

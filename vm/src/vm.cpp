@@ -294,6 +294,28 @@ void VM::run() const
       flags.Z = (registers[a].i == b);
     }break;
 
+    case OPCODE::CMP_C:{
+      get_cmp_args()
+      flags.N = (registers[a].c < registers[b].c);
+      flags.Z = (registers[a].c == registers[b].c);
+    }break;
+    case OPCODE::CMPI_C:{
+      get_cmp_args_inter(int8_t)
+      flags.N = (registers[a].c < b);
+      flags.Z = (registers[a].c == b);
+    }break;
+
+    case OPCODE::CMP_D:{
+      get_cmp_args()
+      flags.N = (registers[a].d < registers[b].d);
+      flags.Z = (registers[a].d == registers[b].d);
+    }break;
+    case OPCODE::CMPI_D:{
+      get_cmp_args_inter(double)
+      flags.N = (registers[a].d < b);
+      flags.Z = (registers[a].d == b);
+    }break;
+
     case OPCODE::JMP:{
       get_jmp_args()
       pc += offset;

@@ -235,6 +235,78 @@ TEST(VMTest, AllArithmeticOps)
   }
 }
 
+TEST(VMTest, CmpOps)
+{
+  auto test1 = []<typename T>(OPCODE op, T a, T b)
+  {
+    VM vm;
+
+    constexpr auto loadi = (sizeof(T) > 1 ? OPCODE::LOADIQ : OPCODE::LOADIB);
+
+    vm.add_load_inter(loadi, 0, a);
+    vm.add_load_inter(loadi, 1, b);
+
+    vm.add_cmp(op, 0, 1);
+
+    vm.add_halt();
+    vm.run();
+    return vm.get_flags();
+  };
+
+  auto test2 = []<typename T>(OPCODE op, T a, T b)
+  {
+    VM vm;
+
+    constexpr auto loadi = (sizeof(T) > 1 ? OPCODE::LOADIQ : OPCODE::LOADIB);
+    constexpr auto load = (sizeof(T) > 1 ? OPCODE::LOADQ : OPCODE::LOADB);
+
+    vm.add_load_inter(loadi, 0, a);
+
+    vm.add_cmp_inter(op, 0, b);
+
+    vm.add_halt();
+    vm.run();
+    return vm.get_flags();
+  };
+
+  auto test = [&]<typename T>(T a, T b, Flags f)
+  {
+    auto cmp = OPCODE::CMP_I;
+    auto cmpi = OPCODE::CMPI_I;
+
+    if(std::is_same_v<T, double>)
+    {
+      cmp = OPCODE::CMP_D;
+      cmpi = OPCODE::CMPI_D;
+    }
+    else if (std::is_same_v<T, int8_t>)
+    {
+      cmp = OPCODE::CMP_C;
+      cmpi = OPCODE::CMPI_C;
+    }
+
+    auto f1 = test1(cmp, a, b);
+    auto f2 = test2(cmpi, a, b);
+    
+    ASSERT_EQ(f1.N, f2.N);
+    ASSERT_EQ(f1.Z, f2.Z);
+    ASSERT_EQ(f1.N, f.N);
+    ASSERT_EQ(f1.Z, f.Z);
+  };
+
+  test((int64_t)5, (int64_t)5, Flags{.Z=true, .N=false});
+  test((int64_t)-1, (int64_t)5, Flags{.Z=false, .N=true});
+  test((int64_t)-1, (int64_t)-10, Flags{.Z=false, .N=false});
+  
+  test((double)5, (double)5, Flags{.Z=true, .N=false});
+  test((double)-1, (double)5, Flags{.Z=false, .N=true});
+  test((double)-1, (double)-10, Flags{.Z=false, .N=false});
+
+  test((int8_t)5, (int8_t)5, Flags{.Z=true, .N=false});
+  test((int8_t)-1, (int8_t)5, Flags{.Z=false, .N=true});
+  test((int8_t)-1, (int8_t)-10, Flags{.Z=false, .N=false});
+}
+
 // Test Control Flow (Jumps)
 TEST(VMTest, ControlFlowJumps)
 {
