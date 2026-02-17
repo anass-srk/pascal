@@ -169,6 +169,70 @@ TEST(VMTest, AllArithmeticOps)
     ASSERT_EQ(vm.get_register(11).i, 1);
   }
 
+  // --- Double Arithmetic ---
+  {
+    VM vm;
+
+    vm.add_load_inter(OPCODE::LOADIQ, 0, 10.0);
+    vm.add_load_inter(OPCODE::LOADIQ, 1, 4.0);
+
+    vm.add_op(OPCODE::ADD_D, 2, 0, 1); // 10.0 + 4.0 = 14.0
+    vm.add_op(OPCODE::SUB_D, 3, 0, 1); // 10.0 - 4.0 = 6.0
+    vm.add_op(OPCODE::MUL_D, 4, 0, 1); // 10.0 * 4.0 = 40.0
+    vm.add_op(OPCODE::DIV_D, 5, 0, 1); // 10.0 / 4.0 = 2.5
+
+    vm.add_op_inter(OPCODE::ADDI_D, 7, 0, 5.0);  // 10.0 + 5.0 = 15.0
+    vm.add_op_inter(OPCODE::SUBI_D, 8, 0, 5.0);  // 10.0 - 5.0 = 5.0
+    vm.add_op_inter(OPCODE::MULI_D, 9, 0, 2.0);  // 10.0 * 2.0 = 20.0
+    vm.add_op_inter(OPCODE::DIVI_D, 10, 0, 2.5); // 10.0 / 2.5 = 4.0
+
+    vm.add_halt();
+    vm.run();
+
+    ASSERT_DOUBLE_EQ(vm.get_register(2).d, 14.0);
+    ASSERT_DOUBLE_EQ(vm.get_register(3).d, 6.0);
+    ASSERT_DOUBLE_EQ(vm.get_register(4).d, 40.0);
+    ASSERT_DOUBLE_EQ(vm.get_register(5).d, 2.5);
+
+    ASSERT_DOUBLE_EQ(vm.get_register(7).d, 15.0);
+    ASSERT_DOUBLE_EQ(vm.get_register(8).d, 5.0);
+    ASSERT_DOUBLE_EQ(vm.get_register(9).d, 20.0);
+    ASSERT_DOUBLE_EQ(vm.get_register(10).d, 4.0);
+  }
+
+  // --- Char Arithmetic ---
+  {
+    VM vm;
+    vm.add_load_inter(OPCODE::LOADIB, 0, (int8_t)10);
+    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)3);
+
+    vm.add_op(OPCODE::ADD_C, 2, 0, 1); // 10 + 3 = 13
+    vm.add_op(OPCODE::SUB_C, 3, 0, 1); // 10 - 3 = 7
+    vm.add_op(OPCODE::MUL_C, 4, 0, 1); // 10 * 3 = 30
+    vm.add_op(OPCODE::DIV_C, 5, 0, 1); // 10 / 3 = 3
+    vm.add_op(OPCODE::MOD_C, 6, 0, 1); // 10 % 3 = 1
+
+    vm.add_op_inter(OPCODE::ADDI_C, 7, 0, (int8_t)5); // 10 + 5 = 15
+    vm.add_op_inter(OPCODE::SUBI_C, 8, 0, (int8_t)5); // 10 - 5 = 5
+    vm.add_op_inter(OPCODE::MULI_C, 9, 0, (int8_t)5); // 10 * 5 = 50
+    vm.add_op_inter(OPCODE::DIVI_C, 10, 0, (int8_t)4); // 10 / 4 = 2
+    vm.add_op_inter(OPCODE::MODI_C, 11, 0, (int8_t)6);  // 10 % 6 = 4
+
+    vm.add_halt();
+    vm.run();
+
+    ASSERT_EQ(vm.get_register(2).c, 13);
+    ASSERT_EQ(vm.get_register(3).c, 7);
+    ASSERT_EQ(vm.get_register(4).c, 30);
+    ASSERT_EQ(vm.get_register(5).c, 3);
+    ASSERT_EQ(vm.get_register(6).c, 1);
+
+    ASSERT_EQ(vm.get_register(7).c, 15);
+    ASSERT_EQ(vm.get_register(8).c, 5);
+    ASSERT_EQ(vm.get_register(9).c, 50);
+    ASSERT_EQ(vm.get_register(10).c, 2);
+    ASSERT_EQ(vm.get_register(11).c, 4);
+  }
 }
 
 // Test Control Flow (Jumps)

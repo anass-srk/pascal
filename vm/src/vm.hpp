@@ -231,7 +231,7 @@ namespace pascal_vm
       uint64_t u;
       int64_t i;
       double d;
-      char c;
+      int8_t c;
       bool b;
       uint8_t byte;
     };

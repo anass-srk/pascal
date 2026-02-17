@@ -207,6 +207,82 @@ void VM::run() const
       registers[dest].i = registers[src].i % val;
     }break;
 
+    case OPCODE::ADD_C:{
+      get_op_args()
+      registers[dest].c = registers[src1].c + registers[src2].c;
+    }break;
+    case OPCODE::SUB_C:{
+      get_op_args()
+      registers[dest].c = registers[src1].c - registers[src2].c;
+    }break;
+    case OPCODE::MUL_C:{
+      get_op_args()
+      registers[dest].c = registers[src1].c * registers[src2].c;
+    }break;
+    case OPCODE::DIV_C:{
+      get_op_args()
+      registers[dest].c = registers[src1].c / registers[src2].c;
+    }break;
+    case OPCODE::MOD_C:{
+      get_op_args()
+      registers[dest].c = registers[src1].c % registers[src2].c;
+    }break;
+
+    case OPCODE::ADD_D:{
+      get_op_args()
+      registers[dest].d = registers[src1].d + registers[src2].d;
+    }break;
+    case OPCODE::SUB_D:{
+      get_op_args()
+      registers[dest].d = registers[src1].d - registers[src2].d;
+    }break;
+    case OPCODE::MUL_D:{
+      get_op_args()
+      registers[dest].d = registers[src1].d * registers[src2].d;
+    }break;
+    case OPCODE::DIV_D:{
+      get_op_args()
+      registers[dest].d = registers[src1].d / registers[src2].d;
+    }break;
+
+    case OPCODE::ADDI_C:{
+      get_op_args_inter(int8_t)
+      registers[dest].c = registers[src].c + val;
+    }break;
+    case OPCODE::SUBI_C:{
+      get_op_args_inter(int8_t)
+      registers[dest].c = registers[src].c - val;
+    }break;
+    case OPCODE::MULI_C:{
+      get_op_args_inter(int8_t)
+      registers[dest].c = registers[src].c * val;
+    }break;
+    case OPCODE::DIVI_C:{
+      get_op_args_inter(int8_t)
+      registers[dest].c = registers[src].c / val;
+    }break;
+    case OPCODE::MODI_C:{
+      get_op_args_inter(int8_t)
+      registers[dest].c = registers[src].c % val;
+    }break;
+
+    case OPCODE::ADDI_D:{
+      get_op_args_inter(double)
+      registers[dest].d = registers[src].d + val;
+    }break;
+    case OPCODE::SUBI_D:{
+      get_op_args_inter(double)
+      registers[dest].d = registers[src].d - val;
+    }break;
+    case OPCODE::MULI_D:{
+      get_op_args_inter(double)
+      registers[dest].d = registers[src].d * val;
+    }break;
+    case OPCODE::DIVI_D:{
+      get_op_args_inter(double)
+      registers[dest].d = registers[src].d / val;
+    }break;
+
     case OPCODE::CMP_I:{
       get_cmp_args()
       flags.N = (registers[a].i < registers[b].i);
