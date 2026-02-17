@@ -436,3 +436,151 @@ TEST(VMTest, IO_Ops)
   // Verify Writes
   ASSERT_EQ(output.str(), "423.14zhello");
 }
+
+// Test basic CALL and RET: a function that does nothing .
+TEST(VMTest, CallRetSimple)
+{
+  VM vm;
+
+  // Jump over the function
+  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+
+  // --- Function code (does nothing) ---
+  size_t func_addr = vm.get_current_location();
+  vm.add_ret(0);
+
+  // --- Main code ---
+  vm.conf_jmp(jmp_to_main, vm.get_current_location());
+
+  // Set last register (R15) to a known value (101) to verify it is restored
+  vm.add_load_inter(OPCODE::LOADIQ, VM::NUM_REGISTERS-1, (uint64_t)101);
+
+  vm.add_call(func_addr);
+  vm.add_halt();
+
+  vm.run();
+
+  // After return, R15 should be restored to its original value (100)
+  ASSERT_EQ(vm.get_register(15).u, 101);
+  // Stack should be empty (no arguments, no locals)
+  ASSERT_EQ(vm.data().size(), 0);
+}
+
+// Test function with a local variables + cleanup.
+TEST(VMTest, CallRetWithLocals)
+{
+  VM vm;
+
+  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+
+  // --- Function code ---
+  size_t func_addr = vm.get_current_location();
+  // Allocate 9 bytes
+  vm.add_push(OPCODE::PUSHQ, 0);
+  vm.add_push(OPCODE::PUSHB, 0);
+  
+  vm.add_load_inter(OPCODE::LOADIQ, 1, (int64_t)42);
+  vm.add_store_local(OPCODE::STORELQ, 1, 0);
+  vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'A');
+  vm.add_store_local(OPCODE::STORELB, 1, 8);
+
+  vm.add_load_local(OPCODE::LOADLQ, 2, 0);
+  vm.add_load_local(OPCODE::LOADLB, 3, 8);
+
+  // Return, cleaning up the local variables (8 bytes)
+  vm.add_ret(9);
+
+  // --- Main code ---
+  vm.conf_jmp(jmp_to_main, vm.get_current_location());
+
+  vm.add_call(func_addr);
+  vm.add_halt();
+
+  vm.run();
+
+  ASSERT_EQ(vm.get_register(2).i, 42);
+  ASSERT_EQ(vm.get_register(3).c, 'A');
+
+  ASSERT_EQ(vm.data().size(), 0);
+}
+
+// Test function that accesses arguments.
+TEST(VMTest, CallRetWithArgs)
+{
+  VM vm;
+
+  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+
+  // --- Function code ---
+  size_t func_addr = vm.get_current_location();
+  // Expects two arguments (8 byte + 1 byte).
+  vm.add_load_local(OPCODE::LOADLQ, 1, -8); // first argument
+  vm.add_load_local(OPCODE::LOADLB, 2, -9); // second argument
+  vm.add_op(OPCODE::ADD_I, 0, 1, 2);        // R0 = arg1 + arg2
+  vm.add_ret(0);                            // no locals
+
+  // --- Main code ---
+  size_t main_start = vm.get_current_location();
+  vm.conf_jmp(jmp_to_main, main_start);
+
+  // Push arguments in reverse order
+  vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)5);
+  vm.add_push(OPCODE::PUSHB, 1);
+  vm.add_load_inter(OPCODE::LOADIQ, 2, (int64_t)10);
+  vm.add_push(OPCODE::PUSHQ, 2);
+
+  vm.add_call(func_addr);
+
+  // After return, arguments remain on stack
+  vm.add_pop(OPCODE::POPQ, 3); // pop 10
+  vm.add_pop(OPCODE::POPB, 4); // pop 5
+  vm.add_halt();
+
+  vm.run();
+
+  ASSERT_EQ(vm.get_register(0).i, 15); // 10 + 5
+  ASSERT_EQ(vm.data().size(), 0);      // stack empty after pops
+}
+
+// Test nested calls: main => func1 => func2
+TEST(VMTest, NestedCalls)
+{
+  VM vm;
+
+  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+
+  // --- Function 2 (doubles its argument) ---
+  size_t func2_addr = vm.get_current_location();
+  vm.add_load_local(OPCODE::LOADLQ, 1, -8); // argument
+  vm.add_op_inter(OPCODE::MULI_I, 0, 1, (int64_t)2);
+  vm.add_ret(0);
+
+  // --- Function 1 (calls func2, then adds 5) ---
+  size_t func1_addr = vm.get_current_location();
+  // Push argument for func2 (the same argument we received)
+  vm.add_load_local(OPCODE::LOADLQ, 1, -8); // argument
+  vm.add_push(OPCODE::PUSHQ, 1);
+  vm.add_call(func2_addr);
+  // Pop the argument after return and discard it
+  vm.add_pop(OPCODE::POPQ, 2);
+  // Add 5 to result
+  vm.add_op_inter(OPCODE::ADDI_I, 0, 0, (int64_t)5);
+  vm.add_ret(0);
+
+  // --- Main code ---
+  vm.conf_jmp(jmp_to_main, vm.get_current_location());
+
+  // Push argument for func1
+  vm.add_load_inter(OPCODE::LOADIQ, 1, (int64_t)7);
+  vm.add_push(OPCODE::PUSHQ, 1);
+  vm.add_call(func1_addr);
+  // Pop argument
+  vm.add_pop(OPCODE::POPQ, 2);
+  vm.add_halt();
+
+  vm.run();
+
+  // Expected: (7 * 2) + 5 = 19
+  ASSERT_EQ(vm.get_register(0).i, 19);
+  ASSERT_EQ(vm.data().size(), 0);
+}
