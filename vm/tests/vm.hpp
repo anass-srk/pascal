@@ -584,3 +584,119 @@ TEST(VMTest, NestedCalls)
   ASSERT_EQ(vm.get_register(0).i, 19);
   ASSERT_EQ(vm.data().size(), 0);
 }
+
+// Tests for MODSTK (stack modification)
+TEST(VMTest, StackOps)
+{
+
+  // Test MODSTK with positive size: allocate extra stack space, store/load values
+  {
+    VM vm;
+  
+    // Initially stack is empty
+    ASSERT_EQ(vm.data().size(), 0);
+  
+    // Allocate 16 bytes
+    vm.add_mod_stack(16);
+  
+    // Write some data
+    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)999);
+    vm.add_store(OPCODE::STOREQ, 0, 0);
+    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'X');
+    vm.add_store(OPCODE::STOREB, 1, 8);
+  
+    vm.add_load(OPCODE::LOADQ, 2, 0);
+    vm.add_load(OPCODE::LOADB, 3, 8);
+  
+    vm.add_halt();
+    vm.run();
+  
+    // Verify stack size (should still be 16)
+    ASSERT_EQ(vm.data().size(), 16);
+  
+    // Verify loaded values
+    ASSERT_EQ(vm.get_register(0).i, 999);
+    ASSERT_EQ(vm.get_register(1).c, 'X');
+    ASSERT_EQ(vm.get_register(2).i, 999);
+    ASSERT_EQ(vm.get_register(3).c, 'X');
+  }
+  
+  // Test MODSTK with negative size: shrink the stack, then push/pop at new top
+  {
+    VM vm;
+  
+    vm.add_mod_stack(24);
+  
+    // Write some data at various offsets
+    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)100);
+    vm.add_store(OPCODE::STOREQ, 0, 0);
+    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'w');
+    vm.add_store(OPCODE::STOREB, 1, 8);
+    vm.add_load_inter(OPCODE::LOADIB, 2, (int8_t)'A');
+    vm.add_store(OPCODE::STOREB, 2, 9);
+  
+    // Now shrink by 15 bytes
+    vm.add_mod_stack(-15);
+  
+    vm.add_load_inter(OPCODE::LOADIQ, 3, (int64_t)300);
+    vm.add_push(OPCODE::PUSHQ, 3);
+  
+    vm.add_pop(OPCODE::POPQ, 4);
+  
+    vm.add_load(OPCODE::LOADQ, 5, 0);
+    vm.add_load(OPCODE::LOADB, 6, 8);
+  
+    vm.add_halt();
+    vm.run();
+  
+    // Final stack size should be 9
+    ASSERT_EQ(vm.data().size(), 9);
+  
+    // Verify data
+    ASSERT_EQ(vm.get_register(0).i, 100);
+    ASSERT_EQ(vm.get_register(1).c, 'w');
+    ASSERT_EQ(vm.get_register(2).c, 'A');
+    ASSERT_EQ(vm.get_register(3).i, 300);
+  
+    ASSERT_EQ(vm.get_register(4).i, 300);
+    ASSERT_EQ(vm.get_register(5).i, 100);
+    ASSERT_EQ(vm.get_register(6).c, 'w');
+  }
+  
+  // Test MODSTK with zero size: no change
+  {
+    VM vm;
+  
+    vm.add_push(OPCODE::PUSHQ, 0);
+  
+    vm.add_mod_stack(0); // should do nothing
+  
+    vm.add_pop(OPCODE::POPQ, 0);
+    vm.add_halt();
+    vm.run();
+  
+    ASSERT_EQ(vm.data().size(), 0);
+  }
+  
+  // Test multiple MODSTK operations in sequence
+  {
+    VM vm;
+  
+    // Start empty
+    vm.add_mod_stack(10);  // size = 10
+    vm.add_mod_stack(5);   // size = 15
+    vm.add_mod_stack(-3);  // size = 12
+    vm.add_mod_stack(-12); // size = 0
+  
+    // Push a value to verify stack is usable
+    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)42);
+    vm.add_push(OPCODE::PUSHQ, 0);
+    vm.add_pop(OPCODE::POPQ, 1);
+    vm.add_halt();
+    vm.run();
+  
+    ASSERT_EQ(vm.data().size(), 0);
+    ASSERT_EQ(vm.get_register(1).i, 42);
+  }
+
+}

@@ -45,6 +45,7 @@ namespace pascal_vm
     // Function Operations (stack shape : ret_addr | args | function vars)
     CALL, // takes argument to unwind the stack
     RET,  // takes function stack size
+    MODSTK,
 
     // Arithmetic (Int)
     ADD_I,
@@ -134,6 +135,7 @@ namespace pascal_vm
     "POPQ",
     "CALL",
     "RET",
+    "MODSTK",
     "ADD_I",
     "SUB_I",
     "MUL_I",
@@ -226,7 +228,10 @@ namespace pascal_vm
   // --- The Virtual Machine ---
   class VM
   {
+  public:
     static constexpr size_t NUM_REGISTERS = 16;
+  
+  private:
     using RegValue = union {
       uint64_t u;
       int64_t i;
@@ -443,6 +448,13 @@ namespace pascal_vm
       add_value(static_cast<uint8_t>(OPCODE::RET));
       add_value<uint8_t>(0);
       add_value(func_stack_size);
+    }
+
+    inline void add_mod_stack(int32_t size)
+    {
+      add_value(static_cast<uint8_t>(OPCODE::MODSTK));
+      add_value<uint8_t>(0);
+      add_value(size);
     }
 
     inline void add_read(OPCODE opcode, uint8_t reg)

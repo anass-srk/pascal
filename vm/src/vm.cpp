@@ -391,6 +391,15 @@ void VM::run() const
       print_op(OPCODE::RET, -1, -1, -1, std::optional(func_stack_size), std::optional(ret_addr));
     }break;
 
+    case OPCODE::MODSTK:{
+      fetch_byte();
+      const auto size = fetch_value<int32_t>();
+
+      print_op(OPCODE::MODSTK, -1, -1, -1, std::optional(stack.size()), std::optional(size));
+
+      stack.resize(stack.size() + size);
+    }break;
+
     case OPCODE::READ_I:{
       get_io_args()
       std::cin >> registers[reg].i;
