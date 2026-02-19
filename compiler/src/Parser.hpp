@@ -68,7 +68,7 @@ public:
   void label_declaration();
   void const_definition();
   void type_definition();
-  void variable_definition();
+  void variable_declaration();
   void procedure_definition();
   void function_definition();
 

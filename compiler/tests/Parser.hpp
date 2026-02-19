@@ -499,3 +499,118 @@ TEST(ParserTest, Records){
   }
 
 }
+
+TEST(ParserTest, Variables)
+{
+  // single variable
+  {
+    std::string program = R"(
+      program Test;
+      var x : Int;
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    auto &vars = parser.m_current_block->m_vars;
+    ASSERT_EQ(vars.size(), 1);
+    auto it = vars.find("x");
+    ASSERT_NE(it, vars.end());
+    const Var &var = it->second;
+    EXPECT_EQ(var.m_name, "x");
+    EXPECT_EQ(var.m_type->m_name, "Int");
+    EXPECT_EQ(var.m_type->m_type, TYPE_CAT::TC_BASIC);
+  }
+
+  // Multiple variables
+  {
+    std::string program = R"(
+      program Test;
+      var
+        x, y : Int;
+        a : Int;
+        b : Real;
+        c : Char;
+        d : Bool;
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    auto &vars = parser.m_current_block->m_vars;
+    ASSERT_EQ(vars.size(), 6);
+
+    auto test = [&](std::initializer_list<std::pair<std::string_view, std::string_view>> l){
+      for(const auto [name, type] : l){
+        auto it = vars.find(name);
+        ASSERT_NE(it, vars.end());
+        EXPECT_EQ(it->second.m_type->m_name, type);
+      }
+    };
+
+    test(
+      {
+        {"x", "Int"},
+        {"y", "Int"},
+        {"a", "Int"},
+        {"b", "Real"},
+        {"c", "Char"},
+        {"d", "Bool"},
+      }
+    );
+  }
+
+  // In-place type definitions
+  {
+    std::string program = R"(
+        program Test;
+        var
+          arr : array[1..10] of Int;
+          rec : record
+            f1 : Int;
+            f2 : Char;
+            end;
+        type color = (red, green, blue);
+        var c : color;
+        .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const auto *block = parser.m_current_block;
+
+    auto &vars = block->m_vars;
+    ASSERT_EQ(vars.size(), 3);
+
+    const Type *type = vars.at("arr").m_type;
+    ASSERT_EQ(type->m_type, TYPE_CAT::TC_ARRAY);
+    const Array *arrType = static_cast<const Array *>(type);
+
+    ASSERT_EQ(arrType->m_itypes.size(), 1);
+    const Type *idxType = arrType->m_itypes[0];
+    ASSERT_EQ(idxType->m_type, TYPE_CAT::TC_SUBRANGE);
+    const Subrange *sub = static_cast<const Subrange *>(idxType);
+    EXPECT_EQ(sub->m_beg, 1);
+    EXPECT_EQ(sub->m_end, 10);
+    EXPECT_EQ(sub->m_cat, CONST_CAT::CC_INT);
+
+    const Type *elemType = arrType->m_etype;
+    EXPECT_EQ(elemType->m_name, "Int");
+    EXPECT_EQ(elemType->m_type, TYPE_CAT::TC_BASIC);
+
+    type = vars.at("rec").m_type;
+    ASSERT_EQ(type->m_type, TYPE_CAT::TC_RECORD);
+    const Record *recType = static_cast<const Record *>(type);
+
+    EXPECT_EQ(recType->m_members.at("f1").m_type->m_name, "Int");
+    EXPECT_EQ(recType->m_members.at("f2").m_type->m_name, "Char");
+
+    type = vars.at("c").m_type;
+    ASSERT_EQ(type->m_type, TYPE_CAT::TC_ENUM);
+    EXPECT_EQ(type->m_name, "color");
+
+    EXPECT_EQ(block->m_enums_vals.at("red").m_value, 0);
+    EXPECT_EQ(block->m_enums_vals.at("green").m_value, 1);
+    EXPECT_EQ(block->m_enums_vals.at("blue").m_value, 2);
+  }
+}

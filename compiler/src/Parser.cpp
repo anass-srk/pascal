@@ -81,10 +81,10 @@ void Parser::declaration()
   {
     type_definition();
   }
-  // else if(check(TOKEN_TYPE::VAR_TOKEN))
-  // {
-  //   variable_definition();
-  // }
+  if(check(TOKEN_TYPE::VAR_TOKEN))
+  {
+    variable_declaration();
+  }
   // else if(check(TOKEN_TYPE::PROCEDURE_TOKEN))
   // {
   //   procedure_definition();
@@ -660,6 +660,25 @@ std::vector<Const> Parser::case_label_list(){
   }
 
   return v;
+}
+
+void Parser::variable_declaration()
+{
+  adv();
+  do{
+    const auto names = id_list();
+    match(TOKEN_TYPE::COLON_TOKEN);
+    adv();
+    const auto type = get_type(m_lexer.getToken(), false);
+    match_adv(TOKEN_TYPE::SEMI_TOKEN);
+    adv();
+
+    for (const auto &name : names){
+      m_current_block->check_used_id(name);
+      m_current_block->m_vars[name.m_id] = (Var){name.m_id, name.m_line, name.m_col, type};
+    }
+    
+  }while(check(TOKEN_TYPE::ID_TOKEN));
 }
 
 void Parser::statement()
