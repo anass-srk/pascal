@@ -3,151 +3,242 @@
 
 namespace pascal_compiler
 {
-
-struct SourceLocation
+struct SourceLocation 
 {
-  size_t line, col;
+  size_t line = 0;
+  size_t column = 0;
 };
 
-class AstNode
+struct AstNode 
 {
-public:
   SourceLocation loc;
-  AstNode(SourceLocation loc = SourceLocation{.line=0, .col=0}) : loc(loc) {};
   virtual ~AstNode() = default;
 };
 
-class LiteralExpression : public AstNode
+// Expressions
+struct Expression : public AstNode 
 {
-public:
+  Expression(SourceLocation loc = SourceLocation{.line = 0,.column = 0}) { this->loc = loc; }
+  const Type* exprType = nullptr;
+};
+
+struct LiteralExpression : public Expression 
+{
   Const value;
-  LiteralExpression(Const c, SourceLocation loc) : AstNode(loc), value(std::move(c)) {}
+  LiteralExpression(Const&& c, SourceLocation loc) : Expression(loc), value(std::move(c)) {}
 };
 
-class IdentifierExpression : public AstNode
+// Identifier reference – can be a variable, constant, enum value, or function name.
+struct IdentifierExpression : public Expression 
 {
-public:
   std::string_view name;
+  std::variant<const Var*, const Const*, const EnumValue*, const Function*> symbol;
 
-  // one is non-null
-  const Const *constant = nullptr;
-  const EnumValue *enumValue = nullptr;
-  const Var *variable = nullptr;
-  const Function *function = nullptr;
+  template<typename T>
+  IdentifierExpression(std::string_view id, T* sym, SourceLocation loc)
+    : Expression(loc), name(id), symbol(sym) {}
 
-  IdentifierExpression(std::string_view n, SourceLocation loc) : AstNode(loc), name(n) {}
+  enum struct Kind { Var, Const, Enum, Func };
+  Kind getKind() const {
+    if (std::holds_alternative<const Var*>(symbol)) return Kind::Var;
+    if (std::holds_alternative<const Const*>(symbol)) return Kind::Const;
+    if (std::holds_alternative<const EnumValue*>(symbol)) return Kind::Enum;
+    return Kind::Func;
+  }
 };
 
-enum class UnaryOp { Plus, Minus, Not};
-enum class BinaryOp {
-  Eq, Ne, Lt, Le, Gt, Ge,   // relational
-  Add, Sub, Or,              // addition
-  Mul, Div, DivInt, And       // multiplication
-};
+// Unary operations (+, -, not)
+enum struct UnaryOp { Plus, Minus, Not };
 
-class UnaryExpression : public AstNode
+struct UnaryExpression : public Expression 
 {
-public:
   UnaryOp op;
-  std::unique_ptr<AstNode> operand;
-  const Type *resultType = nullptr; // set during type checking
-  UnaryExpression(UnaryOp o, std::unique_ptr<AstNode> e, SourceLocation loc) 
-    : AstNode(loc), op(o), operand(std::move(e)) {}
+  std::unique_ptr<Expression> operand;
+
+  UnaryExpression(UnaryOp o, std::unique_ptr<Expression> e, SourceLocation loc)
+    : op(o), operand(std::move(e)) { this->loc = loc; }
 };
 
-class BinaryExpression : public AstNode
+// Binary operations
+enum struct BinaryOp 
 {
-public:
+  Eq, Ne, Lt, Le, Gt, Ge, // relational
+  Add, Sub, Or, // addition
+  Mul, Div, DivInt, And // multiplication
+};
+
+struct BinaryExpression : public Expression 
+{
   BinaryOp op;
-  std::unique_ptr<AstNode> left, right;
-  const Type *resultType = nullptr;
-  BinaryExpression(BinaryOp o, std::unique_ptr<AstNode> l, std::unique_ptr<AstNode> r, SourceLocation loc)
-    : AstNode(loc), op(o), left(std::move(l)), right(std::move(r)) {}
+  std::unique_ptr<Expression> left, right;
+
+  BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, SourceLocation loc)
+    : Expression(loc), op(o), left(std::move(l)), right(std::move(r)) {}
 };
 
-class Selector : public AstNode
+// Selectors for array and record accesses
+struct Selector : public AstNode 
 {
-public:
   virtual ~Selector() = default;
 };
 
-class ArraySelector : public Selector
+struct ArraySelector : public Selector 
 {
-public:
-  std::unique_ptr<AstNode> index;
-  ArraySelector(std::unique_ptr<AstNode> idx, SourceLocation loc)
-      : index(std::move(idx)) { this->loc = loc; }
+  std::unique_ptr<Expression> index;
+  ArraySelector(std::unique_ptr<Expression> idx, SourceLocation loc)
+    : index(std::move(idx)) { this->loc = loc; }
 };
 
-class FieldSelector : public Selector
+struct FieldSelector : public Selector 
 {
-public:
   std::string_view field;
   FieldSelector(std::string_view f, SourceLocation loc) : field(f) { this->loc = loc; }
 };
 
-class VariableAccess : public AstNode
+// Variable access (l‑value)
+struct VariableAccess : public Expression 
 {
-public:
-  const Var *baseVar = nullptr;
+  const Var* baseVar = nullptr;               // the base variable (must be a Var)
   std::vector<std::unique_ptr<Selector>> selectors;
-  // The type after applying all selectors
-  const Type *accessType = nullptr;
-
-  VariableAccess(SourceLocation loc) : AstNode(loc) {}
+  VariableAccess(SourceLocation loc) : Expression(loc) {}
 };
 
-class FunctionCall : public AstNode
+// Function call (returns a value)
+struct FunctionCall : public Expression 
 {
-public:
-  const Function *function = nullptr;
-  std::vector<std::unique_ptr<AstNode>> arguments;
-  const Type *resultType = nullptr;
-
-  FunctionCall(SourceLocation loc) : AstNode(loc) {}
+  const Function* function = nullptr;         // resolved function
+  std::vector<std::unique_ptr<Expression>> arguments;
+  FunctionCall(SourceLocation loc) : Expression(loc) {}
 };
 
-class Statement : public AstNode {};
 
-class LabeledStatement : public Statement
+
+// Statements
+
+struct Statement : public AstNode 
 {
-public:
-  Label label;
+  Statement(SourceLocation loc = SourceLocation{.line = 0, .column = 0}) { this->loc = loc; }
+};
+
+struct LabeledStatement : public Statement 
+{
+  std::string_view label;
   std::unique_ptr<Statement> stmt;
-  LabeledStatement(Label lbl, std::unique_ptr<Statement> s, SourceLocation loc)
-    : label(lbl), stmt(std::move(s)) { this->loc = loc; }
+  LabeledStatement(std::string_view lbl, std::unique_ptr<Statement> s, SourceLocation loc)
+    : Statement(loc), label(lbl), stmt(std::move(s)) {}
 };
 
-class AssignmentStatement : public Statement
+struct AssignmentStatement : public Statement 
 {
-public:
   std::unique_ptr<VariableAccess> lhs;
-  std::unique_ptr<AstNode> rhs; // expression
-  AssignmentStatement(std::unique_ptr<VariableAccess> l, std::unique_ptr<AstNode> r, SourceLocation loc)
-      : lhs(std::move(l)), rhs(std::move(r)) { this->loc = loc; }
+  std::unique_ptr<Expression> rhs;
+  AssignmentStatement(std::unique_ptr<VariableAccess> l, std::unique_ptr<Expression> r, SourceLocation loc)
+    : Statement(loc), lhs(std::move(l)), rhs(std::move(r)) {}
 };
 
-class ProcedureCallStatement : public Statement
+struct ProcedureCallStatement : public Statement 
 {
-public:
-  std::string procName;
-  const Function *procedure = nullptr; // (null for 'write'/'read')
-  std::vector<std::unique_ptr<AstNode>> arguments;
-  ProcedureCallStatement(std::string name, SourceLocation loc) : procName(std::move(name)) {this->loc = loc;}
+  std::string_view procName;
+  const Function* procedure = nullptr;   // null for write
+  std::vector<std::unique_ptr<Expression>> arguments;
+  ProcedureCallStatement(std::string_view name, SourceLocation loc)
+    : Statement(loc), procName(name) {}
 };
 
-class ReadStatement : public Statement
+// Read statement (built‑in)
+struct ReadStatement : public Statement 
 {
-public:
   std::vector<std::unique_ptr<VariableAccess>> arguments;
-  ReadStatement(SourceLocation loc) {this->loc = loc;}
+  ReadStatement(SourceLocation loc) : Statement(loc){}
 };
 
-class GotoStatement : public Statement
+struct GotoStatement : public Statement 
 {
-public:
-  const LabeledStatement *stmt = nullptr;
-  GotoStatement(const LabeledStatement* lbl, SourceLocation loc) : stmt(lbl) {this->loc = loc;}
+  std::string_view label;
+  GotoStatement(std::string_view lbl, SourceLocation loc)
+    : Statement(loc), label(lbl) {}
 };
 
+// Compound statement (BEGIN ... END)
+struct CompoundStatement : public Statement 
+{
+  std::vector<std::unique_ptr<Statement>> statements;
+  CompoundStatement(SourceLocation loc) : Statement(loc) {}
 };
+
+struct WhileStatement : public Statement 
+{
+  std::unique_ptr<Expression> condition;
+  std::unique_ptr<Statement> body;
+  WhileStatement(std::unique_ptr<Expression> cond, std::unique_ptr<Statement> content, SourceLocation loc)
+    : Statement(loc), condition(std::move(cond)), body(std::move(content)) {}
+};
+
+struct RepeatStatement : public Statement 
+{
+  std::vector<std::unique_ptr<Statement>> body;
+  std::unique_ptr<Expression> untilExpr;
+  RepeatStatement(SourceLocation loc) : Statement(loc){}
+};
+
+// For
+struct ForStatement : public Statement 
+{
+  std::unique_ptr<VariableAccess> loopVar;
+  std::unique_ptr<Expression> start, end;
+  bool increasing;   // to -> true, downto -> false
+  std::unique_ptr<Statement> body;
+
+  ForStatement(
+    std::unique_ptr<VariableAccess> var,
+    std::unique_ptr<Expression> s,
+    std::unique_ptr<Expression> e,
+    std::unique_ptr<Statement> content,
+    bool to,
+    SourceLocation loc
+  ) : Statement(loc), loopVar(std::move(var)), start(std::move(s)),
+      end(std::move(e)),body(std::move(content)), increasing(to) {}
+};
+
+struct IfStatement : public Statement 
+{
+  std::unique_ptr<Expression> condition;
+  std::unique_ptr<Statement> thenPart;
+  std::unique_ptr<Statement> elsePart;   // nullptr if no else
+
+  IfStatement(
+    std::unique_ptr<Expression> cond,
+    std::unique_ptr<Statement> thenStmt,
+    std::unique_ptr<Statement> elseStmt,
+    SourceLocation loc
+  ) : Statement(loc), condition(std::move(cond)),
+      thenPart(std::move(thenStmt)), elsePart(std::move(elseStmt)) {}
+};
+
+struct CaseStatement : public Statement 
+{
+  struct CaseAlternative {
+    std::vector<Const> labels;
+    std::unique_ptr<Statement> stmt;
+    SourceLocation loc;
+  };
+
+  std::unique_ptr<Expression> selector;
+  std::vector<CaseAlternative> alternatives;
+
+  CaseStatement(std::unique_ptr<Expression> sel, SourceLocation loc)
+    : Statement(loc), selector(std::move(sel)) {}
+};
+
+// Program root
+struct Program 
+{
+  std::string_view name;
+  std::unique_ptr<Block> block;               // the top‑level block (already contains symbol tables)
+  std::unique_ptr<CompoundStatement> mainBody; // the main statement part
+
+  Program(std::string_view id, std::unique_ptr<Block> defs, std::unique_ptr<CompoundStatement> body)
+    : name(id), block(std::move(defs)), mainBody(std::move(body)) {}
+};
+
+}

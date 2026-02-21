@@ -1,5 +1,6 @@
 #pragma once
 #include "Semantics.hpp"
+#include "Ast.hpp"
 
 namespace pascal_compiler
 {
