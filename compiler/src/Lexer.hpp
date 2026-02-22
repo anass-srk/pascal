@@ -5,6 +5,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <concepts>
+#include <format>
 
 namespace pascal_compiler
 {
@@ -144,6 +145,7 @@ struct Lexeme
   size_t m_index;
 
   std::string to_string_literal() const;
+  std::string to_string() const {return std::format("'{}' at ({},{})", m_id, m_line, m_col);};
 };
 
 class Lexer

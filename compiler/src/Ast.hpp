@@ -7,6 +7,12 @@ struct SourceLocation
 {
   size_t line = 0;
   size_t column = 0;
+  SourceLocation(size_t l = 0, size_t c = 0) : line(l), column(c) {}
+  SourceLocation(const Lexeme& token) 
+  {
+    line = token.m_line;
+    column = token.m_col;
+  }
 };
 
 struct AstNode 
@@ -18,14 +24,14 @@ struct AstNode
 // Expressions
 struct Expression : public AstNode 
 {
-  Expression(SourceLocation loc = SourceLocation{.line = 0,.column = 0}) { this->loc = loc; }
+  Expression(SourceLocation loc = SourceLocation{}) { this->loc = loc; }
   const Type* exprType = nullptr;
 };
 
 struct LiteralExpression : public Expression 
 {
-  Const value;
-  LiteralExpression(Const&& c, SourceLocation loc) : Expression(loc), value(std::move(c)) {}
+  std::unique_ptr<Const> value;
+  LiteralExpression(std::unique_ptr<Const> c, SourceLocation loc) : Expression(loc), value(std::move(c)) {}
 };
 
 // Identifier reference – can be a variable, constant, enum value, or function name.
@@ -56,7 +62,8 @@ struct UnaryExpression : public Expression
   std::unique_ptr<Expression> operand;
 
   UnaryExpression(UnaryOp o, std::unique_ptr<Expression> e, SourceLocation loc)
-    : op(o), operand(std::move(e)) { this->loc = loc; }
+    : Expression(loc), op(o), operand(std::move(e)) {}
+  void validate(const Lexeme&);
 };
 
 // Binary operations
@@ -64,7 +71,7 @@ enum struct BinaryOp
 {
   Eq, Ne, Lt, Le, Gt, Ge, // relational
   Add, Sub, Or, // addition
-  Mul, Div, DivInt, And // multiplication
+  Mul, Div, And // multiplication
 };
 
 struct BinaryExpression : public Expression 
@@ -74,6 +81,7 @@ struct BinaryExpression : public Expression
 
   BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, SourceLocation loc)
     : Expression(loc), op(o), left(std::move(l)), right(std::move(r)) {}
+  void validate(const Lexeme&);
 };
 
 // Selectors for array and record accesses
@@ -117,7 +125,7 @@ struct FunctionCall : public Expression
 
 struct Statement : public AstNode 
 {
-  Statement(SourceLocation loc = SourceLocation{.line = 0, .column = 0}) { this->loc = loc; }
+  Statement(SourceLocation loc = SourceLocation{}) { this->loc = loc; }
 };
 
 struct LabeledStatement : public Statement 
@@ -138,11 +146,11 @@ struct AssignmentStatement : public Statement
 
 struct ProcedureCallStatement : public Statement 
 {
-  std::string_view procName;
+  std::string_view name;
   const Function* procedure = nullptr;   // null for write
   std::vector<std::unique_ptr<Expression>> arguments;
-  ProcedureCallStatement(std::string_view name, SourceLocation loc)
-    : Statement(loc), procName(name) {}
+  ProcedureCallStatement(std::string_view id, SourceLocation loc)
+    : Statement(loc), name(id) {}
 };
 
 // Read statement (built‑in)
@@ -150,6 +158,13 @@ struct ReadStatement : public Statement
 {
   std::vector<std::unique_ptr<VariableAccess>> arguments;
   ReadStatement(SourceLocation loc) : Statement(loc){}
+};
+
+// Write statement (built‑in)
+struct WriteStatement : public Statement
+{
+  std::vector<std::unique_ptr<Expression>> arguments;
+  WriteStatement(SourceLocation loc) : Statement(loc) {}
 };
 
 struct GotoStatement : public Statement 
