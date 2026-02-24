@@ -26,12 +26,14 @@ struct Expression : public AstNode
 {
   Expression(SourceLocation loc = SourceLocation{}) { this->loc = loc; }
   const Type* exprType = nullptr;
+  virtual void validate(const Lexeme&) = 0;
 };
 
 struct LiteralExpression : public Expression 
 {
   std::unique_ptr<Const> value;
   LiteralExpression(std::unique_ptr<Const> c, SourceLocation loc) : Expression(loc), value(std::move(c)) {}
+  void validate(const Lexeme &) override;
 };
 
 // Identifier reference – can be a variable, constant, enum value, or function name.
@@ -63,7 +65,7 @@ struct UnaryExpression : public Expression
 
   UnaryExpression(UnaryOp o, std::unique_ptr<Expression> e, SourceLocation loc)
     : Expression(loc), op(o), operand(std::move(e)) {}
-  void validate(const Lexeme&);
+  void validate(const Lexeme&) override;
 };
 
 // Binary operations
@@ -81,26 +83,29 @@ struct BinaryExpression : public Expression
 
   BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, SourceLocation loc)
     : Expression(loc), op(o), left(std::move(l)), right(std::move(r)) {}
-  void validate(const Lexeme&);
+  void validate(const Lexeme&) override;
 };
 
 // Selectors for array and record accesses
 struct Selector : public AstNode 
 {
   virtual ~Selector() = default;
+  virtual const Type* apply(const Type*) = 0;
 };
 
 struct ArraySelector : public Selector 
 {
-  std::unique_ptr<Expression> index;
-  ArraySelector(std::unique_ptr<Expression> idx, SourceLocation loc)
-    : index(std::move(idx)) { this->loc = loc; }
+  std::vector<std::unique_ptr<Expression>> indices;
+  ArraySelector(std::vector<std::unique_ptr<Expression>> idx, SourceLocation loc) 
+  : indices(std::move(idx)){ this->loc = loc; }
+  const Type* apply(const Type*) override;
 };
 
 struct FieldSelector : public Selector 
 {
   std::string_view field;
   FieldSelector(std::string_view f, SourceLocation loc) : field(f) { this->loc = loc; }
+  const Type* apply(const Type*) override;
 };
 
 // Variable access (l‑value)
@@ -108,7 +113,9 @@ struct VariableAccess : public Expression
 {
   const Var* baseVar = nullptr;               // the base variable (must be a Var)
   std::vector<std::unique_ptr<Selector>> selectors;
-  VariableAccess(SourceLocation loc) : Expression(loc) {}
+  VariableAccess(const Var *v, std::vector<std::unique_ptr<Selector>> sels, SourceLocation loc) 
+  : Expression(loc), selectors(std::move(sels)),  baseVar(v) {}
+  void validate(const Lexeme&) override;
 };
 
 // Function call (returns a value)

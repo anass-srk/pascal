@@ -141,5 +141,108 @@ void BinaryExpression::validate(const Lexeme& token)
   }
 }
 
+void LiteralExpression::validate(const Lexeme& token)
+{
+  this->exprType = value->m_type;
+}
 
+const Type * ArraySelector::apply(const Type *type)
+{
+  if(type->m_type != TYPE_CAT::TC_ARRAY)
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_TYPE,
+      std::format(
+        "Semantic error: type ({}) is not indexable ! Expected an array !",
+        type->to_string()
+      ),
+      loc.line,
+      loc.column
+    );
+  }
+
+  const Array *arr = static_cast<const Array *>(type);
+  
+  if(arr->m_itypes.size() != indices.size())
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_INDEX,
+      std::format(
+        "Semantic error: array type ({}) requires {} indices ! Found {} indices !",
+        type->to_string(), arr->m_itypes.size(), indices.size()
+      ),
+      loc.line,
+      loc.column
+    );
+  }
+
+  for(int i = 0;i < indices.size();++i)
+  {
+    auto itype = indices[i]->exprType;
+    if(itype->m_type == TYPE_CAT::TC_SUBRANGE) itype = static_cast<const Subrange*>(itype)->m_type;
+    
+    auto vtype = arr->m_itypes[i];
+    if(vtype->m_type == TYPE_CAT::TC_SUBRANGE) vtype = static_cast<const Subrange*>(vtype)->m_type;
+    
+    if(vtype != itype)
+    {
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_INVALID_INDEX,
+        std::format(
+          "Semantic error: array type ({}) requires the index-{} to be of type ({}) ! Found {} !",
+          type->to_string(), i+1, arr->m_itypes[i]->to_string(), indices[i]->exprType->to_string()
+        ),
+        loc.line,
+        loc.column
+      );
+    }
+  }
+
+  return arr->m_etype;
+}
+
+const Type* FieldSelector::apply(const Type* type)
+{
+  if(type->m_type != TYPE_CAT::TC_RECORD)
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_TYPE,
+      std::format(
+        "Semantic error: Field name '{}' does not exists for non-record type ({}) ! Expected a record !",
+        field, type->to_string()
+      ),
+      loc.line,
+      loc.column
+    );
+  }
+
+  const Record* rec = static_cast<const Record*>(type);
+  auto it = rec->m_members.find(field);
+  if(it == rec->m_members.end())
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_FIELD_NAME,
+      std::format(
+        "Semantic error: Field name '{}' does not exists for record type ({}) !",
+        field, type->to_string()
+      ),
+      loc.line,
+      loc.column
+    );
+  }
+
+  return it->second.m_type;
+}
+
+
+void VariableAccess::validate(const Lexeme& token)
+{
+  const Type* current = baseVar->m_type;
+  
+  for(const auto& s : selectors)
+  {
+    current = s->apply(current);
+  }
+
+  this->exprType = current;
 }
