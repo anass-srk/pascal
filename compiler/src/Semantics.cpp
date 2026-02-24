@@ -81,6 +81,8 @@ Subrange::Subrange(
     );
   }
 
+  m_type = beg.m_type;
+
   switch(beg.m_cat){
     case CONST_CAT::CC_CHAR:
       m_beg = std::get<char>(beg.m_val);

@@ -21,7 +21,9 @@ enum class SEMANTIC_ERROR
   SE_INVALID_OP,
   SE_INVALID_SUBRANGE,
   SE_INVALID_ENUM,
-  SE_AMBIGUOUS_TAG_VAR
+  SE_AMBIGUOUS_TAG_VAR,
+  SE_INVALID_FIELD_NAME,
+  SE_INVALID_INDEX
 };
 
 class SemanticException{
@@ -172,6 +174,7 @@ struct Subrange : Type
 {
   Int m_beg, m_end; // Must contain the same type
   CONST_CAT m_cat;
+  const Type* m_type;
   Subrange(
     const std::string_view& name, size_t line, size_t col,
     Const&& beg, Const&& end
