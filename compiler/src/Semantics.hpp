@@ -174,7 +174,7 @@ struct Subrange : Type
 {
   Int m_beg, m_end; // Must contain the same type
   CONST_CAT m_cat;
-  const Type* m_type;
+  const Type* m_utype; // Underlying type
   Subrange(
     const std::string_view& name, size_t line, size_t col,
     Const&& beg, Const&& end

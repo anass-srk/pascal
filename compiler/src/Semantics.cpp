@@ -81,7 +81,7 @@ Subrange::Subrange(
     );
   }
 
-  m_type = beg.m_type;
+  m_utype = beg.m_type;
 
   switch(beg.m_cat){
     case CONST_CAT::CC_CHAR:

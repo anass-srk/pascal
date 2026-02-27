@@ -4,6 +4,7 @@ add_executable(
   Lexer.hpp
   ../src/Semantics.cpp
   ../src/Parser.cpp
+  ../src/Ast.cpp
   Parser.hpp
   Main.cpp
 )
