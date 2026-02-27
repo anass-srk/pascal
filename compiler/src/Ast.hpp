@@ -13,6 +13,11 @@ struct SourceLocation
     line = token.m_line;
     column = token.m_col;
   }
+
+  std::string to_string()
+  {
+    return std::format("({}, {})", line, column);
+  }
 };
 
 struct AstNode 
@@ -76,6 +81,13 @@ enum struct BinaryOp
   Mul, Div, And // multiplication
 };
 
+static const char* BINARY_OP_NAME[] =
+{
+  "=", "<>", "<", "<=", ">", ">=", // relational
+  "+", "-", "or", // addition
+  "*", "(/ or div)", "and" // multiplication
+};
+// Only for relational operations
 struct BinaryExpression : public Expression 
 {
   BinaryOp op;
@@ -83,6 +95,23 @@ struct BinaryExpression : public Expression
 
   BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, SourceLocation loc)
     : Expression(loc), op(o), left(std::move(l)), right(std::move(r)) {}
+  void validate(const Lexeme&) override;
+};
+
+struct NExpression : public Expression
+{
+  std::vector<BinaryOp> ops;
+  std::vector<std::unique_ptr<Expression>> exprs;
+
+  NExpression(std::unique_ptr<Expression> first, SourceLocation loc) : Expression(loc)
+  {exprs.push_back(std::move(first));}
+
+  void add(BinaryOp op, std::unique_ptr<Expression> exp)
+  {
+    ops.push_back(op);
+    exprs.push_back(std::move(exp));
+  }
+
   void validate(const Lexeme&) override;
 };
 

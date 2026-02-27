@@ -9,7 +9,7 @@ void UnaryExpression::validate(const Lexeme& token)
   this->exprType = operand->exprType;
   if(operand->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
   {
-    this->exprType = static_cast<const Subrange *>(operand->exprType);
+    this->exprType = static_cast<const Subrange *>(operand->exprType)->m_utype;
     type_name = CONST_CAT_NAMES[int(static_cast<const Subrange *>(operand->exprType)->m_cat)];
   }
   if (
@@ -46,13 +46,13 @@ void UnaryExpression::validate(const Lexeme& token)
 
 void BinaryExpression::validate(const Lexeme& token)
 {
-  // For now, both expression are required to be of the same type
+  // For now, both expression are required to be bools
   // if an expression's type is a subrange, get the underlying type
   auto left_type = left->exprType->m_name;
   this->exprType = left->exprType;
   if (left->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
   {
-    this->exprType = static_cast<const Subrange *>(left->exprType);
+    this->exprType = static_cast<const Subrange *>(left->exprType)->m_utype;
     left_type = CONST_CAT_NAMES[int(static_cast<const Subrange *>(left->exprType)->m_cat)];
   }
   auto right_type = left->exprType->m_name;
@@ -73,6 +73,67 @@ void BinaryExpression::validate(const Lexeme& token)
       loc.column
     );
   }
+  if(left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_OP,
+      std::format(
+        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}} and ({})! Expected Bools !",
+        token.to_string(), left->exprType->to_string(), right->exprType->to_string()
+      ),
+      loc.line,
+      loc.column
+    );
+  }
+
+  switch(op)
+  {
+    case BinaryOp::Eq:
+    case BinaryOp::Ne:
+    case BinaryOp::And:
+    case BinaryOp::Or:
+    break;
+    default:
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_INVALID_OP,
+        std::format(
+          "Semantic error: Cannot apply binary operation ({}) on 2 boolean expressions !",
+          token.to_string()
+        ),
+        loc.line,
+        loc.column
+      );
+  }
+}
+
+void NExpression::validate(const Lexeme& token)
+{
+  // For now, all expression are required to be of the same type
+  // if an expression's type is a subrange, get the underlying type
+
+  const auto left = exprs[0].get();
+
+  if(exprs.size()+1 != ops.size())
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_OP,
+      std::format(
+        "Semantic error: At {}, found {} expressions and {} binary operations ! Expected {} binary operations !",
+        token.to_string(), exprs.size(), ops.size(), exprs.size()-1
+      ),
+      loc.line,
+      loc.column
+    );
+  }
+
+  auto left_type = left->exprType->m_name;
+  this->exprType = left->exprType;
+  if (left->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
+  {
+    this->exprType = static_cast<const Subrange *>(left->exprType)->m_utype;
+    left_type = CONST_CAT_NAMES[int(static_cast<const Subrange *>(left->exprType)->m_cat)];
+  }
+
   if(
     left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
     left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
@@ -83,60 +144,82 @@ void BinaryExpression::validate(const Lexeme& token)
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
-        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}} and ({})! Expected Ints, Reals, Chars or Bools !",
-        token.to_string(), left->exprType->to_string(), right->exprType->to_string()
+        "Semantic error: Cannot apply binary operation ({}) on an expressions of type ({})! Expected Ints, Reals, Chars or Bools !",
+        token.to_string(), left->exprType->to_string()
       ),
       loc.line,
       loc.column
     );
   }
 
-  if(left_type == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
+  for(int i = 0;i < ops.size();++i)
   {
-    switch(op)
+    const auto right = exprs[i+1].get();
+    auto right_type = right->exprType->m_name;
+    if (right->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
     {
-      case BinaryOp::Eq:
-      case BinaryOp::Ne:
-      case BinaryOp::And:
-      case BinaryOp::Or:
-      break;
-      default:
-        throw SemanticException(
-          SEMANTIC_ERROR::SE_INVALID_OP,
-          std::format(
-            "Semantic error: Cannot apply binary operation ({}) on 2 boolean expressions !",
-            token.to_string()
-          ),
-          loc.line,
-          loc.column
-        );
+      right_type = CONST_CAT_NAMES[int(static_cast<const Subrange *>(right->exprType)->m_cat)];
     }
-  }
-  else
-  {
-    switch(op)
+    if(left_type != right_type)
     {
-      case BinaryOp::Add:
-      case BinaryOp::Sub:
-      case BinaryOp::Mul:
-      case BinaryOp::Div:
-      case BinaryOp::Eq:
-      case BinaryOp::Ne:
-      case BinaryOp::Ge:
-      case BinaryOp::Gt:
-      case BinaryOp::Le:
-      case BinaryOp::Lt:
-      break;
-      default:
-        throw SemanticException(
-          SEMANTIC_ERROR::SE_INVALID_OP,
-          std::format(
-            "Semantic error: Cannot apply binary operation ({}) on 2 expressions of underlying type '{}' !",
-            token.to_string(), left_type
-          ),
-          loc.line,
-          loc.column
-        );
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_INVALID_OP,
+        std::format(
+          "Semantic error: Cannot apply binary operation ({}) on 2 expressions of different types ({}) and ({})!",
+          token.to_string(), left->exprType->to_string(), right->exprType->to_string()
+        ),
+        right->loc.line,
+        right->loc.column
+      );
+    }
+    const auto op = ops[i];  
+    if(left_type == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
+    {
+      switch(op)
+      {
+        case BinaryOp::Eq:
+        case BinaryOp::Ne:
+        case BinaryOp::And:
+        case BinaryOp::Or:
+        break;
+        default:
+          throw SemanticException(
+            SEMANTIC_ERROR::SE_INVALID_OP,
+            std::format(
+              "Semantic error: Cannot apply binary operation ({} at {}) on 2 boolean expressions !",
+              BINARY_OP_NAME[int(op)], right->loc.to_string()
+            ),
+            right->loc.line,
+            right->loc.column
+          );
+      }
+    }
+    else
+    {
+      switch(op)
+      {
+        case BinaryOp::Add:
+        case BinaryOp::Sub:
+        case BinaryOp::Mul:
+        case BinaryOp::Div:
+        case BinaryOp::Eq:
+        case BinaryOp::Ne:
+        case BinaryOp::Ge:
+        case BinaryOp::Gt:
+        case BinaryOp::Le:
+        case BinaryOp::Lt:
+        break;
+        default:
+          throw SemanticException(
+            SEMANTIC_ERROR::SE_INVALID_OP,
+            std::format(
+              "Semantic error: Cannot apply binary operation ({} at {}) on 2 expressions of underlying type '{}' !",
+              BINARY_OP_NAME[int(op)], right->loc.to_string(), left_type
+            ),
+            right->loc.line,
+            right->loc.column
+          );
+      }
     }
   }
 }
@@ -179,10 +262,10 @@ const Type * ArraySelector::apply(const Type *type)
   for(int i = 0;i < indices.size();++i)
   {
     auto itype = indices[i]->exprType;
-    if(itype->m_type == TYPE_CAT::TC_SUBRANGE) itype = static_cast<const Subrange*>(itype)->m_type;
+    if(itype->m_type == TYPE_CAT::TC_SUBRANGE) itype = static_cast<const Subrange*>(itype)->m_utype;
     
     auto vtype = arr->m_itypes[i];
-    if(vtype->m_type == TYPE_CAT::TC_SUBRANGE) vtype = static_cast<const Subrange*>(vtype)->m_type;
+    if(vtype->m_type == TYPE_CAT::TC_SUBRANGE) vtype = static_cast<const Subrange*>(vtype)->m_utype;
     
     if(vtype != itype)
     {
@@ -245,4 +328,6 @@ void VariableAccess::validate(const Lexeme& token)
   }
 
   this->exprType = current;
+}
+
 }

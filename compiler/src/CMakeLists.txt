@@ -3,5 +3,6 @@ add_executable(
   Lexer.cpp
   Semantics.cpp
   Parser.cpp
+  Ast.cpp
   Main.cpp
 )
