@@ -1,4 +1,5 @@
 #include "Semantics.hpp"
+#include "Ast.hpp"
 
 namespace pascal_compiler
 {
@@ -84,6 +85,10 @@ Subrange::Subrange(
   m_utype = beg.m_type;
 
   switch(beg.m_cat){
+    case CONST_CAT::CC_BOOL:
+      m_beg = std::get<bool>(beg.m_val);
+      m_end = std::get<bool>(end.m_val);
+      break;
     case CONST_CAT::CC_CHAR:
       m_beg = std::get<char>(beg.m_val);
       m_end = std::get<char>(end.m_val);
@@ -93,7 +98,6 @@ Subrange::Subrange(
       m_beg = std::get<Int>(beg.m_val);
       m_end = std::get<Int>(end.m_val);
       break;
-    break;
     default:
       throw SemanticException(
         SEMANTIC_ERROR::SE_SUBRANGE_TYPES_MISMATCH,

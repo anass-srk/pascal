@@ -23,7 +23,10 @@ enum class SEMANTIC_ERROR
   SE_INVALID_ENUM,
   SE_AMBIGUOUS_TAG_VAR,
   SE_INVALID_FIELD_NAME,
-  SE_INVALID_INDEX
+  SE_INVALID_INDEX,
+  SE_INVALID_ASSIGN,
+  SE_INVALID_CALL,
+  SE_INVALID_COND
 };
 
 class SemanticException{
@@ -109,7 +112,10 @@ struct Const
   Const(std::string_view name, size_t line, size_t col, T value, const Block& main_block);
   Const(std::string_view name, size_t line, size_t col, std::string &&value, const Block &main_block);
   Const(std::string_view name, size_t line, size_t col, const EnumValue& value);
-
+  std::string to_string() const
+  {
+    return std::format("\"{}\" at ({},{})", m_name, m_line, m_col);
+  }
 };
 
 enum class TYPE_CAT : int{
@@ -146,6 +152,8 @@ struct Type
   }
 
   virtual ~Type() = default;
+
+  virtual const Type* get_underlying_type() const {return this;};
 };
 
 struct Enum : Type
@@ -179,6 +187,8 @@ struct Subrange : Type
     const std::string_view& name, size_t line, size_t col,
     Const&& beg, Const&& end
   );
+
+  const Type *get_underlying_type() const override { return m_utype; };
 };
 
 struct Array : Type
@@ -196,6 +206,10 @@ struct Var
   std::string_view m_name;
   size_t m_line, m_col;
   const Type *m_type;
+  std::string to_string() const
+  {
+    return std::format("\"{}\" at ({},{})", m_name, m_line, m_col);
+  }
 };
 
 struct Record : Type
@@ -247,10 +261,14 @@ struct Block
   get(std::string_view, const std::unordered_map<std::string_view, T> &);
 };
 
+struct CompoundStatement;
+
 struct Function
 {
+  std::string_view m_name;
   FunctionType* m_type;
-  std::unique_ptr<Block> m_block;
+  std::unique_ptr<Block> block;
+  std::unique_ptr<CompoundStatement> body;
 };
 
 }
