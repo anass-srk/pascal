@@ -259,4 +259,6 @@ void Record::check_duplicate_id(const Lexeme& rec, const Var& var){
     );
 }
 
+Function::Function(std::string_view id, const FunctionType *func_type, Block *b)
+  : m_name(id), m_type(func_type), block(b) {}
 };

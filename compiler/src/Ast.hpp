@@ -136,8 +136,8 @@ struct FunctionCall : public Expression
 {
   const Function* function = nullptr;         // resolved function
   std::vector<std::unique_ptr<Expression>> args;
-  FunctionCall(const Function* func, std::vector<std::unique_ptr<Expression>>&& args, Lexeme token)
-  : Expression(token), args(std::move(args)), function(func){}
+  FunctionCall(const Function *func, std::vector<std::unique_ptr<Expression>> &&arguments, Lexeme token)
+      : Expression(token), args(std::move(arguments)), function(func) {}
   void validate() override;
 };
 
@@ -169,13 +169,13 @@ struct AssignmentStatement : public Statement
   void validate() override;
 };
 
-struct ProcedureCallStatement : public Statement 
+struct ProcedureCall : public Statement 
 {
-  std::string_view name;
-  const Function* procedure = nullptr;   // null for write
-  std::vector<std::unique_ptr<Expression>> arguments;
-  ProcedureCallStatement(std::string_view id, Lexeme token)
-    : Statement(token), name(id) {}
+  const Function* procedure = nullptr;
+  std::vector<std::unique_ptr<Expression>> args;
+  ProcedureCall(const Function *func, std::vector<std::unique_ptr<Expression>> &&arguments, Lexeme token)
+      : Statement(token), args(std::move(arguments)), procedure(func) {}
+  void validate() override;
 };
 
 // Read statement (built‑in)

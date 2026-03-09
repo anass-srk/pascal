@@ -223,17 +223,32 @@ struct Record : Type
   void check_duplicate_id(const Lexeme &rec, const Var& var);
 };
 
+struct Arg : Var
+{
+  bool ref;
+  Arg(){}
+  Arg(bool by_ref, const Lexeme& token, const Type* t) {
+    ref = by_ref;
+    m_type = t;
+    m_name = token.m_id;
+    m_line = token.m_line;
+    m_col = token.m_col;
+  }
+};
+
 struct FunctionType : Type
 {
 
-  std::vector<Var> m_args;
-  Type* m_ret_type; // Null for procedures
+  std::vector<Arg> m_args;
+  const Type* m_ret_type; // Null for procedures
 
   FunctionType(const std::string_view &name, size_t line, size_t col, Type* ret_type) : Type(name, line, col, TYPE_CAT::TC_FUNCTION), m_ret_type(ret_type) {}
 };
 
 template <typename T>
 concept BlockMemberType = is_one_of<T, Label, Const, std::shared_ptr<Type>, Var, Function, EnumValue>;
+
+struct CompoundStatement;
 
 struct Block
 {
@@ -246,6 +261,8 @@ struct Block
   std::unordered_map<std::string_view, EnumValue> m_enums_vals;
 
   std::vector<std::unique_ptr<Type>> m_unamed_types;
+
+  std::unique_ptr<CompoundStatement> body;
 
   Block(Block *parent = nullptr) : m_parent(parent) {}
 
@@ -261,14 +278,12 @@ struct Block
   get(std::string_view, const std::unordered_map<std::string_view, T> &);
 };
 
-struct CompoundStatement;
-
 struct Function
 {
   std::string_view m_name;
-  FunctionType* m_type;
+  const FunctionType* m_type;
   std::unique_ptr<Block> block;
-  std::unique_ptr<CompoundStatement> body;
+  Function(std::string_view , const FunctionType*, Block*);
 };
 
 }

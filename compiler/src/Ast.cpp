@@ -603,4 +603,74 @@ void CaseStatement::validate()
   }
 }
 
+void validate(const Function *func, const std::vector<std::unique_ptr<Expression>> &args, Lexeme token)
+{
+  const auto& params = func->m_type->m_args;  
+  if(params.size() != args.size())
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_CALL,
+      std::format(
+        "Semantic error: At ({}), found {} arguments ! Expected {} arguments !",
+        token.to_string(), args.size(), params.size()
+      ),
+      token.m_line,
+      token.m_col
+    );
+  }
+
+  for(int i = 0;i < params.size();++i)
+  {
+    const Type* ptype = params[i].m_type->get_underlying_type();
+    const Type* atype = args[i]->exprType->get_underlying_type();
+    if(ptype != atype)
+    {
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_INVALID_CALL,
+        std::format(
+          "Semantic error: At ({}), the {}-argument is of type ({}) ! Expected type ({}) !",
+          token.to_string(), i+1, atype->to_string(), ptype->to_string()
+        ),
+        token.m_line,
+        token.m_col
+      );
+    }
+  }
+}
+
+void ProcedureCall::validate()
+{
+  if(procedure->m_type->m_ret_type != nullptr)
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_CALL,
+      std::format(
+        "Semantic error: At ({}), invalid procedure with return-type ({}) !",
+        token.to_string(), procedure->m_type->m_ret_type->to_string()
+      ),
+      token.m_line,
+      token.m_col
+    );
+  }
+  pascal_compiler::validate(procedure, args, token);
+}
+
+void FunctionCall::validate()
+{
+  if(function->m_type->m_ret_type == nullptr)
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_CALL,
+      std::format(
+        "Semantic error: At ({}), invalid function with no return-type !",
+        token.to_string()
+      ),
+      token.m_line,
+      token.m_col
+    );
+  }
+  pascal_compiler::validate(function, args, token);
+  this->exprType = function->m_type->m_ret_type;
+}
+
 }
