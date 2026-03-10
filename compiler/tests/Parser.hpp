@@ -613,3 +613,232 @@ TEST(ParserTest, Variables)
     EXPECT_EQ(block->m_enums_vals.at("blue").m_value, 2);
   }
 }
+
+TEST(ParserTest, FunctionProcedureTypes) {
+  // Simple procedure type (no parameters)
+  {
+    std::string program = R"(
+      program Test;
+      type
+        SimpleProcType = procedure;
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const Type* type = Block::get("SimpleProcType", parser.m_current_block->m_types);
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(type->m_type, TYPE_CAT::TC_FUNCTION);
+    const FunctionType* ft = static_cast<const FunctionType*>(type);
+    EXPECT_EQ(ft->m_ret_type, nullptr);
+    EXPECT_TRUE(ft->m_args.empty());
+  }
+
+  // Simple function type with return type (no parameters)
+  {
+    std::string program = R"(
+      program Test;
+      type
+        SimpleFuncType = function : Int;
+        StringFunc = function : String;
+        BoolFunc = function : Bool;
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const FunctionType* ft = static_cast<const FunctionType*>(Block::get("SimpleFuncType", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
+    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_TRUE(ft->m_args.empty());
+
+    ft = static_cast<const FunctionType*>(Block::get("StringFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_ret_type->m_name, "String");
+
+    ft = static_cast<const FunctionType*>(Block::get("BoolFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_ret_type->m_name, "Bool");
+  }
+
+  // Procedure type with value parameters
+  {
+    std::string program = R"(
+      program Test;
+      type
+        IntProc = procedure (x : Int);
+        TwoIntProc = procedure (a, b : Int);
+        MixedParams = procedure (x : Int; s : String; flag : Bool);
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const FunctionType* ft = static_cast<const FunctionType*>(Block::get("IntProc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
+    EXPECT_EQ(ft->m_ret_type, nullptr);
+    EXPECT_EQ(ft->m_args.size(), 1);
+    EXPECT_EQ(ft->m_args[0].m_name, "x");
+    EXPECT_EQ(ft->m_args[0].m_type->m_name, "Int");
+    EXPECT_FALSE(ft->m_args[0].ref);
+
+    ft = static_cast<const FunctionType*>(Block::get("TwoIntProc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_args.size(), 2);
+    EXPECT_EQ(ft->m_args[0].m_name, "a");
+    EXPECT_EQ(ft->m_args[1].m_name, "b");
+
+    ft = static_cast<const FunctionType*>(Block::get("MixedParams", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_args.size(), 3);
+    EXPECT_EQ(ft->m_args[0].m_name, "x");
+    EXPECT_EQ(ft->m_args[1].m_name, "s");
+    EXPECT_EQ(ft->m_args[2].m_name, "flag");
+  }
+
+  // Function type with value parameters and return type
+  {
+    std::string program = R"(
+      program Test;
+      type
+        IntFunc = function (x : Int) : Int;
+        RealFunc = function (x : Int; y : Real) : Real;
+        StringFunc = function (a, b : Char) : String;
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const FunctionType* ft = static_cast<const FunctionType*>(Block::get("IntFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
+    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_EQ(ft->m_args.size(), 1);
+    EXPECT_EQ(ft->m_args[0].m_name, "x");
+    EXPECT_EQ(ft->m_args[0].m_type->m_name, "Int");
+    EXPECT_FALSE(ft->m_args[0].ref);
+
+    ft = static_cast<const FunctionType*>(Block::get("RealFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_ret_type->m_name, "Real");
+    EXPECT_EQ(ft->m_args.size(), 2);
+    EXPECT_EQ(ft->m_args[0].m_name, "x");
+    EXPECT_EQ(ft->m_args[1].m_name, "y");
+
+    ft = static_cast<const FunctionType*>(Block::get("StringFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_ret_type->m_name, "String");
+    EXPECT_EQ(ft->m_args.size(), 2);
+    EXPECT_EQ(ft->m_args[0].m_name, "a");
+    EXPECT_EQ(ft->m_args[1].m_name, "b");
+  }
+
+  // Procedure type with VAR (reference) parameters
+  {
+    std::string program = R"(
+      program Test;
+      type
+        VarIntProc = procedure (var x : Int);
+        MixedRefProc = procedure (x : Int; var y : Real; flag : Bool);
+        AllRefPtrs = procedure (var a, b : Int; var s : String);
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const FunctionType* ft = static_cast<const FunctionType*>(Block::get("VarIntProc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
+    EXPECT_EQ(ft->m_args.size(), 1);
+    EXPECT_EQ(ft->m_args[0].m_name, "x");
+    EXPECT_TRUE(ft->m_args[0].ref);
+
+    ft = static_cast<const FunctionType*>(Block::get("MixedRefProc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_args.size(), 3);
+    EXPECT_FALSE(ft->m_args[0].ref);
+    EXPECT_TRUE(ft->m_args[1].ref);
+    EXPECT_FALSE(ft->m_args[2].ref);
+
+    ft = static_cast<const FunctionType*>(Block::get("AllRefPtrs", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_args.size(), 3);
+    EXPECT_TRUE(ft->m_args[0].ref);
+    EXPECT_TRUE(ft->m_args[1].ref);
+    EXPECT_TRUE(ft->m_args[2].ref);
+  }
+
+  // Function type with VAR parameters and return type
+  {
+    std::string program = R"(
+      program Test;
+      type
+        VarIntFunc = function (var x : Int) : Int;
+        ComplexFunc = function (a : Int; var b : Real; var c : String) : String;
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const FunctionType* ft = static_cast<const FunctionType*>(Block::get("VarIntFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
+    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_EQ(ft->m_args.size(), 1);
+    EXPECT_TRUE(ft->m_args[0].ref);
+
+    ft = static_cast<const FunctionType*>(Block::get("ComplexFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_ret_type->m_name, "String");
+    EXPECT_EQ(ft->m_args.size(), 3);
+    EXPECT_FALSE(ft->m_args[0].ref);
+    EXPECT_TRUE(ft->m_args[1].ref);
+    EXPECT_TRUE(ft->m_args[2].ref);
+  }
+
+  // Function/procedure types with complex types (arrays, records, enums)
+  {
+    std::string program = R"(
+      program Test;
+      type
+        Color = (Red, Green, Blue);
+        ArrType = array[1..10] of Int;
+        RecType = record x, y : Int end;
+        ArrayProc = procedure (arr : ArrType);
+        RecordFunc = function (rec : RecType) : Int;
+        EnumProc = procedure (c : Color);
+        ComplexFunc = function (arr : ArrType; rec : RecType) : Color;
+      .
+    )";
+    Parser parser(std::move(program));
+    EXPECT_NO_THROW(parser.parse());
+
+    const FunctionType* ft = static_cast<const FunctionType*>(Block::get("ArrayProc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_args.size(), 1);
+    EXPECT_EQ(ft->m_args[0].m_name, "arr");
+    EXPECT_EQ(ft->m_args[0].m_type->m_name, "ArrType");
+
+    ft = static_cast<const FunctionType*>(Block::get("RecordFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_EQ(ft->m_args.size(), 1);
+    EXPECT_EQ(ft->m_args[0].m_name, "rec");
+    EXPECT_EQ(ft->m_args[0].m_type->m_name, "RecType");
+
+    ft = static_cast<const FunctionType*>(Block::get("EnumProc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_args.size(), 1);
+    EXPECT_EQ(ft->m_args[0].m_name, "c");
+    EXPECT_EQ(ft->m_args[0].m_type->m_name, "Color");
+
+    ft = static_cast<const FunctionType*>(Block::get("ComplexFunc", parser.m_current_block->m_types));
+    ASSERT_NE(ft, nullptr);
+    EXPECT_EQ(ft->m_ret_type->m_name, "Color");
+    EXPECT_EQ(ft->m_args.size(), 2);
+    EXPECT_EQ(ft->m_args[0].m_name, "arr");
+    EXPECT_EQ(ft->m_args[1].m_name, "rec");
+  }
+}

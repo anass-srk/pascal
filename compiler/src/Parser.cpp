@@ -504,7 +504,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
       func_type->m_args = args_list();
       adv();
     }
-    match_adv(TOKEN_TYPE::COLON_TOKEN);
+    match(TOKEN_TYPE::COLON_TOKEN);
     match_adv(TOKEN_TYPE::ID_TOKEN);
     func_type->m_ret_type = find_type(true);
     adv();
