@@ -1,0 +1,81 @@
+ program := PROGRAM ID ';' block '.'
+ id_list := NAME { ',' NAME }
+ block := declaration_part statement_part
+ declaration_part := { label_declaration_part | constant_definition_part |
+ | type_definition_part | variable_declaration_part
+ | procedure_definition_part | function_definition_part } 
+
+ label_declaration_part := LABEL (INT | ID) { ',' (INT | ID) } ';'
+ constant_definition_part := CONST NAME '=' constant ';'
+ { NAME '=' constant ';' }
+ constant= [ '+' | '-' ] ( CONSTANT_NAME | NUMBER ) | ENUM | CHAR | BOOL | STRING
+ type_definition_part := TYPE NAME '=' type ';' { NAME '=' type ';' }
+ type := simple_type | structured_type | procedure_type | function_type | pointer_type | TYPE_NAME
+ simple_type := subrange_type | enumerated_type
+ subrange_type := constant '..' constant
+ enumerated_type := '(' id_list ')'
+ pointer_type :=  '^' TYPE_NAME
+ structured_type := unpacked_structured_type
+ unpacked_structured_type := array_type | record_type
+ array_type := ARRAY '[' ( simple_type | TYPE_NAME) { ',' ( simple_type | TYPE_NAME) } ']' OF type
+ record_type := RECORD field_list END
+ field_list := ( fixed_part [ ';' variant_part ] | variant_part )
+ fixed_part := id_list ':' type { ';' id_list ':' type }
+ variant_part := CASE [NAME ':'] TYPE_NAME OF variant { ';' variant }
+ variant := case_label_list ':' '(' field_list ')'
+ case_label_list := constant { ',' constant }
+ procedure_type := PROCEDURE [ formal_parameter_list ]
+ function_type := FUNCTION [ formal_parameter_list ] ':' TYPE_NAME
+ formal_parameter_list := '(' formal_parameter_section
+ { ';' formal_parameter_section } ')'
+ formal_parameter_section := [ VAR ] id_list ':' TYPE_NAME
+ variable_declaration_part := VAR id_list ':' type ';'
+ { id_list ':' type ';' }
+ procedure_definition_part := PROCEDURE NAME [ formal_parameter_list ] ';' block .
+ function_definition_part := FUNCTION NAME [ formal_parameter_list ] ':' TYPE_NAME ';' block .
+
+ 
+ statement_part := BEGIN statement_sequence END
+ statement_sequence := statement { ';' statement }
+ statement := [ LABEL_ID ':' ] ( simple_statement | structured_statement )
+ simple_statement := [ assignment_statement | procedure_statement
+ | goto_statement ]
+ assignment_statement := variable_access ':=' expression
+ variable_access := VARIABLE_NAME { array_access_ | record_access_ }
+ array_access_ := '[' expression { ',' expression } ']'
+ expression := simple_expression [ relational_operator simple_expression ]
+ relational_operator= '=' | '<>' | '<' | '<=' | '>' | '>='
+ simple_expression := [ '+' | '-' ] term { addition_operator term }
+ addition_operator := '+' | '-' | OR
+ term := factor { multiplication_operator factor }
+ multiplication_operator := '*' | '/' | DIV | AND .
+ factor := NUMBER | STRING | CHAR | CONSTANT_NAME | ENUM_VALUE
+ | variable_access | function_designator
+ | '(' expression ')' | NOT factor
+ function_designator := FUNCTION_NAME [ '(' expression { ',' expression } ')' ]
+ record_access_ := '.' ATTRIBUTE_NAME
+ procedure_statement := ((PROCEDURE_NAME | 'write')  [ '(' expression { ',' expression } ')' ])
+ | 'read' '(' variable_access {',' variable_access } ')'
+ goto_statement := GOTO LABEL_ID
+ structured_statement := compound_statement | repetitive_statement
+ | conditional_statement .
+ compound_statement := BEGIN statement_sequence END
+ repetitive_statement := while_statement | repeat_statement
+ | for_statement .
+ while_statement := WHILE expression DO statement
+ repeat_statement := REPEAT statement_sequence UNTIL expression
+ for_statement := FOR variable_access ':=' constant(ordinal)
+ ( TO | DOWNTO ) constant(ordinal) DO statement
+ conditional_statement := if_statement | case_statement
+ if_statement := IF expression THEN statement [ ELSE statement ]
+ case_statement := CASE expression OF case_label_list ':' statement { ';' case_label_list ':' statement } END
+
+ REAL := [0-9]+(\.[0-9]+)?(('e'|'E')('+'|'-')?[0-9]+)?
+ INT := [0-9]+
+  // NUMBER := INT | REAL
+ COMMENT := '{'.*'}'
+  // NAME, PROCEDURE_NAME, FUNCTION_NAME, ATTRIBUTE_NAME, VARIABLE_NAME, TYPE_NAME, CONSTANT_NAME are all ID
+ ID := [a-zA-Z_]+([a-zA-Z_]|[0-9])*
+ STRING := '"' (['\']^ | ('\n'|'\r'|'\\'|'\"'|'\t'))* '"'
+ CHAR := '\'' (['\']^ | ('\n'|'\r'|'\\'|'\"'|'\t')) '\''
+ // NOT SUPPORTED : FILES, SETS, CHR

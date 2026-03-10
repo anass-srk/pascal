@@ -7,6 +7,7 @@
 #include <concepts>
 #include <variant>
 #include <unordered_set>
+#include <exception>
 
 namespace pascal_compiler
 {
@@ -29,7 +30,7 @@ enum class SEMANTIC_ERROR
   SE_INVALID_COND
 };
 
-class SemanticException{
+class SemanticException : public std::exception {
   SEMANTIC_ERROR m_error;
   const std::string m_msg;
   const size_t m_line;
@@ -37,6 +38,8 @@ class SemanticException{
 
 public:
   SemanticException(SEMANTIC_ERROR error, std::string&& msg, size_t line, size_t col) : m_error(error), m_msg(std::move(msg)), m_line(line), m_col(col) {}
+
+  const char* what() const noexcept override { return m_msg.c_str(); }
 
   SEMANTIC_ERROR getError() const
   {

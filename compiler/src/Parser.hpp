@@ -1,18 +1,21 @@
 #pragma once
 #include "Semantics.hpp"
 #include "Ast.hpp"
+#include <exception>
 
 namespace pascal_compiler
 {
 
-class SyntaxException
+class SyntaxException : public std::exception
 {
-  const std::string m_msg; //Remember lifetimes
+  const std::string m_msg;
   const Lexeme m_token;
 
 public:
 
   SyntaxException(std::string&& msg, const Lexeme& token) : m_msg(std::move(msg)), m_token(token){}
+
+  const char* what() const noexcept override { return m_msg.c_str(); }
 
   const std::string& getMsg() const
   {

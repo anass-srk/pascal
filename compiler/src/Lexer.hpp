@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <concepts>
 #include <format>
+#include <exception>
 
 namespace pascal_compiler
 {
@@ -96,7 +97,7 @@ enum class LEXER_ERROR
   LEXER_ERROR_MAX = LE_INVALID_COMMENT
 };
 
-class LexerException
+class LexerException : public std::exception
 {
 
   const LEXER_ERROR m_error;
@@ -106,8 +107,10 @@ class LexerException
 
   public:
 
-  LexerException(LEXER_ERROR error,const char* msg, size_t line, size_t col) : 
-  m_error(error), m_msg(msg), m_line(line), m_col(col){} 
+  LexerException(LEXER_ERROR error,const char* msg, size_t line, size_t col) :
+  m_error(error), m_msg(msg), m_line(line), m_col(col){}
+
+  const char* what() const noexcept override { return m_msg; }
 
   LEXER_ERROR get_error() const
   {
