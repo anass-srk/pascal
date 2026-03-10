@@ -623,6 +623,22 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
   {
     const Type* ptype = params[i].m_type->get_underlying_type();
     const Type* atype = args[i]->exprType->get_underlying_type();
+    if(params[i].ref)
+    {
+      auto tmp = dynamic_cast<VariableAccess*>(args[i].get());
+      if(!tmp)
+      {
+        throw SemanticException(
+          SEMANTIC_ERROR::SE_INVALID_CALL,
+          std::format(
+            "Semantic error: At ({}), the {}-argument is not a variable but an expression !",
+            token.to_string(), i+1
+          ),
+          token.m_line,
+          token.m_col
+        );
+      }
+    }
     if(ptype != atype)
     {
       throw SemanticException(
