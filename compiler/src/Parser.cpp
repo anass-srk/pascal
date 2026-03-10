@@ -59,7 +59,10 @@ void Parser::program()
 void Parser::block()
 {
   declaration();
-  statement();
+  if(check(TOKEN_TYPE::BEGIN_TOKEN))
+  {
+    m_current_block->body = compound_stmt();
+  }
 }
 
 void Parser::declaration()
@@ -72,27 +75,33 @@ void Parser::declaration()
   if(check(TOKEN_TYPE::LABEL_TOKEN))
   {
     label_declaration();
+    continue;
   }
   if(check(TOKEN_TYPE::CONST_TOKEN))
   {
     const_definition();
+    continue;
   }
   if(check(TOKEN_TYPE::TYPE_TOKEN))
   {
     type_definition();
+    continue;
   }
   if(check(TOKEN_TYPE::VAR_TOKEN))
   {
     variable_declaration();
+    continue;
   }
-  // else if(check(TOKEN_TYPE::PROCEDURE_TOKEN))
-  // {
-  //   procedure_definition();
-  // }
-  // else if(check(TOKEN_TYPE::FUNCTION_TOKEN))
-  // {
-  //   function_definition();
-  // }
+  if(check(TOKEN_TYPE::PROCEDURE_TOKEN))
+  {
+    procedure_definition();
+    continue;
+  }
+  if(check(TOKEN_TYPE::FUNCTION_TOKEN))
+  {
+    function_definition();
+    continue;
+  }
   else{
     break;
   }
@@ -321,7 +330,7 @@ void Parser::type_definition()
 
     get_type(token, true);
 
-    match_adv(TOKEN_TYPE::SEMI_TOKEN);
+    match(TOKEN_TYPE::SEMI_TOKEN);
     adv();
   }
 }
@@ -344,6 +353,7 @@ std::vector<Lexeme> Parser::id_list(){
 }
 
 std::unique_ptr<Enum> Parser::enum_type(const Lexeme& token){
+  match(TOKEN_TYPE::LP_TOKEN);
   adv();
   auto vec = id_list();
   match(TOKEN_TYPE::RP_TOKEN);
@@ -354,7 +364,7 @@ std::unique_ptr<Enum> Parser::enum_type(const Lexeme& token){
     m_current_block->check_used_id(t);
     type->insert(t, *m_current_block);
   }
-  
+  adv();
   return type;
 }
 
@@ -365,6 +375,7 @@ const Type* Parser::get_type(const Lexeme &token, bool named){
     
     do{
       if(auto t = current->m_types.find(id); t != current->m_types.end()){
+        adv();
         if (named)
           return m_current_block->m_types.emplace(std::make_pair(token.m_id, t->second)).first->second.get();
         else 
@@ -408,6 +419,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
           if(auto t = Block::get(id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE)){
             types.emplace_back(t);
             first = true;
+            adv();
             break;
           }
         
@@ -428,6 +440,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
         Const beg = constant(beg_token);
         match_adv(TOKEN_TYPE::RANGE_TOKEN);
         Const end = constant(m_lexer.next_sym());
+        adv();
 
         types.emplace_back(
           m_current_block->m_unamed_types.emplace_back(
@@ -436,7 +449,6 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
         );
       }
 
-      adv();
     }while(check(TOKEN_TYPE::COMMA_TOKEN));
 
     match(TOKEN_TYPE::RB_TOKEN);
@@ -449,6 +461,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
       do{
         if(auto t = Block::get(id, current->m_types); t){
+          adv();
           return std::make_unique<Array>(
             token.m_id, token.m_line, token.m_col, std::move(types), t
           );
@@ -459,7 +472,6 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
     }
 
     auto const beg_token = m_lexer.getToken();
-
     return std::make_unique<Array>(
       token.m_id, token.m_line, token.m_col, std::move(types),
       m_current_block->m_unamed_types.emplace_back(type_eval(beg_token)).get()
@@ -470,15 +482,98 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
   else if(check(TOKEN_TYPE::RECORD_TOKEN)){
     auto record = field_list(token);
     match(TOKEN_TYPE::END_TOKEN);
+    adv();
     return record;
+  }
+
+  else if(check(TOKEN_TYPE::PROCEDURE_TOKEN)){
+    auto proc_type = std::make_unique<FunctionType>(token.m_id, token.m_line, token.m_col, nullptr);
+    adv();
+    if(check(TOKEN_TYPE::LP_TOKEN)){
+      proc_type->m_args = args_list();
+      adv();
+    }
+    return proc_type;
+  }
+
+  else if (check(TOKEN_TYPE::FUNCTION_TOKEN))
+  {
+    auto func_type = std::make_unique<FunctionType>(token.m_id, token.m_line, token.m_col, nullptr);
+    adv();
+    if (check(TOKEN_TYPE::LP_TOKEN)){
+      func_type->m_args = args_list();
+      adv();
+    }
+    match_adv(TOKEN_TYPE::COLON_TOKEN);
+    match_adv(TOKEN_TYPE::ID_TOKEN);
+    func_type->m_ret_type = find_type(true);
+    adv();
+    return func_type;
   }
 
   auto const beg_token = m_lexer.getToken();
   Const beg = constant(beg_token);
   match_adv(TOKEN_TYPE::RANGE_TOKEN);
   Const end = constant(m_lexer.next_sym());
+  adv();
 
   return std::make_unique<Subrange>(token.m_id, token.m_line, token.m_col, std::move(beg), std::move(end));
+}
+
+const Type* Parser::find_type(bool required)
+{
+  match(TOKEN_TYPE::ID_TOKEN);
+  const Type *t = nullptr;
+  auto tkn = m_lexer.getToken();
+  auto type_id = tkn.m_id;
+  Block *current = m_current_block;
+  do
+  {
+    if (const auto _t = Block::get(type_id, current->m_types); _t)
+    {
+      t = _t;
+      break;
+    }
+    current = current->m_parent;
+  } while (current);
+
+  if (t == nullptr && required)
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_TYPE,
+      std::format("Semantic error: Invalid typename ({}) !", tkn.to_string()),
+      tkn.m_line,
+      tkn.m_col
+    );
+  }
+  return t;
+}
+
+std::vector<Arg> Parser::args_list()
+{
+  std::vector<Arg> args;
+  match(TOKEN_TYPE::LP_TOKEN);
+  do{
+    adv();
+    bool ref = false;
+    if(check(TOKEN_TYPE::VAR_TOKEN)){
+      ref = true;
+      adv();
+    }
+    const auto ids = id_list();
+    match(TOKEN_TYPE::COLON_TOKEN);
+    match_adv(TOKEN_TYPE::ID_TOKEN);
+    
+    const Type* t = find_type(true);
+
+    for(const auto& id : ids){
+      args.emplace_back(ref, id, t);
+    }
+
+    adv();
+  }while(check(TOKEN_TYPE::SEMI_TOKEN));
+  match(TOKEN_TYPE::RP_TOKEN);
+  return args;
 }
 
 std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
@@ -490,7 +585,6 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     match(TOKEN_TYPE::COLON_TOKEN);
     adv();
     auto type = get_type(token, false);
-    adv();
 
     for(const auto& name : var_names){
       record->check_duplicate_id(token, name);
@@ -670,7 +764,7 @@ void Parser::variable_declaration()
     match(TOKEN_TYPE::COLON_TOKEN);
     adv();
     const auto type = get_type(m_lexer.getToken(), false);
-    match_adv(TOKEN_TYPE::SEMI_TOKEN);
+    match(TOKEN_TYPE::SEMI_TOKEN);
     adv();
 
     for (const auto &name : names){
@@ -681,8 +775,671 @@ void Parser::variable_declaration()
   }while(check(TOKEN_TYPE::ID_TOKEN));
 }
 
-void Parser::statement()
+void Parser::procedure_definition()
 {
+  match_adv(TOKEN_TYPE::ID_TOKEN);
+
+  auto token = m_lexer.getToken();
+  const auto id = token.m_id;
+  auto proc_type = new FunctionType (token.m_id, token.m_line, token.m_col, nullptr);
+
+  m_current_block->check_used_id(token);
+
+  adv();
+  if(check(TOKEN_TYPE::LP_TOKEN)){
+    proc_type->m_args = args_list();
+    adv();
+  }
+  match(TOKEN_TYPE::SEMI_TOKEN);
+
+  m_current_block->m_unamed_types.emplace_back(proc_type);
+
+  Block *parent = m_current_block;
+  m_current_block = new Block();
+  m_current_block->m_parent = parent;
+
+  // Adding arguments as variables
+  
+  
+  block();
+  match(TOKEN_TYPE::DOT_TOKEN);
+  adv();
+
+  auto *func_block = m_current_block;
+  m_current_block = parent;
+
+  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, proc_type, func_block)));
+}
+
+void Parser::function_definition()
+{
+  match_adv(TOKEN_TYPE::ID_TOKEN);
+
+  auto token = m_lexer.getToken();
+  const auto id = token.m_id;
+  auto proc_type = new FunctionType (token.m_id, token.m_line, token.m_col, nullptr);
+
+  m_current_block->check_used_id(token);
+
+  adv();
+  if(check(TOKEN_TYPE::LP_TOKEN)){
+    proc_type->m_args = args_list();
+    adv();
+  }
+
+  match(TOKEN_TYPE::COLON_TOKEN);
+  match_adv(TOKEN_TYPE::ID_TOKEN);
+  proc_type->m_ret_type = find_type(true);
+  match_adv(TOKEN_TYPE::SEMI_TOKEN);
+
+  m_current_block->m_unamed_types.emplace_back(proc_type);
+
+  Block *parent = m_current_block;
+  m_current_block = new Block();
+  m_current_block->m_parent = parent;
+  
+  block();
+  match(TOKEN_TYPE::DOT_TOKEN);
+  adv();
+
+  auto *func_block = m_current_block;
+  m_current_block = parent;
+
+  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, proc_type, func_block)));
+}
+
+std::unique_ptr<Expression> Parser::gexpression()
+{
+  const auto token = m_lexer.getToken();
+  auto first = expression();
+  if(check({
+    TOKEN_TYPE::EQ_TOKEN, TOKEN_TYPE::NEQ_TOKEN, TOKEN_TYPE::GE_TOKEN,
+    TOKEN_TYPE::GT_TOKEN, TOKEN_TYPE::LT_TOKEN, TOKEN_TYPE::LE_TOKEN
+  }))
+  {
+    BinaryOp op;
+    switch(m_lexer.getToken().m_type)
+    {
+      case TOKEN_TYPE::EQ_TOKEN:
+        op = BinaryOp::Eq;
+      break;
+      case TOKEN_TYPE::NEQ_TOKEN:
+        op = BinaryOp::Ne;
+      break;
+      case TOKEN_TYPE::GE_TOKEN:
+        op = BinaryOp::Ge;
+      break;
+      case TOKEN_TYPE::GT_TOKEN:
+        op = BinaryOp::Gt;
+      break;
+      case TOKEN_TYPE::LT_TOKEN:
+        op = BinaryOp::Lt;
+      break;
+      case TOKEN_TYPE::LE_TOKEN:
+        op = BinaryOp::Le;
+      break;
+    }
+    adv();
+    first = std::make_unique<BinaryExpression>(op, std::move(first), expression(), token);
+    first->validate();
+    return first;
+  }
+  return first;
+}
+
+std::unique_ptr<Expression> Parser::expression()
+{
+  const auto token = m_lexer.getToken();
+
+  bool pos = true;
+  bool sign = false;
+  if(check(TOKEN_TYPE::PLUS_TOKEN))
+  {
+    pos = true;
+    sign = true;
+    adv();
+  }
+  else if(check(TOKEN_TYPE::MINUS_TOKEN))
+  {
+    pos = false;
+    sign = true;
+    adv();
+  }
+
+  auto first = term();
+
+  // Only one term (no addition operators)
+  if (!check({TOKEN_TYPE::PLUS_TOKEN, TOKEN_TYPE::MINUS_TOKEN, TOKEN_TYPE::OR_TOKEN}))
+  {
+    if(!sign) return first;
+
+    auto uexp = std::make_unique<UnaryExpression>((pos ? UnaryOp::Plus : UnaryOp::Minus), std::move(first), token);
+    uexp->validate();
+    return uexp;
+  }
+
+  const auto loc = first->token;
+  auto nexp = std::make_unique<NExpression>(std::move(first), loc);
+
+  while (check({TOKEN_TYPE::PLUS_TOKEN, TOKEN_TYPE::MINUS_TOKEN, TOKEN_TYPE::OR_TOKEN}))
+  {
+    BinaryOp op;
+    switch(m_lexer.getToken().m_type)
+    {
+      case TOKEN_TYPE::PLUS_TOKEN:
+        op = BinaryOp::Add;
+      break;
+      case TOKEN_TYPE::MINUS_TOKEN:
+        op = BinaryOp::Sub;
+      break;
+      case TOKEN_TYPE::OR_TOKEN:
+        op = BinaryOp::Or;
+      break;
+    }
+    adv();
+    nexp->add(op, term());
+  }
+
+  nexp->validate();
+
+  if(sign)
+  {
+    auto uexp = std::make_unique<UnaryExpression>((pos ? UnaryOp::Plus : UnaryOp::Minus), std::move(nexp), token);
+    uexp->validate();
+    return uexp;
+  }
+
+  return nexp;
+}
+
+std::unique_ptr<Expression> Parser::term()
+{
+  const auto token = m_lexer.getToken();
+
+  auto first = factor();
+
+  if(!check({TOKEN_TYPE::STAR_TOKEN, TOKEN_TYPE::SLASH_TOKEN, TOKEN_TYPE::DIV_TOKEN, TOKEN_TYPE::AND_TOKEN})) return first;
+
+  const auto loc = first->token;
+  auto nexp = std::make_unique<NExpression>(std::move(first), loc);
+
+  while (check({TOKEN_TYPE::STAR_TOKEN, TOKEN_TYPE::SLASH_TOKEN, TOKEN_TYPE::DIV_TOKEN, TOKEN_TYPE::AND_TOKEN}))
+  {
+    BinaryOp op;
+    switch (m_lexer.getToken().m_type)
+    {
+    case TOKEN_TYPE::STAR_TOKEN:
+      op = BinaryOp::Mul;
+      break;
+      case TOKEN_TYPE::SLASH_TOKEN:
+      case TOKEN_TYPE::DIV_TOKEN:
+        op = BinaryOp::Div;
+      break;
+      case TOKEN_TYPE::AND_TOKEN:
+        op = BinaryOp::And;
+      break;
+      default:
+      break;
+    }
+    adv();
+    nexp->add(op, factor());
+  }
+
+  nexp->validate();
+
+  return nexp;
+}
+
+std::unique_ptr<Expression> Parser::factor()
+{
+  const auto token = m_lexer.getToken();
+  if(
+    check({
+      TOKEN_TYPE::NUM_INT_TOKEN, TOKEN_TYPE::NUM_REAL_TOKEN, TOKEN_TYPE::CHAR_LITERAL_TOKEN,
+      TOKEN_TYPE::STRING_LITERAL_TOKEN, TOKEN_TYPE::TRUE_TOKEN, TOKEN_TYPE::FALSE_TOKEN
+    })
+  )
+  {
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(constant(token)), token);
+    res->validate();
+    adv();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::NOT_TOKEN))
+  {
+    adv();
+    auto res = std::make_unique<UnaryExpression>(UnaryOp::Not, factor(), token);
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::LP_TOKEN))
+  {
+    adv();
+    auto res = expression();
+    match(TOKEN_TYPE::RP_TOKEN);
+    adv();
+    return res;
+  }
+
+  if(!check(TOKEN_TYPE::ID_TOKEN))
+  {
+    match({
+      TOKEN_TYPE::NUM_INT_TOKEN, TOKEN_TYPE::NUM_REAL_TOKEN, TOKEN_TYPE::CHAR_LITERAL_TOKEN,
+      TOKEN_TYPE::STRING_LITERAL_TOKEN, TOKEN_TYPE::TRUE_TOKEN, TOKEN_TYPE::FALSE_TOKEN,
+      TOKEN_TYPE::NOT_TOKEN, TOKEN_TYPE::LP_TOKEN, TOKEN_TYPE::ID_TOKEN, TOKEN_TYPE::READ_TOKEN
+    });
+  }
+
+  const Var *var = nullptr;
+  const Const *cons = nullptr;
+  const Function *func = nullptr;
+  const EnumValue* ev = nullptr;
+
+  const auto id = token.m_id;
+  Block *current = m_current_block;
+
+  do
+  {
+    if(auto v  = Block::get(id, current->m_vars); v)
+    {
+      var = v;
+      break;
+    }
+    if(auto f = Block::get(id, current->m_funcs); f && f->m_type->m_ret_type != nullptr) // A function, not a procedure
+    {
+      func = f;
+      break;
+    }
+    if(auto e = Block::get(id, current->m_enums_vals); e)
+    {
+      ev = e;
+      break;
+    }
+    if(auto c = Block::get(id, current->m_consts); c)
+    {
+      cons = c;
+      break;
+    }
+
+    current = current->m_parent;
+  } while (current);
+
+  if(cons)
+  {
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(Const(*cons)), token);
+    res->validate();
+    adv();
+    return res;
+  }
+  if(ev)
+  {
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token.m_id, token.m_line, token.m_col, *ev), token);
+    res->validate();
+    adv();
+    return res;
+  }
+
+  // Vars or funcs or none (error)
+  if(var)
+  {
+    return variable_access(var);
+  }
+
+  if(func)
+  {
+    return std::get<std::unique_ptr<FunctionCall>>(function_call(func, false));
+  }
+
+  throw SemanticException(
+    SEMANTIC_ERROR::SE_MISSING_ID,
+    std::format("Semantic error: '{}' does not correspond to a variable, a constant, a function or an enum !", id),
+    token.m_line,
+    token.m_col
+  );
+}
+
+std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> Parser::function_call(const Function *f, bool is_procedure)
+{
+  const auto tkn = m_lexer.getToken();
+  const auto func_type = f->m_type;
+  std::vector<std::unique_ptr<Expression>> args;
+  match(TOKEN_TYPE::ID_TOKEN);
+  adv();
+  
+  if(check(TOKEN_TYPE::LP_TOKEN))
+  {
+    do
+    {
+      adv();
+      args.push_back(gexpression());
+    }while(check(TOKEN_TYPE::COMMA_TOKEN));
+    match(TOKEN_TYPE::RP_TOKEN);
+    adv();
+  }
+  if(!is_procedure)
+  {
+    auto res = std::make_unique<FunctionCall>(f, std::move(args), tkn);
+    res->validate();
+    return res;
+  }
+  auto res = std::make_unique<ProcedureCall>(f, std::move(args), tkn);
+  res->validate();
+  return res;
+}
+
+std::unique_ptr<VariableAccess> Parser::variable_access(const Var *v)
+{
+  const auto tkn = m_lexer.getToken();
+
+  std::vector<std::unique_ptr<Selector>> selectors;
+  match(TOKEN_TYPE::ID_TOKEN);
+
+  if(v == nullptr)
+  {
+    const auto id = tkn.m_id;
+    Block *current = m_current_block;
+
+    do
+    {
+      if (auto _v = Block::get(id, current->m_vars); _v)
+      {
+        v = _v;
+        break;
+      }
+
+      current = current->m_parent;
+    } while (current);
+  }
+
+  adv();
+
+  while(check({TOKEN_TYPE::DOT_TOKEN, TOKEN_TYPE::LB_TOKEN}))
+  {
+    if(check(TOKEN_TYPE::DOT_TOKEN))
+    {
+      match_adv(TOKEN_TYPE::ID_TOKEN);
+      const auto token = m_lexer.getToken();
+      selectors.push_back(std::make_unique<FieldSelector>(token.m_id, token));
+      adv();
+      continue;
+    }
+    std::vector<std::unique_ptr<Expression>> indices;
+    do
+    {
+      adv();
+      const auto token = m_lexer.getToken();
+      indices.push_back(gexpression());
+    }while(check(TOKEN_TYPE::COMMA_TOKEN));
+    match(TOKEN_TYPE::RB_TOKEN);
+    adv();
+    Lexeme loc = indices[0]->token;
+    selectors.push_back(std::make_unique<ArraySelector>(std::move(indices), loc));
+  }
+
+  auto res = std::make_unique<VariableAccess>(v, std::move(selectors), tkn);
+  res->validate();
+  return res;
+}
+
+std::unique_ptr<CompoundStatement> Parser::compound_stmt()
+{
+  const auto token = m_lexer.getToken();
+  std::vector<std::unique_ptr<Statement>> statements;
+
+  match(TOKEN_TYPE::BEGIN_TOKEN);
+  do
+  {
+    adv();
+    statements.push_back(statement());
+  }while(check(TOKEN_TYPE::SEMI_TOKEN));
+
+  match(TOKEN_TYPE::END_TOKEN);
+  adv();
+
+  auto res = std::make_unique<CompoundStatement>(std::move(statements), token);
+  res->validate();
+  return res;
+}
+
+std::unique_ptr<Statement> Parser::statement()
+{
+
+  const auto token = m_lexer.getToken();
+
+  if(check({TOKEN_TYPE::ID_TOKEN, TOKEN_TYPE::NUM_INT_TOKEN})) // label or variable or procedure
+  {
+    const Var *var = nullptr;
+    const Function *func = nullptr;
+    const Label *label = nullptr;
+
+    const auto id = token.m_id;
+    Block *current = m_current_block;
+
+    do
+    {
+      if (auto v = Block::get(id, current->m_vars); v)
+      {
+        var = v;
+        break;
+      }
+      if (auto f = Block::get(id, current->m_funcs); f && f->m_type->m_ret_type == nullptr) // Not a function, a procedure
+      {
+        func = f;
+        break;
+      }
+      if (auto l = Block::get(id, current->m_labels); l)
+      {
+        label = l;
+        break;
+      }
+
+      current = current->m_parent;
+    } while (current);
+
+    if(label)
+    {
+      match_adv(TOKEN_TYPE::COLON_TOKEN);
+      adv();
+      auto res = std::make_unique<LabeledStatement>(label->m_id, statement(), token);
+      res->validate();
+      return res;
+    }
+
+    if(var)
+    {
+      auto v = variable_access(var);
+      match(TOKEN_TYPE::ASSIGN_TOKEN);
+      adv();
+      auto res = std::make_unique<AssignmentStatement>(std::move(v), gexpression(), token);
+      res->validate();
+      return res;
+    }
+
+    // Handle procedures
+    if(func)
+    {
+      return std::get<std::unique_ptr<ProcedureCall>>(function_call(func, true));
+    }
+
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_MISSING_ID,
+      std::format(
+        "Semantic error : invalid statement ! {} doesn't correspond to a label, a function or a variable !",
+        token.to_string()
+      ),
+      token.m_line,
+      token.m_col
+    );
+  }
+
+  //TODO: Handle writes/reads
+  if(check(TOKEN_TYPE::WRITE_TOKEN))
+  {
+    std::vector<std::unique_ptr<Expression>> args;
+    match_adv(TOKEN_TYPE::LP_TOKEN);
+    do{
+      adv();
+      args.push_back(gexpression());
+    }while(check(TOKEN_TYPE::COMMA_TOKEN));
+    match(TOKEN_TYPE::RP_TOKEN);
+    adv();
+    auto res = std::make_unique<WriteStatement>(token, std::move(args));
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::READ_TOKEN))
+  {
+    std::vector<std::unique_ptr<VariableAccess>> args;
+    match_adv(TOKEN_TYPE::LP_TOKEN);
+    do
+    {
+      adv();
+      args.push_back(variable_access(nullptr));
+    } while (check(TOKEN_TYPE::COMMA_TOKEN));
+    match(TOKEN_TYPE::RP_TOKEN);
+    adv();
+
+    auto res = std::make_unique<ReadStatement>(token, std::move(args));
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::GOTO_TOKEN))
+  {
+    match_adv({TOKEN_TYPE::NUM_INT_TOKEN, TOKEN_TYPE::ID_TOKEN});
+    const Label *label = nullptr;
+
+    const auto id = token.m_id;
+    Block *current = m_current_block;
+
+    do
+    {
+      if (auto l = Block::get(id, current->m_labels); l)
+      {
+        label = l;
+        break;
+      }
+
+      current = current->m_parent;
+    } while (current);
+
+    if(!label)
+    {
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_MISSING_ID,
+        std::format(
+            "Semantic error : invalid statement ! {} doesn't correspond to a label !",
+            token.to_string()),
+        token.m_line,
+        token.m_col
+      );
+    }
+
+    auto res = std::make_unique<GotoStatement>(id, token);
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::BEGIN_TOKEN))
+  {
+    return compound_stmt();
+  }
+
+  if(check(TOKEN_TYPE::WHILE_TOKEN))
+  {
+    adv();
+    auto cond = gexpression();
+    match(TOKEN_TYPE::DO_TOKEN);
+    adv();
+    auto res = std::make_unique<WhileStatement>(std::move(cond), statement(), token);
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::REPEAT_TOKEN))
+  {
+    std::vector<std::unique_ptr<Statement>> stmts;
+    
+    do
+    {
+      adv();
+      stmts.push_back(statement());
+    } while (check(TOKEN_TYPE::SEMI_TOKEN));
+    
+    match(TOKEN_TYPE::UNTIL_TOKEN);
+    auto res = std::make_unique<RepeatStatement>(std::move(stmts), gexpression(), token);
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::FOR_TOKEN))
+  {
+    adv();
+    auto v = variable_access(nullptr);
+    match(TOKEN_TYPE::ASSIGN_TOKEN);
+    adv();
+    auto start = constant(m_lexer.getToken());
+    match_adv({TOKEN_TYPE::TO_TOKEN, TOKEN_TYPE::DOWNTO_TOKEN});
+    bool increasing = check(TOKEN_TYPE::TO_TOKEN);
+    adv();
+    auto end = constant(m_lexer.getToken());
+    match_adv(TOKEN_TYPE::DO_TOKEN);
+
+    auto res = std::make_unique<ForStatement>(std::move(v), std::move(start), std::move(end), statement(), increasing, token);
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::IF_TOKEN))
+  {
+    adv();
+    auto cond = gexpression();
+    match(TOKEN_TYPE::THEN_TOKEN);
+    adv();
+    auto then = statement();
+    std::unique_ptr<Statement> otherwise;
+
+    if(check(TOKEN_TYPE::ELSE_TOKEN))
+    {
+      adv();
+      otherwise = statement();
+    }
+
+    auto res = std::make_unique<IfStatement>(std::move(cond), std::move(then), std::move(otherwise), token);
+    res->validate();
+    return res;
+  }
+
+  if(check(TOKEN_TYPE::CASE_TOKEN))
+  {
+    std::vector<CaseStatement::CaseAlternative> cases;
+    adv();
+    auto exp = gexpression();
+    match(TOKEN_TYPE::OF_TOKEN);
+    do
+    {
+      adv();
+      const auto tkn = m_lexer.getToken();
+      auto labels = case_label_list();
+      match(TOKEN_TYPE::COLON_TOKEN);
+      adv();
+      cases.emplace_back(std::move(labels), statement(), tkn);
+    }while(check(TOKEN_TYPE::SEMI_TOKEN));
+    match(TOKEN_TYPE::END_TOKEN);
+    
+    auto res = std::make_unique<CaseStatement>(std::move(exp), std::move(cases), token);
+    res->validate();
+    return res;
+  }
+
+  match({
+    TOKEN_TYPE::ID_TOKEN, TOKEN_TYPE::NUM_INT_TOKEN, TOKEN_TYPE::BEGIN_TOKEN, TOKEN_TYPE::GOTO_TOKEN,
+    TOKEN_TYPE::WRITE_TOKEN, TOKEN_TYPE::READ_TOKEN, TOKEN_TYPE::IF_TOKEN, TOKEN_TYPE::CASE_TOKEN,
+    TOKEN_TYPE::WHILE_TOKEN, TOKEN_TYPE::REPEAT_TOKEN, TOKEN_TYPE::FOR_TOKEN
+  });
 
 }
 

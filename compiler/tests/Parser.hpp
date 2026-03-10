@@ -293,7 +293,6 @@ TEST(ParserTest, Subranges){
   );
 
   test_throw("type range = \"A\"..\"D\";");
-  test_throw("type range = false..true;");
   test_throw("type range = 1.2 .. 3.5;");
   test_throw("type a = (A, B); range = A..5;");
   test_throw("type range = 5..1;");

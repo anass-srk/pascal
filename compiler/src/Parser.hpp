@@ -59,11 +59,19 @@ public:
     return m_lexer.getToken().m_type == type;
   }
 
+  inline bool check(std::initializer_list<TOKEN_TYPE> l)
+  {
+    for(auto t : l)
+    {
+      if(t == m_lexer.getToken().m_type) return true;
+    }
+    return false;
+  }
+
   void parse();
   void program();
   void block();
   void declaration();
-  void statement();
 
   // Declaration types
   void label_declaration();
@@ -81,6 +89,21 @@ public:
   std::vector<Lexeme> id_list();
   std::unique_ptr<Record> field_list(const Lexeme&);
   std::vector<Const> case_label_list();
+  std::vector<Arg> args_list();
+
+  const Type* find_type(bool required);
+
+  std::unique_ptr<Expression> gexpression();
+  std::unique_ptr<Expression> expression();
+  std::unique_ptr<Expression> term();
+  std::unique_ptr<Expression> factor();
+
+  std::unique_ptr<VariableAccess> variable_access(const Var*);
+  std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> function_call(const Function*, bool is_procedure);
+
+  std::unique_ptr<CompoundStatement> compound_stmt();
+  std::unique_ptr<Statement> statement();
+  
 };
 
 }
