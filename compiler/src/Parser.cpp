@@ -13,7 +13,7 @@ void Parser::match(TOKEN_TYPE type)
 {
   const auto& token = m_lexer.getToken();
   if(token.m_type != type){
-    throw SyntaxException(std::format("Syntax error: expected {}, found {} !", TOKEN_NAMES[int(type)], TOKEN_NAMES[int(token.m_type)]),token);
+    throw SyntaxException(std::format("Syntax error: At ({}), expected {}, found {} !", token.to_string(), TOKEN_NAMES[int(type)], TOKEN_NAMES[int(token.m_type)]),token);
   }
 }
 
@@ -26,7 +26,7 @@ void Parser::match(std::initializer_list<TOKEN_TYPE> l){
   }
   
   auto it = l.begin();
-  std::string err = "Syntax error: expected (" + std::string(TOKEN_NAMES[int(*it)]);
+  std::string err = std::format("Syntax error: At ({}), expected (", m_lexer.getToken().to_string()) + std::string(TOKEN_NAMES[int(*it)]);
   ++it;
   for(;it != l.end();++it){
     err += " or " + std::string(TOKEN_NAMES[int(*it)]);
@@ -880,7 +880,22 @@ std::unique_ptr<Expression> Parser::gexpression()
       break;
     }
     adv();
-    first = std::make_unique<BinaryExpression>(op, std::move(first), expression(), token);
+
+    const Type* bool_type = nullptr;
+    {
+      Block* current = m_current_block;
+      do
+      {
+        if (auto t = Block::get(CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)], current->m_types); t)
+        {
+          bool_type = t;
+          break;
+        }
+      } while (current);
+      
+    }
+
+    first = std::make_unique<BinaryExpression>(op, std::move(first), expression(), token, bool_type);
     first->validate();
     return first;
   }
@@ -1312,7 +1327,8 @@ std::unique_ptr<Statement> Parser::statement()
     match_adv({TOKEN_TYPE::NUM_INT_TOKEN, TOKEN_TYPE::ID_TOKEN});
     const Label *label = nullptr;
 
-    const auto id = token.m_id;
+    const auto tkn = m_lexer.getToken();
+    const auto id = tkn.m_id;
     Block *current = m_current_block;
 
     do
@@ -1332,11 +1348,12 @@ std::unique_ptr<Statement> Parser::statement()
         SEMANTIC_ERROR::SE_MISSING_ID,
         std::format(
             "Semantic error : invalid statement ! {} doesn't correspond to a label !",
-            token.to_string()),
+            tkn.to_string()),
         token.m_line,
         token.m_col
       );
     }
+    adv();
 
     auto res = std::make_unique<GotoStatement>(id, token);
     res->validate();
@@ -1370,6 +1387,7 @@ std::unique_ptr<Statement> Parser::statement()
     } while (check(TOKEN_TYPE::SEMI_TOKEN));
     
     match(TOKEN_TYPE::UNTIL_TOKEN);
+    adv();
     auto res = std::make_unique<RepeatStatement>(std::move(stmts), gexpression(), token);
     res->validate();
     return res;
@@ -1387,6 +1405,7 @@ std::unique_ptr<Statement> Parser::statement()
     adv();
     auto end = constant(m_lexer.getToken());
     match_adv(TOKEN_TYPE::DO_TOKEN);
+    adv();
 
     auto res = std::make_unique<ForStatement>(std::move(v), std::move(start), std::move(end), statement(), increasing, token);
     res->validate();
@@ -1429,6 +1448,7 @@ std::unique_ptr<Statement> Parser::statement()
       cases.emplace_back(std::move(labels), statement(), tkn);
     }while(check(TOKEN_TYPE::SEMI_TOKEN));
     match(TOKEN_TYPE::END_TOKEN);
+    adv();
     
     auto res = std::make_unique<CaseStatement>(std::move(exp), std::move(cases), token);
     res->validate();
