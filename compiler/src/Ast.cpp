@@ -5,13 +5,9 @@ namespace pascal_compiler
 
 void UnaryExpression::validate()
 {
-  auto type_name = operand->exprType->m_name;
-  this->exprType = operand->exprType;
-  if(operand->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
-  {
-    this->exprType = static_cast<const Subrange *>(operand->exprType)->m_utype;
-    type_name = CONST_CAT_NAMES[int(static_cast<const Subrange *>(operand->exprType)->m_cat)];
-  }
+  this->exprType = operand->exprType->get_underlying_type();
+  auto type_name = exprType->m_name;
+
   if (
     (op == UnaryOp::Plus || op == UnaryOp::Minus) &&
     type_name != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
@@ -48,18 +44,8 @@ void BinaryExpression::validate()
 {
   // For now, both expression are required to be bools
   // if an expression's type is a subrange, get the underlying type
-  auto left_type = left->exprType->m_name;
-  this->exprType = left->exprType;
-  if (left->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
-  {
-    this->exprType = static_cast<const Subrange *>(left->exprType)->m_utype;
-    left_type = CONST_CAT_NAMES[int(static_cast<const Subrange *>(left->exprType)->m_cat)];
-  }
-  auto right_type = left->exprType->m_name;
-  if (right->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
-  {
-    right_type = CONST_CAT_NAMES[int(static_cast<const Subrange *>(right->exprType)->m_cat)];
-  }
+  auto left_type = left->exprType->get_underlying_type()->m_name;
+  auto right_type = right->exprType->get_underlying_type()->m_name;
 
   if(left_type != right_type)
   {
@@ -73,12 +59,17 @@ void BinaryExpression::validate()
       token.m_col
     );
   }
-  if(left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
+  if(
+    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
+    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
+    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] && 
+    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]
+  )
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
-        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected Bools !",
+        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected Ints, Reals, Chars or Bools !",
         token.to_string(), left->exprType->to_string(), right->exprType->to_string()
       ),
       token.m_line,
@@ -88,16 +79,18 @@ void BinaryExpression::validate()
 
   switch(op)
   {
+    case BinaryOp::Le:
+    case BinaryOp::Lt:
+    case BinaryOp::Ge:
+    case BinaryOp::Gt:
     case BinaryOp::Eq:
     case BinaryOp::Ne:
-    case BinaryOp::And:
-    case BinaryOp::Or:
     break;
     default:
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_OP,
         std::format(
-          "Semantic error: Cannot apply binary operation ({}) on 2 boolean expressions !",
+          "Semantic error: At ({}), expected comparison !",
           token.to_string()
         ),
         token.m_line,
@@ -113,7 +106,7 @@ void NExpression::validate()
 
   const auto left = exprs[0].get();
 
-  if(exprs.size()+1 != ops.size())
+  if(exprs.size() != ops.size()+1)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
@@ -126,13 +119,8 @@ void NExpression::validate()
     );
   }
 
-  auto left_type = left->exprType->m_name;
-  this->exprType = left->exprType;
-  if (left->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
-  {
-    this->exprType = static_cast<const Subrange *>(left->exprType)->m_utype;
-    left_type = CONST_CAT_NAMES[int(static_cast<const Subrange *>(left->exprType)->m_cat)];
-  }
+  this->exprType = left->exprType->get_underlying_type();
+  auto left_type = exprType->m_name;
 
   if(
     left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
@@ -155,11 +143,7 @@ void NExpression::validate()
   for(int i = 0;i < ops.size();++i)
   {
     const auto right = exprs[i+1].get();
-    auto right_type = right->exprType->m_name;
-    if (right->exprType->m_type == TYPE_CAT::TC_SUBRANGE)
-    {
-      right_type = CONST_CAT_NAMES[int(static_cast<const Subrange *>(right->exprType)->m_cat)];
-    }
+    auto right_type = right->exprType->get_underlying_type()->m_name;
     if(left_type != right_type)
     {
       throw SemanticException(
@@ -236,8 +220,8 @@ const Type * ArraySelector::apply(const Type *type)
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format(
-        "Semantic error: type ({}) is not indexable ! Expected an array !",
-        type->to_string()
+        "Semantic error: At ({}), type ({}) is not indexable ! Expected an array !",
+        token.to_string(), type->to_string()
       ),
       token.m_line,
       token.m_col
@@ -251,8 +235,8 @@ const Type * ArraySelector::apply(const Type *type)
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_INDEX,
       std::format(
-        "Semantic error: array type ({}) requires {} indices ! Found {} indices !",
-        type->to_string(), arr->m_itypes.size(), indices.size()
+        "Semantic error: At ({}), array type ({}) requires {} indices ! Found {} indices !",
+        token.to_string(), type->to_string(), arr->m_itypes.size(), indices.size()
       ),
       token.m_line,
       token.m_col
@@ -261,19 +245,17 @@ const Type * ArraySelector::apply(const Type *type)
 
   for(int i = 0;i < indices.size();++i)
   {
-    auto itype = indices[i]->exprType;
-    if(itype->m_type == TYPE_CAT::TC_SUBRANGE) itype = static_cast<const Subrange*>(itype)->m_utype;
+    auto itype = indices[i]->exprType->get_underlying_type();
     
-    auto vtype = arr->m_itypes[i];
-    if(vtype->m_type == TYPE_CAT::TC_SUBRANGE) vtype = static_cast<const Subrange*>(vtype)->m_utype;
+    auto vtype = arr->m_itypes[i]->get_underlying_type();
     
     if(vtype != itype)
     {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_INDEX,
         std::format(
-          "Semantic error: array type ({}) requires the index-{} to be of type ({}) ! Found {} !",
-          type->to_string(), i+1, arr->m_itypes[i]->to_string(), indices[i]->exprType->to_string()
+          "Semantic error: At ({}), array type ({}) requires the index-{} to be of type ({}) ! Found {} !",
+          token.to_string(), type->to_string(), i+1, arr->m_itypes[i]->to_string(), indices[i]->exprType->to_string()
         ),
         token.m_line,
         token.m_col
@@ -291,8 +273,8 @@ const Type* FieldSelector::apply(const Type* type)
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format(
-        "Semantic error: Field name '{}' does not exists for non-record type ({}) ! Expected a record !",
-        field, type->to_string()
+        "Semantic error: At ({}), Field name '{}' does not exists for non-record type ({}) ! Expected a record !",
+        token.to_string(), field, type->to_string()
       ),
       token.m_line,
       token.m_col
@@ -341,6 +323,25 @@ void CompoundStatement::validate()
 
 void AssignmentStatement::validate()
 {
+  const auto type = lhs->exprType->get_underlying_type()->m_name;
+  if(
+    lhs->exprType->m_type != TYPE_CAT::TC_ENUM        && // Enums can be assigned
+    type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)]   &&
+    type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)]  &&
+    type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)]  && 
+    type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]
+  )
+  {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_CALL,
+      std::format(
+        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars or Bools !",
+        token.to_string(), lhs->exprType->to_string()
+      ),
+      token.m_line,
+      token.m_col
+    );
+  }
   if(lhs->exprType->get_underlying_type() != rhs->exprType->get_underlying_type())
   {
     throw SemanticException(
@@ -362,19 +363,24 @@ void WriteStatement::validate()
 {
   for(const auto &exp : arguments)
   {
-    const auto type = exp->exprType->get_underlying_type()->m_name;
-    
+
+    auto t = exp->exprType->get_underlying_type();
+
+    const auto type = t->m_name;
+
     if(
       type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
       type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
       type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] && 
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]
+      type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] &&
+      type != CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)] && 
+      !(t->m_type == TYPE_CAT::TC_ARRAY && static_cast<const Array*>(t)->m_etype->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)])
     )
     {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
-          "Semantic error: In ({}), cannot write an expressions of type ({})! Expected Ints, Reals, Chars or Bools !",
+          "Semantic error: In ({}), cannot write an expressions of type ({})! Expected Ints, Reals, Chars, Strings, Bools or array of Chars !",
           token.to_string(), exp->exprType->to_string()
         ),
         token.m_line,
@@ -389,19 +395,23 @@ void ReadStatement::validate()
 {
   for(const auto &exp : arguments)
   {
-    const auto type = exp->exprType->get_underlying_type()->m_name;
     
+    auto t = exp->exprType->get_underlying_type();
+
+    const auto type = t->m_name;
+
     if(
       type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
       type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
       type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] && 
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]
+      type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] &&
+      !(t->m_type == TYPE_CAT::TC_ARRAY && static_cast<const Array*>(t)->m_etype->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)])
     )
     {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
-          "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars or Bools !",
+          "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars, Bools or array of Chars !",
           token.to_string(), exp->exprType->to_string()
         ),
         token.m_line,
@@ -603,6 +613,7 @@ void CaseStatement::validate()
   }
 }
 
+// How will we deal with references ? what about arrays ?
 void validate(const Function *func, const std::vector<std::unique_ptr<Expression>> &args, Lexeme token)
 {
   const auto& params = func->m_type->m_args;  

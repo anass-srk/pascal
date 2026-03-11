@@ -25,25 +25,6 @@ struct LiteralExpression : public Expression
   void validate() override;
 };
 
-// Identifier reference – can be a variable, constant, enum value, or function name.
-struct IdentifierExpression : public Expression 
-{
-  std::string_view name;
-  std::variant<const Var*, const Const*, const EnumValue*, const Function*> symbol;
-
-  template<typename T>
-  IdentifierExpression(std::string_view id, T* sym, Lexeme token)
-    : Expression(token), name(id), symbol(sym) {}
-
-  enum struct Kind { Var, Const, Enum, Func };
-  Kind getKind() const {
-    if (std::holds_alternative<const Var*>(symbol)) return Kind::Var;
-    if (std::holds_alternative<const Const*>(symbol)) return Kind::Const;
-    if (std::holds_alternative<const EnumValue*>(symbol)) return Kind::Enum;
-    return Kind::Func;
-  }
-};
-
 // Unary operations (+, -, not)
 enum struct UnaryOp { Plus, Minus, Not };
 
@@ -77,8 +58,8 @@ struct BinaryExpression : public Expression
   BinaryOp op;
   std::unique_ptr<Expression> left, right;
 
-  BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, Lexeme token)
-    : Expression(token), op(o), left(std::move(l)), right(std::move(r)) {}
+  BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, Lexeme token, const Type* bool_type)
+    : Expression(token), op(o), left(std::move(l)), right(std::move(r)) {this->exprType = bool_type;}
   void validate() override;
 };
 
