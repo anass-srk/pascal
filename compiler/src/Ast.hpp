@@ -1,34 +1,40 @@
 #pragma once
 #include "Semantics.hpp"
+#include "Visitor.hpp"
 
 namespace pascal_compiler
 {
 
-struct AstNode 
+struct AstNode
 {
   Lexeme token;
   virtual ~AstNode() = default;
 };
 
 // Expressions
-struct Expression : public AstNode 
+struct Expression : public AstNode
 {
   Expression(Lexeme token = Lexeme{}) { this->token = token; }
   const Type* exprType = nullptr;
   virtual void validate() = 0;
+  virtual void accept(ExpressionVisitor&, const Block&) const = 0;
 };
 
-struct LiteralExpression : public Expression 
+struct LiteralExpression : public Expression
 {
   std::unique_ptr<Const> value;
   LiteralExpression(std::unique_ptr<Const> c, Lexeme token) : Expression(token), value(std::move(c)) {}
   void validate() override;
+
+  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Unary operations (+, -, not)
 enum struct UnaryOp { Plus, Minus, Not };
 
-struct UnaryExpression : public Expression 
+struct UnaryExpression : public Expression
 {
   UnaryOp op;
   std::unique_ptr<Expression> operand;
@@ -36,6 +42,10 @@ struct UnaryExpression : public Expression
   UnaryExpression(UnaryOp o, std::unique_ptr<Expression> e, Lexeme token)
     : Expression(token), op(o), operand(std::move(e)) {}
   void validate() override;
+
+  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Binary operations
@@ -53,7 +63,7 @@ static const char* BINARY_OP_NAME[] =
   "*", "(/ or div)", "and" // multiplication
 };
 // Only for relational operations
-struct BinaryExpression : public Expression 
+struct BinaryExpression : public Expression
 {
   BinaryOp op;
   std::unique_ptr<Expression> left, right;
@@ -61,6 +71,10 @@ struct BinaryExpression : public Expression
   BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, Lexeme token, const Type* bool_type)
     : Expression(token), op(o), left(std::move(l)), right(std::move(r)) {this->exprType = bool_type;}
   void validate() override;
+
+  void accept(ExpressionVisitor &visitor, const Block &ctx) const override{
+    visitor.visit(*this, ctx);
+  }
 };
 
 struct NExpression : public Expression
@@ -78,94 +92,133 @@ struct NExpression : public Expression
   }
 
   void validate() override;
+
+  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Selectors for array and record accesses
-struct Selector : public AstNode 
+struct Selector : public AstNode
 {
   virtual ~Selector() = default;
   virtual const Type* apply(const Type*) = 0;
+
+  virtual void accept(SelectorVisitor&, const Block&) const = 0;
 };
 
-struct ArraySelector : public Selector 
+struct ArraySelector : public Selector
 {
   std::vector<std::unique_ptr<Expression>> indices;
-  ArraySelector(std::vector<std::unique_ptr<Expression>>&& idx, Lexeme token) 
+  ArraySelector(std::vector<std::unique_ptr<Expression>>&& idx, Lexeme token)
   : indices(std::move(idx)){ this->token = token; }
   const Type* apply(const Type*) override;
+  
+  void accept(SelectorVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct FieldSelector : public Selector 
+struct FieldSelector : public Selector
 {
   std::string_view field;
   FieldSelector(std::string_view f, Lexeme token) : field(f) { this->token = token; }
   const Type* apply(const Type*) override;
+
+  void accept(SelectorVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Variable access (l‑value)
-struct VariableAccess : public Expression 
+struct VariableAccess : public Expression
 {
   const Var* baseVar = nullptr;               // the base variable (must be a Var)
   std::vector<std::unique_ptr<Selector>> selectors;
-  VariableAccess(const Var *v, std::vector<std::unique_ptr<Selector>>&& sels, Lexeme token) 
+  VariableAccess(const Var *v, std::vector<std::unique_ptr<Selector>>&& sels, Lexeme token)
   : Expression(token), selectors(std::move(sels)),  baseVar(v) {}
   void validate() override;
+
+  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Function call (returns a value)
-struct FunctionCall : public Expression 
+struct FunctionCall : public Expression
 {
   const Function* function = nullptr;         // resolved function
   std::vector<std::unique_ptr<Expression>> args;
   FunctionCall(const Function *func, std::vector<std::unique_ptr<Expression>> &&arguments, Lexeme token)
       : Expression(token), args(std::move(arguments)), function(func) {}
   void validate() override;
+
+  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 
 
 // Statements
 
-struct Statement : public AstNode 
+struct Statement : public AstNode
 {
   Statement(Lexeme token = Lexeme{}) { this->token = token; }
   virtual void validate() = 0;
+  virtual void accept(StatementVisitor&, const Block&) const = 0;
 };
 
-struct LabeledStatement : public Statement 
+struct LabeledStatement : public Statement
 {
   std::string_view label;
   std::unique_ptr<Statement> stmt;
   LabeledStatement(std::string_view lbl, std::unique_ptr<Statement> s, Lexeme token)
     : Statement(token), label(lbl), stmt(std::move(s)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct AssignmentStatement : public Statement 
+struct AssignmentStatement : public Statement
 {
   std::unique_ptr<VariableAccess> lhs;
   std::unique_ptr<Expression> rhs;
   AssignmentStatement(std::unique_ptr<VariableAccess> l, std::unique_ptr<Expression> r, Lexeme token)
     : Statement(token), lhs(std::move(l)), rhs(std::move(r)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct ProcedureCall : public Statement 
+struct ProcedureCall : public Statement
 {
   const Function* procedure = nullptr;
   std::vector<std::unique_ptr<Expression>> args;
   ProcedureCall(const Function *func, std::vector<std::unique_ptr<Expression>> &&arguments, Lexeme token)
       : Statement(token), args(std::move(arguments)), procedure(func) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Read statement (built‑in)
-struct ReadStatement : public Statement 
+struct ReadStatement : public Statement
 {
   std::vector<std::unique_ptr<VariableAccess>> arguments;
   ReadStatement(Lexeme token, std::vector<std::unique_ptr<VariableAccess>>&& args)
     : Statement(token), arguments(std::move(args)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Write statement (built‑in)
@@ -175,44 +228,64 @@ struct WriteStatement : public Statement
   WriteStatement(Lexeme token, std::vector<std::unique_ptr<Expression>>&& args)
     : Statement(token), arguments(std::move(args)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct GotoStatement : public Statement 
+struct GotoStatement : public Statement
 {
   std::string_view label;
   GotoStatement(std::string_view lbl, Lexeme token)
     : Statement(token), label(lbl) {}
   void validate() override {}
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Compound statement (BEGIN ... END)
-struct CompoundStatement : public Statement 
+struct CompoundStatement : public Statement
 {
   std::vector<std::unique_ptr<Statement>> statements;
   CompoundStatement(std::vector<std::unique_ptr<Statement>>&& stmts, Lexeme token) : Statement(token), statements(std::move(stmts)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct WhileStatement : public Statement 
+struct WhileStatement : public Statement
 {
   std::unique_ptr<Expression> condition;
   std::unique_ptr<Statement> body;
   WhileStatement(std::unique_ptr<Expression> cond, std::unique_ptr<Statement> content, Lexeme token)
     : Statement(token), condition(std::move(cond)), body(std::move(content)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct RepeatStatement : public Statement 
+struct RepeatStatement : public Statement
 {
   std::vector<std::unique_ptr<Statement>> body;
   std::unique_ptr<Expression> untilExpr;
   RepeatStatement(std::vector<std::unique_ptr<Statement>> &&content, std::unique_ptr<Expression> cond, Lexeme token)
     : Statement(token), body(std::move(content)), untilExpr(std::move(cond)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // For
-struct ForStatement : public Statement 
+struct ForStatement : public Statement
 {
   std::unique_ptr<VariableAccess> loopVar;
   Const start, end;
@@ -229,9 +302,13 @@ struct ForStatement : public Statement
   ) : Statement(token), loopVar(std::move(var)), start(std::move(s)),
       end(std::move(e)),body(std::move(content)), increasing(to) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct IfStatement : public Statement 
+struct IfStatement : public Statement
 {
   std::unique_ptr<Expression> condition;
   std::unique_ptr<Statement> thenPart;
@@ -245,9 +322,13 @@ struct IfStatement : public Statement
   ) : Statement(token), condition(std::move(cond)),
       thenPart(std::move(thenStmt)), elsePart(std::move(elseStmt)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
-struct CaseStatement : public Statement 
+struct CaseStatement : public Statement
 {
   struct CaseAlternative {
     std::vector<Const> labels;
@@ -263,10 +344,14 @@ struct CaseStatement : public Statement
   CaseStatement(std::unique_ptr<Expression> sel, std::vector<CaseAlternative>&& cases, Lexeme token)
     : Statement(token), selector(std::move(sel)), alternatives(std::move(cases)) {}
   void validate() override;
+
+  void accept(StatementVisitor& visitor, const Block& ctx) const override {
+    visitor.visit(*this, ctx);
+  }
 };
 
 // Program root
-struct Program 
+struct Program
 {
   std::string_view name;
   std::unique_ptr<Block> block;               // the top‑level block (already contains symbol tables)
