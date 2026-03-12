@@ -935,7 +935,7 @@ TEST(ExpressionTest, ComplexExpressions)
 // EXPRESSION TESTS - Array and Record Access
 // =============================================================================
 
-TEST(ExpressionTest, UnifiedVariableAndFieldAccess) {
+TEST(ExpressionTest, VariableAndFieldAccess) {
   std::string program = R"(
     program Test;
     type Point = record x, y : Int end;
@@ -1197,4 +1197,479 @@ TEST(ExpressionTest, MixedTypeAdditionInvalid) {
   )";
   Parser parser(std::move(program));
   EXPECT_THROW(parser.parse(), SemanticException);
+}
+
+// =============================================================================
+// EXPRESSION TESTS - Function Calls
+// =============================================================================
+
+TEST(FunctionCallTest, NoArguments)
+{
+  std::string program = R"(
+    program Test;
+    function getPi : Real;
+    begin
+      getPi := 3.14159
+    end.
+    var x : Real;
+    begin
+      x := getPi
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->statements.size(), 1);
+
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(checkVariableAccess(stmt->lhs.get(), "x"));
+
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->function->m_name, "getPi");
+  EXPECT_EQ(call->args.size(), 0);
+  EXPECT_NE(call->exprType, nullptr);
+}
+
+TEST(FunctionCallTest, SingleArgument)
+{
+  std::string program = R"(
+    program Test;
+    function square(x : Int) : Int;
+    begin
+      square := x * x
+    end.
+    var y : Int;
+    begin
+      y := square(5)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  ASSERT_NE(stmt, nullptr);
+
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->function->m_name, "square");
+  EXPECT_EQ(call->args.size(), 1);
+  EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 5));
+}
+
+TEST(FunctionCallTest, MultipleArguments)
+{
+  std::string program = R"(
+    program Test;
+    function add(a, b : Int) : Int;
+    begin
+      add := a + b
+    end.
+    function combine(x, y, z : Int) : Int;
+    begin
+      combine := x + y + z
+    end.
+    var r1, r2 : Int;
+    begin
+      r1 := add(10, 20);
+      r2 := combine(1, 2, 3)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->statements.size(), 2);
+
+  // Check r1 := add(10, 20)
+  {
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+    ASSERT_NE(stmt, nullptr);
+    const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+    ASSERT_NE(call, nullptr);
+    EXPECT_EQ(call->function->m_name, "add");
+    EXPECT_EQ(call->args.size(), 2);
+    EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 10));
+    EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 20));
+  }
+
+  // Check r2 := combine(1, 2, 3)
+  {
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+    ASSERT_NE(stmt, nullptr);
+    const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+    ASSERT_NE(call, nullptr);
+    EXPECT_EQ(call->function->m_name, "combine");
+    EXPECT_EQ(call->args.size(), 3);
+    EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 1));
+    EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 2));
+    EXPECT_TRUE(checkIntLiteral(call->args[2].get(), 3));
+  }
+}
+
+TEST(FunctionCallTest, NestedCalls)
+{
+  std::string program = R"(
+    program Test;
+    function square(x : Int) : Int;
+    begin
+      square := x * x
+    end.
+    function sum(a, b : Int) : Int;
+    begin
+      sum := a + b
+    end.
+    var result : Int;
+    begin
+      result := sum(square(2), square(3))
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->statements.size(), 1);
+
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  ASSERT_NE(stmt, nullptr);
+
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->function->m_name, "sum");
+  EXPECT_EQ(call->args.size(), 2);
+
+  // Check first arg: square(2)
+  {
+    const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args[0].get());
+    ASSERT_NE(innerCall, nullptr);
+    EXPECT_EQ(innerCall->function->m_name, "square");
+    EXPECT_EQ(innerCall->args.size(), 1);
+    EXPECT_TRUE(checkIntLiteral(innerCall->args[0].get(), 2));
+  }
+
+  // Check second arg: square(3)
+  {
+    const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args[1].get());
+    ASSERT_NE(innerCall, nullptr);
+    EXPECT_EQ(innerCall->function->m_name, "square");
+    EXPECT_EQ(innerCall->args.size(), 1);
+    EXPECT_TRUE(checkIntLiteral(innerCall->args[0].get(), 3));
+  }
+}
+
+TEST(FunctionCallTest, LiteralArguments)
+{
+  std::string program = R"(
+    program Test;
+    function max(a, b : Int) : Int;
+    begin
+      if a > b then max := a else max := b
+    end.
+    var result : Int;
+    begin
+      result := max(10, 20)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  ASSERT_NE(stmt, nullptr);
+
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  ASSERT_NE(call, nullptr);
+  EXPECT_TRUE(checkFunctionCallWithArgs(stmt->rhs.get(), "max", 2));
+  EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 10));
+  EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 20));
+}
+
+TEST(FunctionCallTest, VariableArguments)
+{
+  std::string program = R"(
+    program Test;
+    function add(a, b : Int) : Int;
+    begin
+      add := a + b
+    end.
+    var x, y, result : Int;
+    begin
+      x := 10;
+      y := 20;
+      result := add(x, y)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[2].get());
+  ASSERT_NE(stmt, nullptr);
+
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  ASSERT_NE(call, nullptr);
+  EXPECT_TRUE(checkFunctionCallWithArgs(stmt->rhs.get(), "add", 2));
+  EXPECT_TRUE(checkVariableAccess(call->args[0].get(), "x"));
+  EXPECT_TRUE(checkVariableAccess(call->args[1].get(), "y"));
+}
+
+TEST(FunctionCallTest, DifferentReturnTypes)
+{
+  std::string program = R"(
+    program Test;
+    function intFunc : Int;
+    begin
+      intFunc := 42
+    end.
+    function realFunc : Real;
+    begin
+      realFunc := 3.14
+    end.
+    function boolFunc : Bool;
+    begin
+      boolFunc := true
+    end.
+    function charFunc : Char;
+    begin
+      charFunc := 'a'
+    end.
+    var i : Int;
+    var r : Real;
+    var b : Bool;
+    var c : Char;
+    begin
+      i := intFunc;
+      r := realFunc;
+      b := boolFunc;
+      c := charFunc
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->statements.size(), 4);
+
+  // Check i := intFunc
+  {
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+    ASSERT_NE(stmt, nullptr);
+    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "intFunc"));
+  }
+
+  // Check r := realFunc
+  {
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+    ASSERT_NE(stmt, nullptr);
+    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "realFunc"));
+  }
+
+  // Check b := boolFunc
+  {
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[2].get());
+    ASSERT_NE(stmt, nullptr);
+    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "boolFunc"));
+  }
+
+  // Check c := charFunc
+  {
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[3].get());
+    ASSERT_NE(stmt, nullptr);
+    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "charFunc"));
+  }
+}
+
+TEST(FunctionCallTest, WrongArgumentCountTooFew)
+{
+  std::string program = R"(
+    program Test;
+    function add(a, b : Int) : Int;
+    begin
+      add := a + b
+    end.
+    var result : Int;
+    begin
+      result := add(5)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_THROW(parser.parse(), SemanticException);
+}
+
+TEST(FunctionCallTest, WrongArgumentCountTooMany)
+{
+  std::string program = R"(
+    program Test;
+    function square(x : Int) : Int;
+    begin
+      square := x * x
+    end.
+    var result : Int;
+    begin
+      result := square(5, 10)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_THROW(parser.parse(), SemanticException);
+}
+
+TEST(FunctionCallTest, WrongArgumentType)
+{
+  std::string program = R"(
+    program Test;
+    function expectsInt(x : Int) : Int;
+    begin
+      expectsInt := x
+    end.
+    var result : Int;
+    var s : String;
+    begin
+      s := "hello";
+      result := expectsInt(s)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_THROW(parser.parse(), SemanticException);
+}
+
+TEST(FunctionCallTest, VarParameterValid)
+{
+  std::string program = R"(
+    program Test;
+    procedure swap(var a, b : Int);
+    var temp : Int;
+    begin
+      temp := a;
+      a := b;
+      b := temp
+    end.
+    var x, y : Int;
+    begin
+      x := 10;
+      y := 20;
+      swap(x, y)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->statements.size(), 3);
+
+  // Check swap(x, y) statement
+  auto* stmt = dynamic_cast<const ProcedureCall*>(body->statements[2].get());
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_TRUE(checkProcedureCall(stmt, "swap"));
+  EXPECT_EQ(stmt->args.size(), 2);
+  EXPECT_TRUE(checkVariableAccess(stmt->args[0].get(), "x"));
+  EXPECT_TRUE(checkVariableAccess(stmt->args[1].get(), "y"));
+}
+
+TEST(FunctionCallTest, VarParameterInvalidExpression)
+{
+  std::string program = R"(
+    program Test;
+    procedure swap(var a, b : Int);
+    var temp : Int;
+    begin
+      temp := a;
+      a := b;
+      b := temp
+    end.
+    var x, y : Int;
+    begin
+      x := 10;
+      y := 20;
+      swap(x + 5, y)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_THROW(parser.parse(), SemanticException);
+}
+
+TEST(FunctionCallTest, FunctionCalledAsExpression)
+{
+  std::string program = R"(
+    program Test;
+    function square(x : Int) : Int;
+    begin
+      square := x * x
+    end.
+    var result : Int;
+    begin
+      result := square(5)
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  ASSERT_NE(stmt, nullptr);
+
+  // Verify it's a FunctionCall (expression) not a ProcedureCall
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(call->function->m_name, "square");
+  ASSERT_NE(call->exprType, nullptr); // Has return type
+}
+
+TEST(FunctionCallTest, ProcedureCalledAsStatement)
+{
+  std::string program = R"(
+    program Test;
+    procedure pr;
+    var tmp : Int;
+    begin
+      tmp := 2
+    end.
+    begin
+      pr
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_NO_THROW(parser.parse());
+
+  const auto& body = parser.m_current_block->body;
+  ASSERT_NE(body, nullptr);
+  ASSERT_EQ(body->statements.size(), 1);
+
+  // Verify it's a ProcedureCall (statement) not a FunctionCall
+  auto* stmt = dynamic_cast<const ProcedureCall*>(body->statements[0].get());
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->procedure->m_name, "pr");
+  EXPECT_EQ(stmt->args.size(), 0);
+}
+
+TEST(FunctionCallTest, ParenthesesWithNoArgs)
+{
+  std::string program = R"(
+    program Test;
+    function getPi : Real;
+    begin
+      getPi := 3.14159
+    end.
+    var x : Real;
+    begin
+      x := getPi()
+    end.
+  )";
+  Parser parser(std::move(program));
+  EXPECT_THROW(parser.parse(), SyntaxException);
 }

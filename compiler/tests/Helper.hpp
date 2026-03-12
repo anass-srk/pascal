@@ -52,3 +52,32 @@ static bool checkVariableAccess(const Expression *expr, std::string_view varName
     return false;
   return va->baseVar->m_name == varName;
 }
+
+// Check if expression is a FunctionCall and get function name
+static bool checkFunctionCall(const Expression *expr, std::string_view funcName)
+{
+  auto fc = dynamic_cast<const FunctionCall *>(expr);
+  if (!fc)
+    return false;
+  return fc->function->m_name == funcName;
+}
+
+// Check if expression is a FunctionCall and verify argument count
+static bool checkFunctionCallWithArgs(const Expression *expr, std::string_view funcName, size_t expectedArgs)
+{
+  auto fc = dynamic_cast<const FunctionCall *>(expr);
+  if (!fc)
+    return false;
+  if (fc->function->m_name != funcName)
+    return false;
+  return fc->args.size() == expectedArgs;
+}
+
+// Check if statement is a ProcedureCall and get procedure name
+static bool checkProcedureCall(const Statement *stmt, std::string_view procName)
+{
+  auto pc = dynamic_cast<const ProcedureCall *>(stmt);
+  if (!pc)
+    return false;
+  return pc->procedure->m_name == procName;
+}
