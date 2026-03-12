@@ -40,7 +40,7 @@
  statement := [ LABEL_ID ':' ] ( simple_statement | structured_statement )
  simple_statement := [ assignment_statement | procedure_statement
  | goto_statement ]
- assignment_statement := variable_access ':=' expression
+ assignment_statement := variable_access ':=' expression (Can assign to primitives only)
  variable_access := VARIABLE_NAME { array_access_ | record_access_ }
  array_access_ := '[' expression { ',' expression } ']'
  expression := simple_expression [ relational_operator simple_expression ]

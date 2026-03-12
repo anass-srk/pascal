@@ -1,5 +1,6 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
+#include "Expressions.hpp"
 
 int main(int argc, char **argv)
 {

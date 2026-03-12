@@ -6,6 +6,8 @@ add_executable(
   ../src/Parser.cpp
   ../src/Ast.cpp
   Parser.hpp
+  Helper.hpp
+  Expressions.hpp
   Main.cpp
 )
 
