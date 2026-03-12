@@ -171,9 +171,9 @@ struct Statement : public AstNode
 
 struct LabeledStatement : public Statement
 {
-  std::string_view label;
+  const Label* label;
   std::unique_ptr<Statement> stmt;
-  LabeledStatement(std::string_view lbl, std::unique_ptr<Statement> s, Lexeme token)
+  LabeledStatement(const Label* lbl, std::unique_ptr<Statement> s, Lexeme token)
     : Statement(token), label(lbl), stmt(std::move(s)) {}
   void validate() override;
 

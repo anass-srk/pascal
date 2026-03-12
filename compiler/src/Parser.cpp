@@ -51,6 +51,7 @@ void Parser::program()
   Block::init_main_block(*m_block.get());
 
   m_current_block = m_block.get();
+  _top = m_current_block;
   block();
 
   match(TOKEN_TYPE::DOT_TOKEN);
@@ -94,12 +95,12 @@ void Parser::declaration()
   }
   if(check(TOKEN_TYPE::PROCEDURE_TOKEN))
   {
-    procedure_definition();
+    function_definition(true);
     continue;
   }
   if(check(TOKEN_TYPE::FUNCTION_TOKEN))
   {
-    function_definition();
+    function_definition(false);
     continue;
   }
   else{
@@ -149,7 +150,7 @@ Const Parser::constant(const Lexeme& token)
       token.m_line,
       token.m_col,
       m_lexer.getToken().to_string_literal(), // value of the constant
-      *m_current_block
+      *getTop()
     );
   }
 
@@ -160,7 +161,7 @@ Const Parser::constant(const Lexeme& token)
       token.m_line,
       token.m_col,
       m_lexer.getToken().to_string_literal()[0],
-      *m_current_block
+      *getTop()
     );
   }
 
@@ -171,7 +172,7 @@ Const Parser::constant(const Lexeme& token)
       token.m_line,
       token.m_col,
       true,
-      *m_current_block
+      *getTop()
     );
   }
 
@@ -182,7 +183,7 @@ Const Parser::constant(const Lexeme& token)
       token.m_line,
       token.m_col,
       false,
-      *m_current_block
+      *getTop()
     );
   }
   
@@ -208,7 +209,7 @@ Const Parser::constant(const Lexeme& token)
       token.m_line,
       token.m_col,
       m_lexer.getToken().m_ival * fact,
-      *m_current_block
+      *getTop()
     );
   }
 
@@ -219,7 +220,7 @@ Const Parser::constant(const Lexeme& token)
       token.m_line,
       token.m_col,
       m_lexer.getToken().m_dval * fact,
-      *m_current_block
+      *getTop()
     );
   }
 
@@ -552,6 +553,7 @@ const Type* Parser::find_type(bool required)
 std::vector<Arg> Parser::args_list()
 {
   std::vector<Arg> args;
+  std::unordered_map<std::string_view, Lexeme> used_ids;
   match(TOKEN_TYPE::LP_TOKEN);
   do{
     adv();
@@ -567,6 +569,18 @@ std::vector<Arg> Parser::args_list()
     const Type* t = find_type(true);
 
     for(const auto& id : ids){
+      // Check if argument name is taken
+      if(auto it = used_ids.find(id.m_id); it != used_ids.end())
+      {
+        throw SemanticException(
+          SEMANTIC_ERROR::SE_DUPLICATE_ID,
+          std::format("Semantic error: '{}' is found in ({}) and ({}) !", it->first, it->second.to_string(), id.to_string()),
+          id.m_line,
+          id.m_col
+        );
+      }
+      used_ids.insert(std::make_pair(id.m_id, id));
+
       args.emplace_back(ref, id, t);
     }
 
@@ -775,32 +789,47 @@ void Parser::variable_declaration()
   }while(check(TOKEN_TYPE::ID_TOKEN));
 }
 
-void Parser::procedure_definition()
+void Parser::function_definition(bool is_proc)
 {
   match_adv(TOKEN_TYPE::ID_TOKEN);
 
   auto token = m_lexer.getToken();
   const auto id = token.m_id;
-  auto proc_type = new FunctionType (token.m_id, token.m_line, token.m_col, nullptr);
+  auto func_type = new FunctionType (token.m_id, token.m_line, token.m_col, nullptr);
 
   m_current_block->check_used_id(token);
 
   adv();
   if(check(TOKEN_TYPE::LP_TOKEN)){
-    proc_type->m_args = args_list();
+    func_type->m_args = args_list();
     adv();
   }
-  match(TOKEN_TYPE::SEMI_TOKEN);
 
-  m_current_block->m_unamed_types.emplace_back(proc_type);
+  if(is_proc)
+  {
+    match(TOKEN_TYPE::SEMI_TOKEN);
+  }
+  else
+  {
+    match(TOKEN_TYPE::COLON_TOKEN);
+    match_adv(TOKEN_TYPE::ID_TOKEN);
+    func_type->m_ret_type = find_type(true);
+    match_adv(TOKEN_TYPE::SEMI_TOKEN);
+  }
+
+  m_current_block->m_unamed_types.emplace_back(func_type);
 
   Block *parent = m_current_block;
   m_current_block = new Block();
   m_current_block->m_parent = parent;
 
-  // Adding arguments as variables
-  
-  
+  // to return a value, we assign to a variable with the id of the function (not for procedures)
+  if(!is_proc) m_current_block->m_vars.insert(std::make_pair(id, (Var){token.m_id, token.m_line, token.m_col, func_type->m_ret_type}));
+  for (const auto &arg : func_type->m_args)
+  {
+    m_current_block->m_vars.insert(std::make_pair(arg.m_name, Var(arg)));
+  }
+
   block();
   match(TOKEN_TYPE::DOT_TOKEN);
   adv();
@@ -808,44 +837,7 @@ void Parser::procedure_definition()
   auto *func_block = m_current_block;
   m_current_block = parent;
 
-  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, proc_type, func_block)));
-}
-
-void Parser::function_definition()
-{
-  match_adv(TOKEN_TYPE::ID_TOKEN);
-
-  auto token = m_lexer.getToken();
-  const auto id = token.m_id;
-  auto proc_type = new FunctionType (token.m_id, token.m_line, token.m_col, nullptr);
-
-  m_current_block->check_used_id(token);
-
-  adv();
-  if(check(TOKEN_TYPE::LP_TOKEN)){
-    proc_type->m_args = args_list();
-    adv();
-  }
-
-  match(TOKEN_TYPE::COLON_TOKEN);
-  match_adv(TOKEN_TYPE::ID_TOKEN);
-  proc_type->m_ret_type = find_type(true);
-  match_adv(TOKEN_TYPE::SEMI_TOKEN);
-
-  m_current_block->m_unamed_types.emplace_back(proc_type);
-
-  Block *parent = m_current_block;
-  m_current_block = new Block();
-  m_current_block->m_parent = parent;
-  
-  block();
-  match(TOKEN_TYPE::DOT_TOKEN);
-  adv();
-
-  auto *func_block = m_current_block;
-  m_current_block = parent;
-
-  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, proc_type, func_block)));
+  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, func_type, func_block)));
 }
 
 std::unique_ptr<Expression> Parser::gexpression()
@@ -881,21 +873,7 @@ std::unique_ptr<Expression> Parser::gexpression()
     }
     adv();
 
-    const Type* bool_type = nullptr;
-    {
-      Block* current = m_current_block;
-      do
-      {
-        if (auto t = Block::get(CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)], current->m_types); t)
-        {
-          bool_type = t;
-          break;
-        }
-      } while (current);
-      
-    }
-
-    first = std::make_unique<BinaryExpression>(op, std::move(first), expression(), token, bool_type);
+    first = std::make_unique<BinaryExpression>(op, std::move(first), expression(), token, getTop()->m_types.at(CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]).get());
     first->validate();
     return first;
   }
@@ -1257,7 +1235,7 @@ std::unique_ptr<Statement> Parser::statement()
     {
       match_adv(TOKEN_TYPE::COLON_TOKEN);
       adv();
-      auto res = std::make_unique<LabeledStatement>(label->m_id, statement(), token);
+      auto res = std::make_unique<LabeledStatement>(label, statement(), token);
       res->validate();
       return res;
     }

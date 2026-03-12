@@ -34,11 +34,14 @@ class Parser
   Lexer m_lexer;
   std::string m_program_name;
   std::unique_ptr<Block> m_block;
+  Block *_top;
 public:
   Block *m_current_block;
 
 public:
   Parser(std::string&&);
+
+  const Block * getTop() {return _top;};
 
   void match(TOKEN_TYPE);
   inline void match_adv(TOKEN_TYPE type)
@@ -81,8 +84,7 @@ public:
   void const_definition();
   void type_definition();
   void variable_declaration();
-  void procedure_definition();
-  void function_definition();
+  void function_definition(bool is_proc);
 
   //
   Const constant(const Lexeme&); // token containing id of the constant

@@ -9,7 +9,7 @@ void Block::init_main_block(Block& block){
   for (auto type : {CONST_CAT::CC_INT, CONST_CAT::CC_REAL, CONST_CAT::CC_CHAR, CONST_CAT::CC_STRING, CONST_CAT::CC_BOOL})
   {
     auto name = CONST_CAT_NAMES[int(type)];
-    types[name] = std::make_shared<Type>(name, 0, 0, TYPE_CAT::TC_BASIC);
+    types.insert(std::make_pair(name,std::make_shared<Type>(name, 0, 0, TYPE_CAT::TC_BASIC)));
   }
 }
 
