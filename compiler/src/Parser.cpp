@@ -1333,7 +1333,7 @@ std::unique_ptr<Statement> Parser::statement()
     }
     adv();
 
-    auto res = std::make_unique<GotoStatement>(id, token);
+    auto res = std::make_unique<GotoStatement>(label, token);
     res->validate();
     return res;
   }

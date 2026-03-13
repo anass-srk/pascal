@@ -236,8 +236,8 @@ struct WriteStatement : public Statement
 
 struct GotoStatement : public Statement
 {
-  std::string_view label;
-  GotoStatement(std::string_view lbl, Lexeme token)
+  const Label *label;
+  GotoStatement(const Label *lbl, Lexeme token)
     : Statement(token), label(lbl) {}
   void validate() override {}
 

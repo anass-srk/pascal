@@ -8,6 +8,7 @@ add_executable(
   Parser.hpp
   Helper.hpp
   Expressions.hpp
+  Statements.hpp
   Visitor.hpp
   Main.cpp
 )

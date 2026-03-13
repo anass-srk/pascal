@@ -1,6 +1,7 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Expressions.hpp"
+#include "Statements.hpp"
 #include "Visitor.hpp"
 
 int main(int argc, char **argv)

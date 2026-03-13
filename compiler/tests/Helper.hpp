@@ -81,3 +81,9 @@ static bool checkProcedureCall(const Statement *stmt, std::string_view procName)
     return false;
   return pc->procedure->m_name == procName;
 }
+
+static bool checkCondition(const Expression *expr)
+{
+  if(!expr) return false;
+  return expr->exprType->get_underlying_type()->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
+}
