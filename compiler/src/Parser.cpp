@@ -12,13 +12,13 @@ Parser::Parser(std::string&& content) : m_lexer(std::move(content))
 void Parser::match(TOKEN_TYPE type)
 {
   const auto& token = m_lexer.getToken();
-  if(token.m_type != type){
-    throw SyntaxException(std::format("Syntax error: At ({}), expected {}, found {} !", token.to_string(), TOKEN_NAMES[int(type)], TOKEN_NAMES[int(token.m_type)]),token);
+  if(token.type() != type){
+    throw SyntaxException(std::format("Syntax error: At ({}), expected {}, found {} !", token.to_string(), TOKEN_NAMES[int(type)], TOKEN_NAMES[int(token.type())]),token);
   }
 }
 
 void Parser::match(std::initializer_list<TOKEN_TYPE> l){
-  const auto current = m_lexer.getToken().m_type;
+  const auto current = m_lexer.getToken().type();
   for(auto type : l){
     if(type == current){
       return;
@@ -44,7 +44,7 @@ void Parser::program()
 {
   match_adv(TOKEN_TYPE::PROGRAM_TOKEN);
   match_adv(TOKEN_TYPE::ID_TOKEN);
-  m_program_name = m_lexer.getToken().m_id;
+  m_program_name = m_lexer.getToken().id();
   match_adv(TOKEN_TYPE::SEMI_TOKEN);
 
   m_block = std::make_unique<Block>();
@@ -116,7 +116,7 @@ void Parser::label_declaration(){
     Lexeme token = m_lexer.getToken();
     m_current_block->check_used_id(token);
 
-    m_current_block->m_labels[token.m_id] = {token.m_id, token.m_line, token.m_col};
+    m_current_block->m_labels[token.id()] = {token.id(), token.line(), token.column()};
 
     adv();
   }while (check(TOKEN_TYPE::COMMA_TOKEN));
@@ -134,7 +134,7 @@ void Parser::const_definition()
 
     match_adv(TOKEN_TYPE::EQ_TOKEN);
     adv();
-    m_current_block->m_consts.emplace(std::make_pair(token.m_id, constant(token)));
+    m_current_block->m_consts.emplace(std::make_pair(token.id(), constant(token)));
 
     match_adv(TOKEN_TYPE::SEMI_TOKEN);
     adv();
@@ -146,9 +146,9 @@ Const Parser::constant(const Lexeme& token)
   if(check(TOKEN_TYPE::STRING_LITERAL_TOKEN))
   {
     return Const(
-      token.m_id, // id of the contant
-      token.m_line,
-      token.m_col,
+      token.id(), // id of the contant
+      token.line(),
+      token.column(),
       m_lexer.getToken().to_string_literal(), // value of the constant
       *getTop()
     );
@@ -157,9 +157,9 @@ Const Parser::constant(const Lexeme& token)
   if(check(TOKEN_TYPE::CHAR_LITERAL_TOKEN))
   {
     return Const(
-      token.m_id,
-      token.m_line,
-      token.m_col,
+      token.id(),
+      token.line(),
+      token.column(),
       m_lexer.getToken().to_string_literal()[0],
       *getTop()
     );
@@ -168,9 +168,9 @@ Const Parser::constant(const Lexeme& token)
   if(check(TOKEN_TYPE::TRUE_TOKEN))
   {
     return Const(
-      token.m_id,
-      token.m_line,
-      token.m_col,
+      token.id(),
+      token.line(),
+      token.column(),
       true,
       *getTop()
     );
@@ -179,9 +179,9 @@ Const Parser::constant(const Lexeme& token)
   if(check(TOKEN_TYPE::FALSE_TOKEN))
   {
     return Const(
-      token.m_id,
-      token.m_line,
-      token.m_col,
+      token.id(),
+      token.line(),
+      token.column(),
       false,
       *getTop()
     );
@@ -205,10 +205,10 @@ Const Parser::constant(const Lexeme& token)
   if(check(TOKEN_TYPE::NUM_INT_TOKEN))
   {
     return Const(
-      token.m_id,
-      token.m_line,
-      token.m_col,
-      m_lexer.getToken().m_ival * fact,
+      token.id(),
+      token.line(),
+      token.column(),
+      m_lexer.getToken().int_value() * fact,
       *getTop()
     );
   }
@@ -216,17 +216,17 @@ Const Parser::constant(const Lexeme& token)
   if(check(TOKEN_TYPE::NUM_REAL_TOKEN))
   {
     return Const(
-      token.m_id,
-      token.m_line,
-      token.m_col,
-      m_lexer.getToken().m_dval * fact,
+      token.id(),
+      token.line(),
+      token.column(),
+      m_lexer.getToken().real_value() * fact,
       *getTop()
     );
   }
 
   if(check(TOKEN_TYPE::ID_TOKEN))
   {
-    auto id = m_lexer.getToken().m_id;
+    auto id = m_lexer.getToken().id();
     Block *current = m_current_block;
     
     do{
@@ -237,16 +237,16 @@ Const Parser::constant(const Lexeme& token)
             SEMANTIC_ERROR::SE_INVALID_OP,
             std::format(
               "Semantic error: applying a unary operation on the constant ({} at ({},{})) requires it to be an int or real ('{}' in your case) ! ",
-              token.m_id, token.m_line, token.m_col, enum_val->m_type->m_name
+              token.id(), token.line(), token.column(), enum_val->m_type->m_name
             ),
-            token.m_line,
-            token.m_col
+            token.line(),
+            token.column()
           );
         }
         return Const(
-          token.m_id,
-          token.m_line,
-          token.m_col,
+          token.id(),
+          token.line(),
+          token.column(),
           *enum_val          
         );
       }
@@ -258,16 +258,16 @@ Const Parser::constant(const Lexeme& token)
             SEMANTIC_ERROR::SE_INVALID_OP,
             std::format(
               "Semantic error: applying a unary operation on the constant ({} at ({},{})) requires it to be an int or real ('{}' in your case) ! ",
-              token.m_id, token.m_line, token.m_col, const_val->m_type->m_name
+              token.id(), token.line(), token.column(), const_val->m_type->m_name
             ),
-            token.m_line,
-            token.m_col
+            token.line(),
+            token.column()
           );
         }
         Const res = *const_val;
-        res.m_name = token.m_id; // Must change name as well as location
-        res.m_line = token.m_line;
-        res.m_col = token.m_col;
+        res.m_name = token.id(); // Must change name as well as location
+        res.m_line = token.line();
+        res.m_col = token.column();
 
         if(const_val->m_cat == CONST_CAT::CC_INT){
           res.m_val = std::get<Int>(res.m_val) * fact;
@@ -285,10 +285,10 @@ Const Parser::constant(const Lexeme& token)
       SEMANTIC_ERROR::SE_MISSING_ID,
       std::format(
         "Semantic error: to initialize a constant ({} at ({},{})) with an id, it needs to reference another constant or enum value ('{}' in your case) ! ",
-        token.m_id, token.m_line, token.m_col, id
+        token.id(), token.line(), token.column(), id
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -299,7 +299,7 @@ Const Parser::constant(const Lexeme& token)
     throw SyntaxException(
       std::format(
         "Syntax error: unary operations (+ and -) can be applied on int and/or real values ! ({},{})",
-        old.m_line, old.m_col
+        old.line(), old.column()
       ),
       old
     );
@@ -359,7 +359,7 @@ std::unique_ptr<Enum> Parser::enum_type(const Lexeme& token){
   auto vec = id_list();
   match(TOKEN_TYPE::RP_TOKEN);
   
-  auto type = std::make_unique<Enum>(token.m_id, token.m_line, token.m_col);
+  auto type = std::make_unique<Enum>(token.id(), token.line(), token.column());
 
   for(const auto& t : vec){
     m_current_block->check_used_id(t);
@@ -371,14 +371,14 @@ std::unique_ptr<Enum> Parser::enum_type(const Lexeme& token){
 
 const Type* Parser::get_type(const Lexeme &token, bool named){
   if(check(TOKEN_TYPE::ID_TOKEN)){
-    const auto id = m_lexer.getToken().m_id;
+    const auto id = m_lexer.getToken().id();
     Block *current = m_current_block;
     
     do{
       if(auto t = current->m_types.find(id); t != current->m_types.end()){
         adv();
         if (named)
-          return m_current_block->m_types.emplace(std::make_pair(token.m_id, t->second)).first->second.get();
+          return m_current_block->m_types.emplace(std::make_pair(token.id(), t->second)).first->second.get();
         else 
           return t->second.get();
         break;
@@ -391,7 +391,7 @@ const Type* Parser::get_type(const Lexeme &token, bool named){
   auto type = type_eval(token);
   
   if(named){
-    return m_current_block->m_types.emplace(std::make_pair(token.m_id, std::move(type))).first->second.get();
+    return m_current_block->m_types.emplace(std::make_pair(token.id(), std::move(type))).first->second.get();
   }else{ 
     return m_current_block->m_unamed_types.emplace_back(std::move(type)).get();
   }
@@ -413,7 +413,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
       bool first = false, second = false;
 
       if(check(TOKEN_TYPE::ID_TOKEN)){ // If is TYPENAME of simple type
-        const auto id = m_lexer.getToken().m_id;
+        const auto id = m_lexer.getToken().id();
         Block *current = m_current_block;
         
         do{
@@ -445,7 +445,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
         types.emplace_back(
           m_current_block->m_unamed_types.emplace_back(
-            std::make_unique<Subrange>(beg_token.m_id, beg_token.m_line, beg_token.m_col, std::move(beg), std::move(end))
+            std::make_unique<Subrange>(beg_token.id(), beg_token.line(), beg_token.column(), std::move(beg), std::move(end))
           ).get()
         );
       }
@@ -457,14 +457,14 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
     adv();
 
     if(check(TOKEN_TYPE::ID_TOKEN)){
-      const auto id = m_lexer.getToken().m_id;
+      const auto id = m_lexer.getToken().id();
       Block *current = m_current_block;
 
       do{
         if(auto t = Block::get(id, current->m_types); t){
           adv();
           return std::make_unique<Array>(
-            token.m_id, token.m_line, token.m_col, std::move(types), t
+            token.id(), token.line(), token.column(), std::move(types), t
           );
         }
       
@@ -474,7 +474,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
     auto const beg_token = m_lexer.getToken();
     return std::make_unique<Array>(
-      token.m_id, token.m_line, token.m_col, std::move(types),
+      token.id(), token.line(), token.column(), std::move(types),
       m_current_block->m_unamed_types.emplace_back(type_eval(beg_token)).get()
     );
     
@@ -488,7 +488,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
   }
 
   else if(check(TOKEN_TYPE::PROCEDURE_TOKEN)){
-    auto proc_type = std::make_unique<FunctionType>(token.m_id, token.m_line, token.m_col, nullptr);
+    auto proc_type = std::make_unique<FunctionType>(token.id(), token.line(), token.column(), nullptr);
     adv();
     if(check(TOKEN_TYPE::LP_TOKEN)){
       proc_type->m_args = args_list();
@@ -499,7 +499,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
   else if (check(TOKEN_TYPE::FUNCTION_TOKEN))
   {
-    auto func_type = std::make_unique<FunctionType>(token.m_id, token.m_line, token.m_col, nullptr);
+    auto func_type = std::make_unique<FunctionType>(token.id(), token.line(), token.column(), nullptr);
     adv();
     if (check(TOKEN_TYPE::LP_TOKEN)){
       func_type->m_args = args_list();
@@ -518,7 +518,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
   Const end = constant(m_lexer.next_sym());
   adv();
 
-  return std::make_unique<Subrange>(token.m_id, token.m_line, token.m_col, std::move(beg), std::move(end));
+  return std::make_unique<Subrange>(token.id(), token.line(), token.column(), std::move(beg), std::move(end));
 }
 
 const Type* Parser::find_type(bool required)
@@ -526,7 +526,7 @@ const Type* Parser::find_type(bool required)
   match(TOKEN_TYPE::ID_TOKEN);
   const Type *t = nullptr;
   auto tkn = m_lexer.getToken();
-  auto type_id = tkn.m_id;
+  auto type_id = tkn.id();
   Block *current = m_current_block;
   do
   {
@@ -543,8 +543,8 @@ const Type* Parser::find_type(bool required)
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format("Semantic error: Invalid typename ({}) !", tkn.to_string()),
-      tkn.m_line,
-      tkn.m_col
+      tkn.line(),
+      tkn.column()
     );
   }
   return t;
@@ -570,16 +570,16 @@ std::vector<Arg> Parser::args_list()
 
     for(const auto& id : ids){
       // Check if argument name is taken
-      if(auto it = used_ids.find(id.m_id); it != used_ids.end())
+      if(auto it = used_ids.find(id.id()); it != used_ids.end())
       {
         throw SemanticException(
           SEMANTIC_ERROR::SE_DUPLICATE_ID,
           std::format("Semantic error: '{}' is found in ({}) and ({}) !", it->first, it->second.to_string(), id.to_string()),
-          id.m_line,
-          id.m_col
+          id.line(),
+          id.column()
         );
       }
-      used_ids.insert(std::make_pair(id.m_id, id));
+      used_ids.insert(std::make_pair(id.id(), id));
 
       args.emplace_back(ref, id, t);
     }
@@ -591,7 +591,7 @@ std::vector<Arg> Parser::args_list()
 }
 
 std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
-  std::unique_ptr<Record> record = std::make_unique<Record>(token.m_id, token.m_line, token.m_col);
+  std::unique_ptr<Record> record = std::make_unique<Record>(token.id(), token.line(), token.column());
   do{
     adv();
     if(check(TOKEN_TYPE::CASE_TOKEN) || check(TOKEN_TYPE::END_TOKEN)) break; // Move to variant part or quit
@@ -602,7 +602,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
 
     for(const auto& name : var_names){
       record->check_duplicate_id(token, name);
-      record->m_members[name.m_id] = (Var){name.m_id, name.m_line, name.m_col, type};
+      record->m_members[name.id()] = (Var){name.id(), name.line(), name.column(), type};
     }
 
   }while(check(TOKEN_TYPE::SEMI_TOKEN));
@@ -612,7 +612,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
   adv();
   match(TOKEN_TYPE::ID_TOKEN);
 
-  const auto id = m_lexer.getToken().m_id;
+  const auto id = m_lexer.getToken().id();
 
   const Type* type = nullptr;
   const Var* var = nullptr;
@@ -631,8 +631,8 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     for(const auto &[name, v] : record->m_members){
       if(v.m_type == type){
         if(var){ // Already found a tag
-          const auto line = m_lexer.getToken().m_line;
-          const auto col = m_lexer.getToken().m_col;
+          const auto line = m_lexer.getToken().line();
+          const auto col = m_lexer.getToken().column();
           throw SemanticException(
             SEMANTIC_ERROR::SE_AMBIGUOUS_TAG_VAR,
             std::format(
@@ -646,8 +646,8 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
       }
     }
     if(!var){
-      const auto line = m_lexer.getToken().m_line;
-      const auto col = m_lexer.getToken().m_col;
+      const auto line = m_lexer.getToken().line();
+      const auto col = m_lexer.getToken().column();
       throw SemanticException(
         SEMANTIC_ERROR::SE_MISSING_ID,
         std::format(
@@ -658,8 +658,8 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     }
   }else{
     if(record->m_members.contains(id)){
-      const auto line = m_lexer.getToken().m_line;
-      const auto col = m_lexer.getToken().m_col;
+      const auto line = m_lexer.getToken().line();
+      const auto col = m_lexer.getToken().column();
       throw SemanticException(
         SEMANTIC_ERROR::SE_DUPLICATE_ID,
         std::format(
@@ -668,12 +668,12 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
         line, col);
     }
     
-    const auto var_line = m_lexer.getToken().m_line;
-    const auto var_col = m_lexer.getToken().m_col;
+    const auto var_line = m_lexer.getToken().line();
+    const auto var_col = m_lexer.getToken().column();
     
     match_adv(TOKEN_TYPE::COLON_TOKEN);
     match_adv(TOKEN_TYPE::ID_TOKEN);
-    const auto type_id = m_lexer.getToken().m_id;
+    const auto type_id = m_lexer.getToken().id();
     {
       Block *current = m_current_block;
       do{
@@ -684,8 +684,8 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
       } while (current);
     }
     if(!type){
-      const auto line = m_lexer.getToken().m_line;
-      const auto col = m_lexer.getToken().m_col;
+      const auto line = m_lexer.getToken().line();
+      const auto col = m_lexer.getToken().column();
       throw SemanticException(
         SEMANTIC_ERROR::SE_MISSING_ID,
         std::format(
@@ -783,7 +783,7 @@ void Parser::variable_declaration()
 
     for (const auto &name : names){
       m_current_block->check_used_id(name);
-      m_current_block->m_vars[name.m_id] = (Var){name.m_id, name.m_line, name.m_col, type};
+      m_current_block->m_vars[name.id()] = (Var){name.id(), name.line(), name.column(), type};
     }
     
   }while(check(TOKEN_TYPE::ID_TOKEN));
@@ -794,8 +794,8 @@ void Parser::function_definition(bool is_proc)
   match_adv(TOKEN_TYPE::ID_TOKEN);
 
   auto token = m_lexer.getToken();
-  const auto id = token.m_id;
-  auto func_type = new FunctionType (token.m_id, token.m_line, token.m_col, nullptr);
+  const auto id = token.id();
+  auto func_type = new FunctionType (token.id(), token.line(), token.column(), nullptr);
 
   m_current_block->check_used_id(token);
 
@@ -824,7 +824,7 @@ void Parser::function_definition(bool is_proc)
   m_current_block->m_parent = parent;
 
   // to return a value, we assign to a variable with the id of the function (not for procedures)
-  if(!is_proc) m_current_block->m_vars.insert(std::make_pair(id, (Var){token.m_id, token.m_line, token.m_col, func_type->m_ret_type}));
+  if(!is_proc) m_current_block->m_vars.insert(std::make_pair(id, (Var){token.id(), token.line(), token.column(), func_type->m_ret_type}));
   for (const auto &arg : func_type->m_args)
   {
     m_current_block->m_vars.insert(std::make_pair(arg.m_name, Var(arg)));
@@ -850,7 +850,7 @@ std::unique_ptr<Expression> Parser::gexpression()
   }))
   {
     BinaryOp op;
-    switch(m_lexer.getToken().m_type)
+    switch(m_lexer.getToken().type())
     {
       case TOKEN_TYPE::EQ_TOKEN:
         op = BinaryOp::Eq;
@@ -917,7 +917,7 @@ std::unique_ptr<Expression> Parser::expression()
   while (check({TOKEN_TYPE::PLUS_TOKEN, TOKEN_TYPE::MINUS_TOKEN, TOKEN_TYPE::OR_TOKEN}))
   {
     BinaryOp op;
-    switch(m_lexer.getToken().m_type)
+    switch(m_lexer.getToken().type())
     {
       case TOKEN_TYPE::PLUS_TOKEN:
         op = BinaryOp::Add;
@@ -959,7 +959,7 @@ std::unique_ptr<Expression> Parser::term()
   while (check({TOKEN_TYPE::STAR_TOKEN, TOKEN_TYPE::SLASH_TOKEN, TOKEN_TYPE::DIV_TOKEN, TOKEN_TYPE::AND_TOKEN}))
   {
     BinaryOp op;
-    switch (m_lexer.getToken().m_type)
+    switch (m_lexer.getToken().type())
     {
     case TOKEN_TYPE::STAR_TOKEN:
       op = BinaryOp::Mul;
@@ -1030,7 +1030,7 @@ std::unique_ptr<Expression> Parser::factor()
   const Function *func = nullptr;
   const EnumValue* ev = nullptr;
 
-  const auto id = token.m_id;
+  const auto id = token.id();
   Block *current = m_current_block;
 
   do
@@ -1068,7 +1068,7 @@ std::unique_ptr<Expression> Parser::factor()
   }
   if(ev)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token.m_id, token.m_line, token.m_col, *ev), token);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token.id(), token.line(), token.column(), *ev), token);
     res->validate();
     adv();
     return res;
@@ -1088,8 +1088,8 @@ std::unique_ptr<Expression> Parser::factor()
   throw SemanticException(
     SEMANTIC_ERROR::SE_MISSING_ID,
     std::format("Semantic error: '{}' does not correspond to a variable, a constant, a function or an enum !", id),
-    token.m_line,
-    token.m_col
+    token.line(),
+    token.column()
   );
 }
 
@@ -1131,7 +1131,7 @@ std::unique_ptr<VariableAccess> Parser::variable_access(const Var *v)
 
   if(v == nullptr)
   {
-    const auto id = tkn.m_id;
+    const auto id = tkn.id();
     Block *current = m_current_block;
 
     do
@@ -1154,7 +1154,7 @@ std::unique_ptr<VariableAccess> Parser::variable_access(const Var *v)
     {
       match_adv(TOKEN_TYPE::ID_TOKEN);
       const auto token = m_lexer.getToken();
-      selectors.push_back(std::make_unique<FieldSelector>(token.m_id, token));
+      selectors.push_back(std::make_unique<FieldSelector>(token.id(), token));
       adv();
       continue;
     }
@@ -1207,7 +1207,7 @@ std::unique_ptr<Statement> Parser::statement()
     const Function *func = nullptr;
     const Label *label = nullptr;
 
-    const auto id = token.m_id;
+    const auto id = token.id();
     Block *current = m_current_block;
 
     do
@@ -1262,8 +1262,8 @@ std::unique_ptr<Statement> Parser::statement()
         "Semantic error : invalid statement ! {} doesn't correspond to a label, a function or a variable !",
         token.to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -1306,7 +1306,7 @@ std::unique_ptr<Statement> Parser::statement()
     const Label *label = nullptr;
 
     const auto tkn = m_lexer.getToken();
-    const auto id = tkn.m_id;
+    const auto id = tkn.id();
     Block *current = m_current_block;
 
     do
@@ -1327,8 +1327,8 @@ std::unique_ptr<Statement> Parser::statement()
         std::format(
             "Semantic error : invalid statement ! {} doesn't correspond to a label !",
             tkn.to_string()),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
     }
     adv();

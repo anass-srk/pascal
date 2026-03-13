@@ -136,19 +136,31 @@ class LexerException : public std::exception
 
 struct Lexeme
 {
+private:
   TOKEN_TYPE m_type;
+  std::string_view m_id;
+  size_t m_line;
+  size_t m_col;
+  size_t m_index;
   union
   {
     Int m_ival;
     Real m_dval;
   };
-  std::string_view m_id;
-  size_t m_col;
-  size_t m_line;
-  size_t m_index;
+
+public:
+  TOKEN_TYPE type() const { return m_type; }
+  std::string_view id() const { return m_id; }
+  size_t line() const { return m_line; }
+  size_t column() const { return m_col; }
+  size_t index() const { return m_index; }
+  Int int_value() const { return m_ival; }
+  Real real_value() const { return m_dval; }
 
   std::string to_string_literal() const;
   std::string to_string() const {return std::format("'{}' at ({},{})", m_id, m_line, m_col);};
+
+  friend class Lexer;
 };
 
 class Lexer

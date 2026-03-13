@@ -178,7 +178,7 @@ public:
   const size_t m_line;
   const size_t m_col;
 private:
-  EnumValue(Enum* type, const Lexeme& token, Int value) : m_type(type), m_id(token.m_id), m_value(value), m_line(token.m_line), m_col(token.m_col) {} 
+  EnumValue(Enum* type, const Lexeme& token, Int value) : m_type(type), m_id(token.id()), m_value(value), m_line(token.line()), m_col(token.column()) {} 
 };
 
 struct Subrange : Type
@@ -233,9 +233,9 @@ struct Arg : Var
   Arg(bool by_ref, const Lexeme& token, const Type* t) {
     ref = by_ref;
     m_type = t;
-    m_name = token.m_id;
-    m_line = token.m_line;
-    m_col = token.m_col;
+    m_name = token.id();
+    m_line = token.line();
+    m_col = token.column();
   }
 };
 

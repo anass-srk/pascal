@@ -21,8 +21,8 @@ void UnaryExpression::validate()
         "Semantic error: Cannot apply unary operation ({}) on expression of type ({})! Expected Int, Char or Real !",
         token.to_string(), operand->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -34,8 +34,8 @@ void UnaryExpression::validate()
         "Semantic error: Cannot apply unary operation ({}) on expression of type ({})! Expected Bool !",
         token.to_string(), operand->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 }
@@ -55,8 +55,8 @@ void BinaryExpression::validate()
         "Semantic error: Cannot apply binary operation ({}) on 2 expressions of different types ({}) and ({})!",
         token.to_string(), left->exprType->to_string(), right->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
   if(
@@ -72,8 +72,8 @@ void BinaryExpression::validate()
         "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected Ints, Reals, Chars or Bools !",
         token.to_string(), left->exprType->to_string(), right->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -93,8 +93,8 @@ void BinaryExpression::validate()
           "Semantic error: At ({}), expected comparison !",
           token.to_string()
         ),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
   }
 }
@@ -114,8 +114,8 @@ void NExpression::validate()
         "Semantic error: At {}, found {} expressions and {} binary operations ! Expected {} binary operations !",
         token.to_string(), exprs.size(), ops.size(), exprs.size()-1
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -135,8 +135,8 @@ void NExpression::validate()
         "Semantic error: Cannot apply binary operation ({}) on an expressions of type ({})! Expected Ints, Reals, Chars or Bools !",
         token.to_string(), left->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -152,8 +152,8 @@ void NExpression::validate()
           "Semantic error: Cannot apply binary operation ({}) on 2 expressions of different types ({}) and ({})!",
           token.to_string(), left->exprType->to_string(), right->exprType->to_string()
         ),
-        right->token.m_line,
-        right->token.m_col
+        right->token.line(),
+        right->token.column()
       );
     }
     const auto op = ops[i];  
@@ -173,8 +173,8 @@ void NExpression::validate()
               "Semantic error: Cannot apply binary operation ({}) on 2 boolean expressions !",
               right->token.to_string()
             ),
-            right->token.m_line,
-            right->token.m_col
+            right->token.line(),
+            right->token.column()
           );
       }
     }
@@ -200,8 +200,8 @@ void NExpression::validate()
               "Semantic error: Cannot apply binary operation ({}) on 2 expressions of underlying type '{}' !",
               right->token.to_string(), left_type
             ),
-            right->token.m_line,
-            right->token.m_col
+            right->token.line(),
+            right->token.column()
           );
       }
     }
@@ -223,8 +223,8 @@ const Type * ArraySelector::apply(const Type *type)
         "Semantic error: At ({}), type ({}) is not indexable ! Expected an array !",
         token.to_string(), type->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -238,8 +238,8 @@ const Type * ArraySelector::apply(const Type *type)
         "Semantic error: At ({}), array type ({}) requires {} indices ! Found {} indices !",
         token.to_string(), type->to_string(), arr->m_itypes.size(), indices.size()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -257,8 +257,8 @@ const Type * ArraySelector::apply(const Type *type)
           "Semantic error: At ({}), array type ({}) requires the index-{} to be of type ({}) ! Found {} !",
           token.to_string(), type->to_string(), i+1, arr->m_itypes[i]->to_string(), indices[i]->exprType->to_string()
         ),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
     }
   }
@@ -276,8 +276,8 @@ const Type* FieldSelector::apply(const Type* type)
         "Semantic error: At ({}), Field name '{}' does not exists for non-record type ({}) ! Expected a record !",
         token.to_string(), field, type->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -291,8 +291,8 @@ const Type* FieldSelector::apply(const Type* type)
         "Semantic error: Field name '{}' does not exists for record type ({}) !",
         field, type->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -338,8 +338,8 @@ void AssignmentStatement::validate()
         "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars or Bools !",
         token.to_string(), lhs->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
   if(lhs->exprType->get_underlying_type() != rhs->exprType->get_underlying_type())
@@ -350,8 +350,8 @@ void AssignmentStatement::validate()
         "Semantic error: Variable access ({}) of type ({}) cannot be assigned value of different type ({}) !",
         lhs->baseVar->to_string(), lhs->exprType->to_string(), rhs->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 }
@@ -383,8 +383,8 @@ void WriteStatement::validate()
           "Semantic error: In ({}), cannot write an expressions of type ({})! Expected Ints, Reals, Chars, Strings, Bools or array of Chars !",
           token.to_string(), exp->exprType->to_string()
         ),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
     }
 
@@ -414,8 +414,8 @@ void ReadStatement::validate()
           "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars, Bools or array of Chars !",
           token.to_string(), exp->exprType->to_string()
         ),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
     }
 
@@ -432,8 +432,8 @@ void WhileStatement::validate()
         "Semantic error: In ({}), the while loop's condition is required to be a boolean ! Found {} !",
         this->token.to_string(), this->condition->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 }
@@ -448,8 +448,8 @@ void RepeatStatement::validate()
         "Semantic error: In ({}), the repeat loop's condition is required to be a boolean ! Found {} !",
         this->token.to_string(), this->untilExpr->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 }
@@ -468,8 +468,8 @@ void ForStatement::validate()
         "Semantic error: In ({}), the for loop expects the bounds and the loop variable to be of the same type ! Found ({}) for the start, ({}) for the end and ({}) for the variable !",
         token.to_string(), CONST_CAT_NAMES[int(start.m_cat)], CONST_CAT_NAMES[int(end.m_cat)], loopVar->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
   Int a,b;
@@ -495,8 +495,8 @@ void ForStatement::validate()
             "Semantic error: In ({}), bounds can be made only using chars, enums or ints (constants) ! Found '{}' !",
             token.to_string(), CONST_CAT_NAMES[int(start.m_cat)]  
           ),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
   }
   if(increasing && a > b)
@@ -507,8 +507,8 @@ void ForStatement::validate()
         "Semantic error: In ({}), the lower bound should be less than the upper bound ! Found {}->{} !",
         token.to_string(), a, b
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
   else if(!increasing && a < b)
@@ -519,8 +519,8 @@ void ForStatement::validate()
         "Semantic error: In ({}), the lower bound should be greater than the upper bound ! Found {}->{} !",
         token.to_string(), a, b
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 }
@@ -535,8 +535,8 @@ void IfStatement::validate()
         "Semantic error: In ({}), the condition of if statement is required to be a boolean ! Found {} !",
         this->token.to_string(), this->condition->exprType->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 }
@@ -559,8 +559,8 @@ void CaseStatement::validate()
               "Semantic error: In ({}), case statement's label ({}) is of type ({}) ! Expected {} !",
               alt.token.to_string(), current.to_string(), CONST_CAT_NAMES[int(current.m_cat)], CONST_CAT_NAMES[int(cat)]
             ),
-            alt.token.m_line,
-            alt.token.m_col
+            alt.token.line(),
+            alt.token.column()
           );
         }
         if(values.contains(std::get<T>(current.m_val)))
@@ -571,8 +571,8 @@ void CaseStatement::validate()
               "Semantic error: In ({}), case statement's label ({}) is duplicated !",
               alt.token.to_string(), current.to_string()
             ),
-            alt.token.m_line,
-            alt.token.m_col
+            alt.token.line(),
+            alt.token.column()
           );
         }
         values.insert(std::get<T>(current.m_val));
@@ -606,8 +606,8 @@ void CaseStatement::validate()
           "Semantic error: In ({}), case statement's expression is of type ({}) ! Expected Int, Char, Bool or Enum type !",
           token.to_string(), this->selector->exprType->to_string()
         ),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
     }
   }
@@ -625,8 +625,8 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
         "Semantic error: At ({}), found {} arguments ! Expected {} arguments !",
         token.to_string(), args.size(), params.size()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -645,8 +645,8 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
             "Semantic error: At ({}), the {}-argument is not a variable but an expression !",
             token.to_string(), i+1
           ),
-          token.m_line,
-          token.m_col
+          token.line(),
+          token.column()
         );
       }
     }
@@ -658,8 +658,8 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
           "Semantic error: At ({}), the {}-argument is of type ({}) ! Expected type ({}) !",
           token.to_string(), i+1, atype->to_string(), ptype->to_string()
         ),
-        token.m_line,
-        token.m_col
+        token.line(),
+        token.column()
       );
     }
   }
@@ -675,8 +675,8 @@ void ProcedureCall::validate()
         "Semantic error: At ({}), invalid procedure with return-type ({}) !",
         token.to_string(), procedure->m_type->m_ret_type->to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
   pascal_compiler::validate(procedure, args, token);
@@ -692,8 +692,8 @@ void FunctionCall::validate()
         "Semantic error: At ({}), invalid function with no return-type !",
         token.to_string()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
   pascal_compiler::validate(function, args, token);

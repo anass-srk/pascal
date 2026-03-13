@@ -62,14 +62,14 @@ public:
   }
 
   inline bool check(TOKEN_TYPE type){
-    return m_lexer.getToken().m_type == type;
+    return m_lexer.getToken().type() == type;
   }
 
   inline bool check(std::initializer_list<TOKEN_TYPE> l)
   {
     for(auto t : l)
     {
-      if(t == m_lexer.getToken().m_type) return true;
+      if(t == m_lexer.getToken().type()) return true;
     }
     return false;
   }

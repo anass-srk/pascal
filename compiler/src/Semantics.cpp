@@ -127,31 +127,31 @@ Subrange::Subrange(
 }
 
 void Enum::insert(const Lexeme& token, Block& block){
-  if(token.m_type != TOKEN_TYPE::ID_TOKEN){
+  if(token.type() != TOKEN_TYPE::ID_TOKEN){
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TOKEN,
       std::format(
         "Semantic error: enum type '{}' values are identifiers. Found '{}' at ({},{}) !",
-        to_string(), token.m_id, token.m_line, token.m_col
+        to_string(), token.id(), token.line(), token.column()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
-  if(m_values.contains(token.m_id)){
+  if(m_values.contains(token.id())){
     throw SemanticException(
       SEMANTIC_ERROR::SE_DUPLICATE_ID,
       std::format(
         "Semantic error: enum type '{}' already contains value '{}'. Found earlier at ({},{}) !!",
-        to_string(), token.m_id, token.m_line, token.m_col
+        to_string(), token.id(), token.line(), token.column()
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
   const Int value = Int(m_values.size());
-  m_values[token.m_id] = value;
-  block.m_enums_vals.emplace(std::make_pair(token.m_id, EnumValue(this, token, value)));
+  m_values[token.id()] = value;
+  block.m_enums_vals.emplace(std::make_pair(token.id(), EnumValue(this, token, value)));
 }
 
 template <BlockMemberType T>
@@ -171,7 +171,7 @@ template <BlockMemberType T>
 void Block::check_used_id(const Lexeme &token, const std::unordered_map<std::string_view, T> &map)
 {
 
-  if(auto it = map.find(token.m_id); it != map.end())
+  if(auto it = map.find(token.id()); it != map.end())
   {
 
     throw SemanticException(
@@ -179,14 +179,14 @@ void Block::check_used_id(const Lexeme &token, const std::unordered_map<std::str
       std::format
       (
         "Semantic error: duplicate id '{}' found at ({},{}) and ({},{}) !",
-        token.m_id,
-        token.m_line,
-        token.m_col,
+        token.id(),
+        token.line(),
+        token.column(),
         getInfo(it->second).m_line,
         getInfo(it->second).m_col
       ),
-      token.m_line,
-      token.m_col
+      token.line(),
+      token.column()
     );
   }
 
@@ -229,18 +229,18 @@ template const Function* Block::get(std::string_view, const std::unordered_map<s
 template const EnumValue* Block::get(std::string_view, const std::unordered_map<std::string_view, EnumValue> &);
 
 void Record::check_duplicate_id(const Lexeme& rec, const Lexeme& name){
-  if(m_members.contains(name.m_id))
+  if(m_members.contains(name.id()))
     throw SemanticException(
       SEMANTIC_ERROR::SE_DUPLICATE_ID,
       std::format(
         "Semantic error: duplicate record member id '{}' found at ({},{}) and ({},{}) !",
-        name.m_id,
-        name.m_line,
-        name.m_col,
-        rec.m_line,
-        rec.m_col),
-      name.m_line,
-      name.m_col
+        name.id(),
+        name.line(),
+        name.column(),
+        rec.line(),
+        rec.column()),
+      name.line(),
+      name.column()
     );
 }
 void Record::check_duplicate_id(const Lexeme& rec, const Var& var){
@@ -252,8 +252,8 @@ void Record::check_duplicate_id(const Lexeme& rec, const Var& var){
         var.m_name,
         var.m_line,
         var.m_col,
-        rec.m_line,
-        rec.m_col),
+        rec.line(),
+        rec.column()),
       var.m_line,
       var.m_col
     );

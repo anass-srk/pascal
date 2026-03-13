@@ -8,15 +8,15 @@ TEST(LexerTest, Keywords)
 
   Lexer lexer("program begin end if then else while do");
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::PROGRAM_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::BEGIN_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::END_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::IF_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::THEN_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ELSE_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::WHILE_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::DO_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::EOF_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::PROGRAM_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::BEGIN_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::END_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::IF_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::THEN_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ELSE_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::WHILE_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::DO_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::EOF_TOKEN);
 }
 
 TEST(LexerTest, Identifiers)
@@ -26,8 +26,8 @@ TEST(LexerTest, Identifiers)
 
   auto id_test = [&lexer](const char* id)
   {
-    EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-    EXPECT_EQ(lexer.getToken().m_id, id);
+    EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+    EXPECT_EQ(lexer.getToken().id(), id);
   };
 
   id_test("myVar");
@@ -42,7 +42,7 @@ TEST(LexerTest, Identifiers)
   id_test("_a2c");
   id_test("_ad3");
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::DO_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::DO_TOKEN);
 }
 
 TEST(LexerTest, Numbers)
@@ -59,14 +59,14 @@ TEST(LexerTest, Numbers)
 
   auto int_test = [&lexer](long long i)
   {
-    EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::NUM_INT_TOKEN);
-    EXPECT_EQ(lexer.getToken().m_ival, i);
+    EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::NUM_INT_TOKEN);
+    EXPECT_EQ(lexer.getToken().int_value(), i);
   };
 
   auto real_test = [&lexer](double d)
   {
-    EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::NUM_REAL_TOKEN);
-    EXPECT_DOUBLE_EQ(lexer.getToken().m_dval, d);
+    EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::NUM_REAL_TOKEN);
+    EXPECT_DOUBLE_EQ(lexer.getToken().real_value(), d);
   };
 
   int_test(1);
@@ -109,14 +109,14 @@ TEST(LexerTest, StringsAndChars)
 
   auto str_test = [&lexer](const char* str)
   {
-    EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::STRING_LITERAL_TOKEN);
+    EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::STRING_LITERAL_TOKEN);
     EXPECT_EQ(lexer.getToken().to_string_literal(), str);
   };
 
   std::string s;
   auto char_test = [&lexer, &s](char c)
   {
-    EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::CHAR_LITERAL_TOKEN);
+    EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::CHAR_LITERAL_TOKEN);
     s = lexer.getToken().to_string_literal();
     EXPECT_EQ(s.length(), 1);
     EXPECT_EQ(s[0], c);
@@ -134,17 +134,17 @@ TEST(LexerTest, Operators)
 
   Lexer lexer(":= + - * / = <> < <= > >=");
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ASSIGN_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::PLUS_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::MINUS_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::STAR_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::SLASH_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::EQ_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::NEQ_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::LT_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::LE_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::GT_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::GE_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ASSIGN_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::PLUS_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::MINUS_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::STAR_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::SLASH_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::EQ_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::NEQ_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::LT_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::LE_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::GT_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::GE_TOKEN);
 }
 
 TEST(LexerTest, Comments)
@@ -152,9 +152,9 @@ TEST(LexerTest, Comments)
 
   Lexer lexer("program { this is a comment } test");
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::PROGRAM_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.getToken().m_id, "test");
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::PROGRAM_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.getToken().id(), "test");
 }
 
 TEST(LexerTest, ComplexExpression)
@@ -162,18 +162,18 @@ TEST(LexerTest, ComplexExpression)
 
   Lexer lexer("x := (a + b) * c - 10.5;");
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ASSIGN_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::LP_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::PLUS_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::RP_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::STAR_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::MINUS_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::NUM_REAL_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::SEMI_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ASSIGN_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::LP_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::PLUS_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::RP_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::STAR_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::MINUS_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::NUM_REAL_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::SEMI_TOKEN);
 }
 
 TEST(LexerTest, SimpleProgram)
@@ -187,30 +187,30 @@ TEST(LexerTest, SimpleProgram)
     "end."
   );
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::PROGRAM_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.getToken().m_id, "Test");
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::SEMI_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::PROGRAM_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.getToken().id(), "Test");
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::SEMI_TOKEN);
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::VAR_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.getToken().m_id, "x");
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::COLON_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.getToken().m_id, "integer");
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::SEMI_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::VAR_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.getToken().id(), "x");
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::COLON_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.getToken().id(), "integer");
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::SEMI_TOKEN);
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::BEGIN_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::BEGIN_TOKEN);
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ID_TOKEN);
-  EXPECT_EQ(lexer.getToken().m_id, "x");
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::ASSIGN_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::NUM_INT_TOKEN);
-  EXPECT_EQ(lexer.getToken().m_ival, 42);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::SEMI_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ID_TOKEN);
+  EXPECT_EQ(lexer.getToken().id(), "x");
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::ASSIGN_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::NUM_INT_TOKEN);
+  EXPECT_EQ(lexer.getToken().int_value(), 42);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::SEMI_TOKEN);
 
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::END_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::DOT_TOKEN);
-  EXPECT_EQ(lexer.next_sym().m_type, TOKEN_TYPE::EOF_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::END_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::DOT_TOKEN);
+  EXPECT_EQ(lexer.next_sym().type(), TOKEN_TYPE::EOF_TOKEN);
 
 }
