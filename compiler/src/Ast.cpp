@@ -210,7 +210,7 @@ void NExpression::validate()
 
 void LiteralExpression::validate()
 {
-  this->exprType = value->m_type;
+  this->exprType = value->type();
 }
 
 const Type * ArraySelector::apply(const Type *type)
@@ -458,42 +458,42 @@ void ForStatement::validate()
 {
   auto type_id = this->loopVar->exprType->get_underlying_type()->m_name;
   if(
-    CONST_CAT_NAMES[int(this->start.m_cat)] != type_id ||
-    start.m_cat != end.m_cat
+    CONST_CAT_NAMES[int(this->start.category())] != type_id ||
+    start.category() != end.category()
   )
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format(
         "Semantic error: In ({}), the for loop expects the bounds and the loop variable to be of the same type ! Found ({}) for the start, ({}) for the end and ({}) for the variable !",
-        token.to_string(), CONST_CAT_NAMES[int(start.m_cat)], CONST_CAT_NAMES[int(end.m_cat)], loopVar->exprType->to_string()
+        token.to_string(), CONST_CAT_NAMES[int(start.category())], CONST_CAT_NAMES[int(end.category())], loopVar->exprType->to_string()
       ),
       token.line(),
       token.column()
     );
   }
   Int a,b;
-  switch (start.m_cat)
+  switch (start.category())
   {
     case CONST_CAT::CC_CHAR:
-      a = std::get<char>(start.m_val);
-      b = std::get<char>(end.m_val);
+      a = start.get<char>();
+      b = end.get<char>();
     break;
     case CONST_CAT::CC_BOOL:
-      a = std::get<bool>(start.m_val);
-      b = std::get<bool>(end.m_val);
+      a = start.get<bool>();
+      b = end.get<bool>();
     break;
     case CONST_CAT::CC_ENUM:
     case CONST_CAT::CC_INT:
-      a = std::get<Int>(start.m_val);
-      b = std::get<Int>(end.m_val);
+      a = start.get<Int>();
+      b = end.get<Int>();
     break;
     default:
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_SUBRANGE,
         std::format(
             "Semantic error: In ({}), bounds can be made only using chars, enums or ints (constants) ! Found '{}' !",
-            token.to_string(), CONST_CAT_NAMES[int(start.m_cat)]  
+            token.to_string(), CONST_CAT_NAMES[int(start.category())]
           ),
         token.line(),
         token.column()
@@ -551,19 +551,19 @@ void CaseStatement::validate()
     for(const auto& alt : this->alternatives){
       for(int index = 0;index < alt.labels.size();++index){
         const auto current = alt.labels[index];
-        if(!std::holds_alternative<T>(current.m_val))
+        if(!std::holds_alternative<T>(current.value()))
         {
           throw SemanticException(
             SEMANTIC_ERROR::SE_INVALID_TYPE,
             std::format(
               "Semantic error: In ({}), case statement's label ({}) is of type ({}) ! Expected {} !",
-              alt.token.to_string(), current.to_string(), CONST_CAT_NAMES[int(current.m_cat)], CONST_CAT_NAMES[int(cat)]
+              alt.token.to_string(), current.to_string(), CONST_CAT_NAMES[int(current.category())], CONST_CAT_NAMES[int(cat)]
             ),
             alt.token.line(),
             alt.token.column()
           );
         }
-        if(values.contains(std::get<T>(current.m_val)))
+        if(values.contains(current.get<T>()))
         {
           throw SemanticException(
             SEMANTIC_ERROR::SE_INVALID_TYPE,
@@ -575,7 +575,7 @@ void CaseStatement::validate()
             alt.token.column()
           );
         }
-        values.insert(std::get<T>(current.m_val));
+        values.insert(current.get<T>());
       }
     }
   };

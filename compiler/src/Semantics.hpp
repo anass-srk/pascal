@@ -102,19 +102,34 @@ struct EnumValue;
 struct Record;
 struct Function;
 
-struct Const
+class Const
 {
-  // A const doesn't always have an actual name (when unamed, points to constant)
   std::string_view m_name;
   size_t m_line, m_col;
   std::variant<Int, Real, std::string, char, bool> m_val;
-  const Type *m_type; // Stored to tell which enum is used and to check types with variables
+  const Type *m_type;
   CONST_CAT m_cat;
 
+public:
   template <NumConstType T>
-  Const(std::string_view name, size_t line, size_t col, T value, const Block& main_block);
-  Const(std::string_view name, size_t line, size_t col, std::string &&value, const Block &main_block);
-  Const(std::string_view name, size_t line, size_t col, const EnumValue& value);
+  Const(const Lexeme& token, T value, const Block& main_block);
+  Const(const Lexeme& token, std::string &&value, const Block &main_block);
+  Const(const Lexeme& token, const EnumValue& value);
+
+  std::string_view name() const;
+  size_t line() const;
+  size_t col() const;
+  const Type* type() const;
+  CONST_CAT category() const { return m_cat; }
+
+  template <typename T>
+  T get() const;
+  Int asInt() const;
+
+  const std::variant<Int, Real, std::string, char, bool>& value() const;
+
+  static Const withSign(const Const& original, int sign, const Lexeme& new_token);
+
   std::string to_string() const
   {
     return std::format("\"{}\" at ({},{})", m_name, m_line, m_col);

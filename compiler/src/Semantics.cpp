@@ -13,100 +13,124 @@ void Block::init_main_block(Block& block){
   }
 }
 
-Const::Const(std::string_view name, size_t line, size_t col, const EnumValue& value) : m_name(name), m_line(line), m_col(col),
-  m_type(static_cast<const Type*>(value.m_type)) 
+Const::Const(const Lexeme& token, const EnumValue& value)
+  : m_name(token.id()), m_line(token.line()), m_col(token.column()),
+    m_type(static_cast<const Type*>(value.m_type)),
+    m_val(value.m_value),
+    m_cat(CONST_CAT::CC_ENUM)
 {
-  m_val = value.m_value;
-  m_cat = CONST_CAT::CC_ENUM;
 }
 
-Const::Const(std::string_view name, size_t line, size_t col, std::string&& value, const Block& block) : m_name(name), m_line(line), m_col(col), 
-  m_type(block.m_types.at(CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)]).get())
+Const::Const(const Lexeme &token, std::string &&value, const Block &block)
+  : m_name(token.id()), m_line(token.line()), m_col(token.column()),
+    m_type(block.m_types.at(CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)]).get()),
+    m_val(std::move(value)),
+    m_cat(CONST_CAT::CC_STRING)
 {
-  m_val = std::move(value);
-  m_cat = CONST_CAT::CC_STRING;
 }
 
-template Const::Const(std::string_view name, size_t line, size_t col, Int value, const Block& block);
-template Const::Const(std::string_view name, size_t line, size_t col, Real value, const Block& block);
-template Const::Const(std::string_view name, size_t line, size_t col, char value, const Block& block);
-template Const::Const(std::string_view name, size_t line, size_t col, bool value, const Block& block);
+template Const::Const(const Lexeme &token, Int value, const Block& block);
+template Const::Const(const Lexeme &token, Real value, const Block& block);
+template Const::Const(const Lexeme &token, char value, const Block& block);
+template Const::Const(const Lexeme &token, bool value, const Block& block);
 
 template <NumConstType T>
-Const::Const(std::string_view name, size_t line, size_t col, T value, const Block& block) : m_name(name), m_line(line), m_col(col),
-  m_type(block.m_types.at(CONST_CAT_NAMES[int(
-    (std::is_same_v<T, Int> ? CONST_CAT::CC_INT : 
-      (std::is_same_v<T, Real> ? CONST_CAT::CC_REAL : 
-        (std::is_same_v<T, char>) ? CONST_CAT::CC_CHAR : CONST_CAT::CC_BOOL
+Const::Const(const Lexeme &token, T value, const Block& block)
+  : m_name(token.id()), m_line(token.line()), m_col(token.column()),
+    m_type(block.m_types.at(CONST_CAT_NAMES[int(
+      (std::is_same_v<T, Int> ? CONST_CAT::CC_INT :
+        (std::is_same_v<T, Real> ? CONST_CAT::CC_REAL :
+          (std::is_same_v<T, char>) ? CONST_CAT::CC_CHAR : CONST_CAT::CC_BOOL
+        )
       )
-    )
-  )]).get())
+    )]).get()),
+    m_val(value),
+    m_cat(std::is_same_v<T, Int> ? CONST_CAT::CC_INT :
+        (std::is_same_v<T, Real> ? CONST_CAT::CC_REAL :
+          (std::is_same_v<T, char>) ? CONST_CAT::CC_CHAR : CONST_CAT::CC_BOOL
+        )
+      )
 {
+}
 
-  m_val = value;
+std::string_view Const::name() const { return m_name; }
+size_t Const::line() const { return m_line; }
+size_t Const::col() const { return m_col; }
+const Type* Const::type() const { return m_type; }
 
-  if constexpr (std::is_same_v<T, Int>)
-  {
-    m_cat = CONST_CAT::CC_INT;
+template <typename T>
+T Const::get() const {
+  return std::get<T>(m_val);
+}
+
+Int Const::asInt() const {
+  return std::visit([](auto&& val) -> Int {
+    using T = std::decay_t<decltype(val)>;
+    if constexpr (std::is_same_v<T, Int>) return val;
+    else if constexpr (std::is_same_v<T, char>) return static_cast<Int>(val);
+    else if constexpr (std::is_same_v<T, bool>) return static_cast<Int>(val);
+    else throw std::bad_variant_access();
+  }, m_val);
+}
+
+const std::variant<Int, Real, std::string, char, bool>& Const::value() const { return m_val; }
+
+Const Const::withSign(const Const& original, int sign, const Lexeme& new_token) {
+  Const res = original;
+  res.m_name = new_token.id();
+  res.m_line = new_token.line();
+  res.m_col = new_token.column();
+
+  if (original.category() == CONST_CAT::CC_INT) {
+    res.m_val = std::get<Int>(original.m_val) * sign;
+  } else if (original.category() == CONST_CAT::CC_REAL) {
+    res.m_val = std::get<Real>(original.m_val) * sign;
   }
 
-  else if constexpr (std::is_same_v<T, Real>)
-  {
-    m_cat = CONST_CAT::CC_REAL;
-  }
-
-  else if constexpr (std::is_same_v<T, char>)
-  {
-    m_cat = CONST_CAT::CC_CHAR;
-  }
-
-  else if constexpr (std::is_same_v<T, bool>)
-  {
-    m_cat = CONST_CAT::CC_BOOL;
-  }
+  return res;
 }
 
 Subrange::Subrange(
   const std::string_view& name, size_t line, size_t col,
   Const&& beg, Const&& end 
 ) : Type(name, line, col, TYPE_CAT::TC_SUBRANGE) {
-  if(beg.m_type != end.m_type){
+  if(beg.type() != end.type()){
     throw SemanticException(
       SEMANTIC_ERROR::SE_SUBRANGE_TYPES_MISMATCH,
       std::format(
         "Semantic error: Subrange type must be made using 2 constants of the same type. Found {} and {} !",
-        beg.m_type->to_string(), end.m_type->to_string()
+        beg.type()->to_string(), end.type()->to_string()
       ),
-      beg.m_line,
-      beg.m_col
+      beg.line(),
+      beg.col()
     );
   }
 
-  m_utype = beg.m_type;
+  m_utype = beg.type();
 
-  switch(beg.m_cat){
+  switch(beg.category()){
     case CONST_CAT::CC_BOOL:
-      m_beg = std::get<bool>(beg.m_val);
-      m_end = std::get<bool>(end.m_val);
+      m_beg = beg.get<bool>();
+      m_end = end.get<bool>();
       break;
     case CONST_CAT::CC_CHAR:
-      m_beg = std::get<char>(beg.m_val);
-      m_end = std::get<char>(end.m_val);
+      m_beg = beg.get<char>();
+      m_end = end.get<char>();
       break;
     case CONST_CAT::CC_ENUM:
     case CONST_CAT::CC_INT:
-      m_beg = std::get<Int>(beg.m_val);
-      m_end = std::get<Int>(end.m_val);
+      m_beg = beg.get<Int>();
+      m_end = end.get<Int>();
       break;
     default:
       throw SemanticException(
         SEMANTIC_ERROR::SE_SUBRANGE_TYPES_MISMATCH,
         std::format(
           "Semantic error: Subrange type \"{}\" can be made only using chars, enums or ints (constants) !",
-          beg.m_type->to_string()
+          beg.type()->to_string()
         ),
-        m_line,
-        m_col
+        line,
+        col
       );
   }
 
@@ -115,14 +139,14 @@ Subrange::Subrange(
       SEMANTIC_ERROR::SE_INVALID_SUBRANGE,
       std::format(
         "Semantic error: Subrange type \"{}\" 's beginning ({}) is greater or equals than its end ({}) !",
-        beg.m_type->to_string(), m_beg, m_end
+        beg.type()->to_string(), m_beg, m_end
       ),
-      m_line,
-      m_col
+      line,
+      col
     );
   }
 
-  m_cat = beg.m_cat;
+  m_cat = beg.category();
 
 }
 
@@ -168,26 +192,58 @@ inline const auto& getInfo(const T& t){
 }
 
 template <BlockMemberType T>
+size_t getInfoLine(const T& t){
+  if constexpr (is_one_of<T, Label, Var, EnumValue>){
+    return t.m_line;
+  }
+  else if constexpr(std::is_same_v<T, std::shared_ptr<Type>>){
+    return t.get()->m_line;
+  }
+  else if constexpr(std::is_same_v<T, Function>){
+    return t.m_type->m_line;
+  }
+  else if constexpr(std::is_same_v<T, Const>){
+    return t.line();
+  }
+}
+
+template <BlockMemberType T>
+size_t getInfoCol(const T& t){
+  if constexpr (is_one_of<T, Label, Var, EnumValue>){
+    return t.m_col;
+  }
+  else if constexpr(std::is_same_v<T, std::shared_ptr<Type>>){
+    return t.get()->m_col;
+  }
+  else if constexpr(std::is_same_v<T, Function>){
+    return t.m_type->m_col;
+  }
+  else if constexpr(std::is_same_v<T, Const>){
+    return t.col();
+  }
+}
+
+template <BlockMemberType T>
 void Block::check_used_id(const Lexeme &token, const std::unordered_map<std::string_view, T> &map)
 {
 
   if(auto it = map.find(token.id()); it != map.end())
   {
 
-    throw SemanticException(
-      SEMANTIC_ERROR::SE_DUPLICATE_ID,
-      std::format
-      (
-        "Semantic error: duplicate id '{}' found at ({},{}) and ({},{}) !",
-        token.id(),
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_DUPLICATE_ID,
+        std::format
+        (
+          "Semantic error: duplicate id '{}' found at ({},{}) and ({},{}) !",
+          token.id(),
+          token.line(),
+          token.column(),
+          getInfoLine(it->second),
+          getInfoCol(it->second)
+        ),
         token.line(),
-        token.column(),
-        getInfo(it->second).m_line,
-        getInfo(it->second).m_col
-      ),
-      token.line(),
-      token.column()
-    );
+        token.column()
+      );
   }
 
 }

@@ -1,9 +1,10 @@
+#pragma once
 #include <gtest/gtest.h>
 #include "../src/Parser.hpp"
 
 using namespace pascal_compiler;
 
-using ConstType = decltype(Const::m_val);
+using ConstType = std::variant<Int, Real, std::string, char, bool>;
 
 TEST(ParserTest, Labels){
 
@@ -109,7 +110,7 @@ TEST(ParserTest, Consts){
 
     const Const* v = Block::get(name, p.m_current_block->m_consts);
     EXPECT_NE(v, nullptr);
-    EXPECT_EQ(std::get<decltype(value)>(v->m_val), value);
+    EXPECT_EQ(std::get<decltype(value)>(v->value()), value);
   };
 
   auto test_complex = []<typename T>(const char *code, std::initializer_list<std::pair<std::string_view, T>> l)
@@ -124,9 +125,9 @@ TEST(ParserTest, Consts){
       const Const *v = Block::get(name, p.m_current_block->m_consts);
       EXPECT_NE(v, nullptr);
       if constexpr(std::is_same_v<T, ConstType>){
-        EXPECT_EQ(v->m_val, v->m_val);
+        EXPECT_EQ(v->value(), v->value());
       }else {
-        EXPECT_EQ(std::get<T>(v->m_val), value);
+        EXPECT_EQ(std::get<T>(v->value()), value);
       }
     }
   };

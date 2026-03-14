@@ -5,7 +5,7 @@
 
 using namespace pascal_compiler;
 
-using ConstType = decltype(Const::m_val);
+using ConstType = std::variant<Int, Real, std::string, char, bool>;
 
 template <typename T>
 bool checkLiteral(const Expression *expr, T expected, CONST_CAT cat)
@@ -13,11 +13,11 @@ bool checkLiteral(const Expression *expr, T expected, CONST_CAT cat)
   auto lit = dynamic_cast<const LiteralExpression *>(expr);
   if (!lit)
     return false;
-  if (lit->value->m_cat != cat)
+  if (lit->value->category() != cat)
     return false;
-  if (!std::holds_alternative<T>(lit->value->m_val))
+  if (!std::holds_alternative<T>(lit->value->value()))
     return false;
-  return std::get<T>(lit->value->m_val) == expected;
+  return std::get<T>(lit->value->value()) == expected;
 }
 
 static bool checkIntLiteral(const Expression *expr, Int expected)

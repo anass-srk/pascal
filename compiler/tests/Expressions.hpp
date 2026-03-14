@@ -553,7 +553,7 @@ TEST(ExpressionTest, LogicalOperations) {
   auto checkBoolLiteral = [](const Expression* expr, bool val) -> bool {
     const auto* lit = dynamic_cast<const LiteralExpression*>(expr);
     if (!lit) return false;
-    return std::get<bool>(lit->value->m_val) == val;
+    return std::get<bool>(lit->value->value()) == val;
   };
 
   // 4. Check: result := a or b

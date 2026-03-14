@@ -458,9 +458,9 @@ TEST(VisitorTest, Pattern_TypeExtractor_IntLiterals)
   parser.m_current_block->body->accept(extractor, *parser.m_current_block);
 
   ASSERT_EQ(extractor.nodes.size(), 3);
-  EXPECT_EQ(std::get<Int>(extractor.nodes[0]->value->m_val), 1);
-  EXPECT_EQ(std::get<Int>(extractor.nodes[1]->value->m_val), 2);
-  EXPECT_EQ(std::get<Int>(extractor.nodes[2]->value->m_val), 42);
+  EXPECT_EQ(std::get<Int>(extractor.nodes[0]->value->value()), 1);
+  EXPECT_EQ(std::get<Int>(extractor.nodes[1]->value->value()), 2);
+  EXPECT_EQ(std::get<Int>(extractor.nodes[2]->value->value()), 42);
 }
 
 TEST(VisitorTest, Pattern_TypeExtractor_Assignments)

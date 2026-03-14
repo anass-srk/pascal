@@ -145,46 +145,22 @@ Const Parser::constant(const Lexeme& token)
 {
   if(check(TOKEN_TYPE::STRING_LITERAL_TOKEN))
   {
-    return Const(
-      token.id(), // id of the contant
-      token.line(),
-      token.column(),
-      m_lexer.getToken().to_string_literal(), // value of the constant
-      *getTop()
-    );
+    return Const(token, m_lexer.getToken().to_string_literal(), *getTop());
   }
 
   if(check(TOKEN_TYPE::CHAR_LITERAL_TOKEN))
   {
-    return Const(
-      token.id(),
-      token.line(),
-      token.column(),
-      m_lexer.getToken().to_string_literal()[0],
-      *getTop()
-    );
+    return Const(token, m_lexer.getToken().to_string_literal()[0], *getTop());
   }
 
   if(check(TOKEN_TYPE::TRUE_TOKEN))
   {
-    return Const(
-      token.id(),
-      token.line(),
-      token.column(),
-      true,
-      *getTop()
-    );
+    return Const(token, true, *getTop());
   }
 
   if(check(TOKEN_TYPE::FALSE_TOKEN))
   {
-    return Const(
-      token.id(),
-      token.line(),
-      token.column(),
-      false,
-      *getTop()
-    );
+    return Const(token, false, *getTop());
   }
   
   bool sign = false;
@@ -204,24 +180,12 @@ Const Parser::constant(const Lexeme& token)
 
   if(check(TOKEN_TYPE::NUM_INT_TOKEN))
   {
-    return Const(
-      token.id(),
-      token.line(),
-      token.column(),
-      m_lexer.getToken().int_value() * fact,
-      *getTop()
-    );
+    return Const(token, m_lexer.getToken().int_value() * fact, *getTop());
   }
 
   if(check(TOKEN_TYPE::NUM_REAL_TOKEN))
   {
-    return Const(
-      token.id(),
-      token.line(),
-      token.column(),
-      m_lexer.getToken().real_value() * fact,
-      *getTop()
-    );
+    return Const(token, m_lexer.getToken().real_value() * fact, *getTop());
   }
 
   if(check(TOKEN_TYPE::ID_TOKEN))
@@ -243,39 +207,23 @@ Const Parser::constant(const Lexeme& token)
             token.column()
           );
         }
-        return Const(
-          token.id(),
-          token.line(),
-          token.column(),
-          *enum_val          
-        );
+        return Const(token, *enum_val);
       }
 
       if(auto const_val = Block::get(id,current->m_consts); const_val != nullptr){
         // Only ints and reals can be negative
-        if(sign && const_val->m_cat != CONST_CAT::CC_INT && const_val->m_cat != CONST_CAT::CC_REAL){
+        if(sign && const_val->category() != CONST_CAT::CC_INT && const_val->category() != CONST_CAT::CC_REAL){
           throw SemanticException(
             SEMANTIC_ERROR::SE_INVALID_OP,
             std::format(
               "Semantic error: applying a unary operation on the constant ({} at ({},{})) requires it to be an int or real ('{}' in your case) ! ",
-              token.id(), token.line(), token.column(), const_val->m_type->m_name
+              token.id(), token.line(), token.column(), const_val->type()->m_name
             ),
             token.line(),
             token.column()
           );
         }
-        Const res = *const_val;
-        res.m_name = token.id(); // Must change name as well as location
-        res.m_line = token.line();
-        res.m_col = token.column();
-
-        if(const_val->m_cat == CONST_CAT::CC_INT){
-          res.m_val = std::get<Int>(res.m_val) * fact;
-        }else if(const_val->m_cat == CONST_CAT::CC_REAL){
-          res.m_val = std::get<Real>(res.m_val) * fact;
-        }
-
-        return res;
+        return Const::withSign(*const_val, fact, token);
       }
 
       current = current->m_parent;
@@ -705,36 +653,36 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
 
     if(type->m_type == TYPE_CAT::TC_ENUM){
       for (const auto &c : constants){
-        if (c.m_type != type){
+        if (c.type() != type){
           throw SemanticException(
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not an enum of the tag type '{}' at ({},{}) !\n",
-              c.m_name, record->m_name, c.m_line, c.m_col, type->m_name, type->m_line, type->m_col),
-            c.m_line, c.m_col
+              c.name(), record->m_name, c.line(), c.col(), type->m_name, type->m_line, type->m_col),
+            c.line(), c.col()
           );
         }
       }
     }else{ // Type is a subrange
       auto sub = static_cast<const Subrange*>(type);
       for(const auto& c : constants){
-        if(c.m_cat != sub->m_cat){ // Char, Enum or Int
+        if(c.category() != sub->m_cat){ // Char, Enum or Int
           throw SemanticException(
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not a subrange of the tag type '{}' at ({},{}) !\n",
-              c.m_name, record->m_name, c.m_line, c.m_col, type->m_name, type->m_line, type->m_col),
-            c.m_line, c.m_col
+              c.name(), record->m_name, c.line(), c.col(), type->m_name, type->m_line, type->m_col),
+            c.line(), c.col()
           );
         }
-        const Int val = (std::holds_alternative<char>(c.m_val) ? static_cast<Int>(std::get<char>(c.m_val)) : std::get<Int>(c.m_val));
+        const Int val = c.asInt();
         if(val < sub->m_beg || val > sub->m_end){
           throw SemanticException(
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not in the subrange ({} <= {}) of the tag type '{}' at ({},{}) !\n",
-              c.m_name, record->m_name, c.m_line, c.m_col, sub->m_beg, sub->m_end, type->m_name, type->m_line, type->m_col),
-            c.m_line, c.m_col
+              c.name(), record->m_name, c.line(), c.col(), sub->m_beg, sub->m_end, type->m_name, type->m_line, type->m_col),
+            c.line(), c.col()
           );
         }
       }
@@ -1068,7 +1016,7 @@ std::unique_ptr<Expression> Parser::factor()
   }
   if(ev)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token.id(), token.line(), token.column(), *ev), token);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token, *ev), token);
     res->validate();
     adv();
     return res;

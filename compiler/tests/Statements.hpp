@@ -188,12 +188,12 @@ static void checkFor(const ForStatement *stmt, std::string_view id, bool increas
   EXPECT_NE(stmt->body.get(), nullptr);
   EXPECT_EQ(stmt->increasing, increasing);
   EXPECT_TRUE(checkVariableAccess(stmt->loopVar.get(), id));
-  EXPECT_EQ(stmt->loopVar->exprType->get_underlying_type(), stmt->start.m_type);
-  EXPECT_EQ(stmt->end.m_type, stmt->start.m_type);
-  ASSERT_TRUE(std::holds_alternative<T>(stmt->start.m_val));
-  ASSERT_TRUE(std::holds_alternative<T>(stmt->end.m_val));
-  EXPECT_EQ(std::get<T>(stmt->start.m_val), beg);
-  EXPECT_EQ(std::get<T>(stmt->end.m_val), end);
+  EXPECT_EQ(stmt->loopVar->exprType->get_underlying_type(), stmt->start.type());
+  EXPECT_EQ(stmt->end.type(), stmt->start.type());
+  ASSERT_TRUE(std::holds_alternative<T>(stmt->start.value()));
+  ASSERT_TRUE(std::holds_alternative<T>(stmt->end.value()));
+  EXPECT_EQ(std::get<T>(stmt->start.value()), beg);
+  EXPECT_EQ(std::get<T>(stmt->end.value()), end);
 }
 
 
@@ -386,8 +386,8 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
       int i = 0;
       for (auto v : l)
       {
-        ASSERT_TRUE(std::holds_alternative<T>(alt.labels[i].m_val));
-        EXPECT_EQ(v, std::get<T>(alt.labels[i].m_val));
+        ASSERT_TRUE(std::holds_alternative<T>(alt.labels[i].value()));
+        EXPECT_EQ(v, std::get<T>(alt.labels[i].value()));
         ++i;
       }
     }
