@@ -1,4 +1,5 @@
 #include "Ast.hpp"
+#include "ValidationUtils.hpp"
 
 namespace pascal_compiler
 {
@@ -6,33 +7,13 @@ namespace pascal_compiler
 void UnaryExpression::validate()
 {
   this->exprType = operand->exprType->get_underlying_type();
-  auto type_name = exprType->m_name;
-
-  if (
-    (op == UnaryOp::Plus || op == UnaryOp::Minus) &&
-    type_name != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
-    type_name != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
-    type_name != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)]
-  )
-  {
+  if (!validation::is_valid_unary_operand(op, operand->exprType)) {
+    const std::string expected = (op == UnaryOp::Not ? "Bool" : "Int, Char or Real");
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
-        "Semantic error: Cannot apply unary operation ({}) on expression of type ({})! Expected Int, Char or Real !",
-        token.to_string(), operand->exprType->to_string()
-      ),
-      token.line(),
-      token.column()
-    );
-  }
-
-  if (op == UnaryOp::Not && type_name != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
-  {
-    throw SemanticException(
-      SEMANTIC_ERROR::SE_INVALID_OP,
-      std::format(
-        "Semantic error: Cannot apply unary operation ({}) on expression of type ({})! Expected Bool !",
-        token.to_string(), operand->exprType->to_string()
+        "Semantic error: Cannot apply unary operation ({}) on expression of type ({})! Expected {} !",
+        token.to_string(), operand->exprType->to_string(), expected
       ),
       token.line(),
       token.column()
@@ -44,32 +25,11 @@ void BinaryExpression::validate()
 {
   // For now, both expression are required to be bools
   // if an expression's type is a subrange, get the underlying type
-  auto left_type = left->exprType->get_underlying_type()->m_name;
-  auto right_type = right->exprType->get_underlying_type()->m_name;
-
-  if(left_type != right_type)
-  {
+  if (!validation::is_valid_binary_operand(op, left->exprType, right->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
-        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of different types ({}) and ({})!",
-        token.to_string(), left->exprType->to_string(), right->exprType->to_string()
-      ),
-      token.line(),
-      token.column()
-    );
-  }
-  if(
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] && 
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]
-  )
-  {
-    throw SemanticException(
-      SEMANTIC_ERROR::SE_INVALID_OP,
-      std::format(
-        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected Ints, Reals, Chars or Bools !",
+        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected compatible basic types for relational operation!",
         token.to_string(), left->exprType->to_string(), right->exprType->to_string()
       ),
       token.line(),
@@ -120,15 +80,7 @@ void NExpression::validate()
   }
 
   this->exprType = left->exprType->get_underlying_type();
-  auto left_type = exprType->m_name;
-
-  if(
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] && 
-    left_type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]
-  )
-  {
+  if (!validation::is_basic_type(exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
@@ -143,9 +95,7 @@ void NExpression::validate()
   for(int i = 0;i < ops.size();++i)
   {
     const auto right = exprs[i+1].get();
-    auto right_type = right->exprType->get_underlying_type()->m_name;
-    if(left_type != right_type)
-    {
+    if (!validation::types_compatible(left->exprType, right->exprType)) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_OP,
         std::format(
@@ -157,52 +107,28 @@ void NExpression::validate()
       );
     }
     const auto op = ops[i];  
-    if(left_type == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
-    {
-      switch(op)
-      {
-        case BinaryOp::Eq:
-        case BinaryOp::Ne:
-        case BinaryOp::And:
-        case BinaryOp::Or:
-        break;
-        default:
-          throw SemanticException(
-            SEMANTIC_ERROR::SE_INVALID_OP,
-            std::format(
-              "Semantic error: Cannot apply binary operation ({}) on 2 boolean expressions !",
-              right->token.to_string()
-            ),
-            right->token.line(),
-            right->token.column()
-          );
-      }
-    }
-    else
-    {
-      switch(op)
-      {
-        case BinaryOp::Add:
-        case BinaryOp::Sub:
-        case BinaryOp::Mul:
-        case BinaryOp::Div:
-        case BinaryOp::Eq:
-        case BinaryOp::Ne:
-        case BinaryOp::Ge:
-        case BinaryOp::Gt:
-        case BinaryOp::Le:
-        case BinaryOp::Lt:
-        break;
-        default:
-          throw SemanticException(
-            SEMANTIC_ERROR::SE_INVALID_OP,
-            std::format(
-              "Semantic error: Cannot apply binary operation ({}) on 2 expressions of underlying type '{}' !",
-              right->token.to_string(), left_type
-            ),
-            right->token.line(),
-            right->token.column()
-          );
+    if (!validation::is_valid_binary_operand(op, left->exprType, right->exprType)) {
+      std::string_view left_type = left->exprType->get_underlying_type()->m_name;
+      if (left_type == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]) {
+        throw SemanticException(
+          SEMANTIC_ERROR::SE_INVALID_OP,
+          std::format(
+            "Semantic error: Cannot apply binary operation ({}) on 2 boolean expressions !",
+            right->token.to_string()
+          ),
+          right->token.line(),
+          right->token.column()
+        );
+      } else {
+        throw SemanticException(
+          SEMANTIC_ERROR::SE_INVALID_OP,
+          std::format(
+            "Semantic error: Cannot apply binary operation ({}) on 2 expressions of underlying type '{}' !",
+            right->token.to_string(), left_type
+          ),
+          right->token.line(),
+          right->token.column()
+        );
       }
     }
   }
@@ -323,27 +249,18 @@ void CompoundStatement::validate()
 
 void AssignmentStatement::validate()
 {
-  const auto type = lhs->exprType->get_underlying_type()->m_name;
-  if(
-    lhs->exprType->m_type != TYPE_CAT::TC_ENUM        && // Enums can be assigned
-    type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)]   &&
-    type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)]  &&
-    type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)]  && 
-    type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]
-  )
-  {
+  if (!validation::is_basic_type(lhs->exprType) && !validation::is_enum_type(lhs->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
-        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars or Bools !",
+        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars, Bools or enums !",
         token.to_string(), lhs->exprType->to_string()
       ),
       token.line(),
       token.column()
     );
   }
-  if(lhs->exprType->get_underlying_type() != rhs->exprType->get_underlying_type())
-  {
+  if (!validation::types_compatible(lhs->exprType, rhs->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_ASSIGN,
       std::format(
@@ -363,20 +280,7 @@ void WriteStatement::validate()
 {
   for(const auto &exp : arguments)
   {
-
-    auto t = exp->exprType->get_underlying_type();
-
-    const auto type = t->m_name;
-
-    if(
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] && 
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] &&
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)] && 
-      !(t->m_type == TYPE_CAT::TC_ARRAY && static_cast<const Array*>(t)->m_etype->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)])
-    )
-    {
+    if (!validation::is_writable_type(exp->exprType)) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
@@ -387,7 +291,6 @@ void WriteStatement::validate()
         token.column()
       );
     }
-
   }
 }
 
@@ -395,19 +298,7 @@ void ReadStatement::validate()
 {
   for(const auto &exp : arguments)
   {
-    
-    auto t = exp->exprType->get_underlying_type();
-
-    const auto type = t->m_name;
-
-    if(
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] &&
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] &&
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] && 
-      type != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] &&
-      !(t->m_type == TYPE_CAT::TC_ARRAY && static_cast<const Array*>(t)->m_etype->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)])
-    )
-    {
+    if (!validation::is_readable_type(exp->exprType)) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
@@ -418,14 +309,12 @@ void ReadStatement::validate()
         token.column()
       );
     }
-
   }
 }
 
 void WhileStatement::validate()
 {
-  if(this->condition->exprType->get_underlying_type()->m_name != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
-  {
+  if (!validation::is_boolean_type(this->condition->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_COND,
       std::format(
@@ -440,8 +329,7 @@ void WhileStatement::validate()
 
 void RepeatStatement::validate()
 {
-  if(this->untilExpr->exprType->get_underlying_type()->m_name != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
-  {
+  if (!validation::is_boolean_type(this->untilExpr->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_COND,
       std::format(
@@ -527,8 +415,7 @@ void ForStatement::validate()
 
 void IfStatement::validate()
 {
-  if(this->condition->exprType->get_underlying_type()->m_name != CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)])
-  {
+  if (!validation::is_boolean_type(this->condition->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_COND,
       std::format(
@@ -544,6 +431,17 @@ void IfStatement::validate()
 void CaseStatement::validate()
 {
   auto type_id = this->selector->exprType->get_underlying_type()->m_name;
+  if (!validation::is_case_selector_type(this->selector->exprType)) {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_TYPE,
+      std::format(
+        "Semantic error: In ({}), case statement's expression is of type ({}) ! Expected Int, Char, Bool or Enum type !",
+        token.to_string(), this->selector->exprType->to_string()
+      ),
+      token.line(),
+      token.column()
+    );
+  }
 
   auto check = [&]<typename T>(CONST_CAT cat)
   {

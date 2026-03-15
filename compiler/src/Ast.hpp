@@ -2,6 +2,21 @@
 #include "Semantics.hpp"
 #include "Visitor.hpp"
 
+#define DEFINE_EXPR_ACCEPT() \
+    void accept(ExpressionVisitor& visitor, const Block& ctx) const override { \
+        visitor.visit(*this, ctx); \
+    }
+
+#define DEFINE_STMT_ACCEPT() \
+    void accept(StatementVisitor& visitor, const Block& ctx) const override { \
+        visitor.visit(*this, ctx); \
+    }
+
+#define DEFINE_SELECTOR_ACCEPT() \
+    void accept(SelectorVisitor& visitor, const Block& ctx) const override { \
+        visitor.visit(*this, ctx); \
+    }
+
 namespace pascal_compiler
 {
 
@@ -26,9 +41,7 @@ struct LiteralExpression : public Expression
   LiteralExpression(std::unique_ptr<Const> c, Lexeme token) : Expression(token), value(std::move(c)) {}
   void validate() override;
 
-  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_EXPR_ACCEPT()
 };
 
 // Unary operations (+, -, not)
@@ -43,9 +56,7 @@ struct UnaryExpression : public Expression
     : Expression(token), op(o), operand(std::move(e)) {}
   void validate() override;
 
-  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_EXPR_ACCEPT()
 };
 
 // Binary operations
@@ -72,9 +83,7 @@ struct BinaryExpression : public Expression
     : Expression(token), op(o), left(std::move(l)), right(std::move(r)) {this->exprType = bool_type;}
   void validate() override;
 
-  void accept(ExpressionVisitor &visitor, const Block &ctx) const override{
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_EXPR_ACCEPT()
 };
 
 struct NExpression : public Expression
@@ -93,9 +102,7 @@ struct NExpression : public Expression
 
   void validate() override;
 
-  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_EXPR_ACCEPT()
 };
 
 // Selectors for array and record accesses
@@ -113,10 +120,8 @@ struct ArraySelector : public Selector
   ArraySelector(std::vector<std::unique_ptr<Expression>>&& idx, Lexeme token)
   : indices(std::move(idx)){ this->token = token; }
   const Type* apply(const Type*) override;
-  
-  void accept(SelectorVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+
+  DEFINE_SELECTOR_ACCEPT()
 };
 
 struct FieldSelector : public Selector
@@ -125,9 +130,7 @@ struct FieldSelector : public Selector
   FieldSelector(std::string_view f, Lexeme token) : field(f) { this->token = token; }
   const Type* apply(const Type*) override;
 
-  void accept(SelectorVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_SELECTOR_ACCEPT()
 };
 
 // Variable access (l‑value)
@@ -139,9 +142,7 @@ struct VariableAccess : public Expression
   : Expression(token), selectors(std::move(sels)),  baseVar(v) {}
   void validate() override;
 
-  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_EXPR_ACCEPT()
 };
 
 // Function call (returns a value)
@@ -153,9 +154,7 @@ struct FunctionCall : public Expression
       : Expression(token), args(std::move(arguments)), function(func) {}
   void validate() override;
 
-  void accept(ExpressionVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_EXPR_ACCEPT()
 };
 
 
@@ -177,9 +176,7 @@ struct LabeledStatement : public Statement
     : Statement(token), label(lbl), stmt(std::move(s)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 struct AssignmentStatement : public Statement
@@ -190,9 +187,7 @@ struct AssignmentStatement : public Statement
     : Statement(token), lhs(std::move(l)), rhs(std::move(r)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 struct ProcedureCall : public Statement
@@ -203,9 +198,7 @@ struct ProcedureCall : public Statement
       : Statement(token), args(std::move(arguments)), procedure(func) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 // Read statement (built‑in)
@@ -216,9 +209,7 @@ struct ReadStatement : public Statement
     : Statement(token), arguments(std::move(args)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 // Write statement (built‑in)
@@ -229,9 +220,7 @@ struct WriteStatement : public Statement
     : Statement(token), arguments(std::move(args)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 struct GotoStatement : public Statement
@@ -241,9 +230,7 @@ struct GotoStatement : public Statement
     : Statement(token), label(lbl) {}
   void validate() override {}
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 // Compound statement (BEGIN ... END)
@@ -253,9 +240,7 @@ struct CompoundStatement : public Statement
   CompoundStatement(std::vector<std::unique_ptr<Statement>>&& stmts, Lexeme token) : Statement(token), statements(std::move(stmts)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 struct WhileStatement : public Statement
@@ -266,9 +251,7 @@ struct WhileStatement : public Statement
     : Statement(token), condition(std::move(cond)), body(std::move(content)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 struct RepeatStatement : public Statement
@@ -279,9 +262,7 @@ struct RepeatStatement : public Statement
     : Statement(token), body(std::move(content)), untilExpr(std::move(cond)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 // For
@@ -303,9 +284,7 @@ struct ForStatement : public Statement
       end(std::move(e)),body(std::move(content)), increasing(to) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 struct IfStatement : public Statement
@@ -323,9 +302,7 @@ struct IfStatement : public Statement
       thenPart(std::move(thenStmt)), elsePart(std::move(elseStmt)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 struct CaseStatement : public Statement
@@ -345,9 +322,7 @@ struct CaseStatement : public Statement
     : Statement(token), selector(std::move(sel)), alternatives(std::move(cases)) {}
   void validate() override;
 
-  void accept(StatementVisitor& visitor, const Block& ctx) const override {
-    visitor.visit(*this, ctx);
-  }
+  DEFINE_STMT_ACCEPT()
 };
 
 // Program root

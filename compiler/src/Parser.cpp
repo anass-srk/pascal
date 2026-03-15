@@ -743,7 +743,8 @@ void Parser::function_definition(bool is_proc)
 
   auto token = m_lexer.getToken();
   const auto id = token.id();
-  auto func_type = new FunctionType (token.id(), token.line(), token.column(), nullptr);
+  auto func_type_unique = std::make_unique<FunctionType>(token.id(), token.line(), token.column(), nullptr);
+  auto func_type = func_type_unique.get();
 
   m_current_block->check_used_id(token);
 
@@ -765,10 +766,11 @@ void Parser::function_definition(bool is_proc)
     match_adv(TOKEN_TYPE::SEMI_TOKEN);
   }
 
-  m_current_block->m_unamed_types.emplace_back(func_type);
+  m_current_block->m_unamed_types.emplace_back(std::move(func_type_unique));
 
   Block *parent = m_current_block;
-  m_current_block = new Block();
+  auto new_block = std::make_unique<Block>();
+  m_current_block = new_block.get();
   m_current_block->m_parent = parent;
 
   // to return a value, we assign to a variable with the id of the function (not for procedures)
@@ -785,7 +787,7 @@ void Parser::function_definition(bool is_proc)
   auto *func_block = m_current_block;
   m_current_block = parent;
 
-  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, func_type, func_block)));
+  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, func_type, new_block.release())));
 }
 
 std::unique_ptr<Expression> Parser::gexpression()
