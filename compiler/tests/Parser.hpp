@@ -66,10 +66,10 @@ TEST(ParserTest, Enums){
     EXPECT_EQ(type->m_type, TYPE_CAT::TC_ENUM);
 
     const Enum* e = static_cast<const Enum*>(type);
-    EXPECT_EQ(e->m_values.size(), enum_vals.size());
+    EXPECT_EQ(e->values().size(), enum_vals.size());
 
     for(auto enum_val : enum_vals){
-      EXPECT_TRUE(e->m_values.contains(enum_val));
+      EXPECT_TRUE(e->values().contains(enum_val));
       EXPECT_TRUE(p.m_current_block->m_enums_vals.contains(enum_val));
     }
 
@@ -257,8 +257,8 @@ TEST(ParserTest, Subranges){
       EXPECT_EQ(_type->m_type, TYPE_CAT::TC_SUBRANGE);
 
       const Subrange* sub = static_cast<const Subrange*>(_type);
-      EXPECT_EQ(sub->m_beg, vals.first);
-      EXPECT_EQ(sub->m_end, vals.second);
+      EXPECT_EQ(sub->start(), vals.first);
+      EXPECT_EQ(sub->end(), vals.second);
     }
   };
 
@@ -312,71 +312,71 @@ TEST(ParserTest, Arrays){
   parser.parse();
 
   auto check_subrange = []<typename T>(const Subrange* subrange, T a, T b) {
-    EXPECT_EQ(subrange->m_beg, a);
-    EXPECT_EQ(subrange->m_end, b);
+    EXPECT_EQ(subrange->start(), a);
+    EXPECT_EQ(subrange->end(), b);
   };
 
   auto check_enum = [](const Enum* e, std::initializer_list<std::pair<std::string_view, Int>> enum_vals){
 
-    EXPECT_EQ(e->m_values.size(), enum_vals.size());
+    EXPECT_EQ(e->values().size(), enum_vals.size());
     for(auto const [name, val] : enum_vals)
     {
-      EXPECT_TRUE(e->m_values.contains(name));
-      EXPECT_EQ(e->m_values.at(name), val);
+      EXPECT_TRUE(e->values().contains(name));
+      EXPECT_EQ(e->values().at(name), val);
     }
   };
 
   auto ar1 = static_cast<const Array *>(Block::get("ar1", parser.m_current_block->m_types));
   EXPECT_EQ(ar1->m_type, TYPE_CAT::TC_ARRAY);
-  EXPECT_EQ(ar1->m_itypes.size(), 1);
-  EXPECT_EQ(ar1->m_itypes[0]->m_name, "sub");
-  EXPECT_EQ(ar1->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
-  EXPECT_EQ(ar1->m_etype->m_name, "Int");
-  EXPECT_EQ(ar1->m_etype->m_type, TYPE_CAT::TC_BASIC);
+  EXPECT_EQ(ar1->index_types().size(), 1);
+  EXPECT_EQ(ar1->index_types()[0]->m_id, "sub");
+  EXPECT_EQ(ar1->index_types()[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+  EXPECT_EQ(ar1->element_type()->m_id, "Int");
+  EXPECT_EQ(ar1->element_type()->m_type, TYPE_CAT::TC_BASIC);
 
   auto ar2 = static_cast<const Array *>(Block::get("ar2", parser.m_current_block->m_types));
   EXPECT_EQ(ar2->m_type, TYPE_CAT::TC_ARRAY);
-  EXPECT_EQ(ar2->m_itypes.size(), 1);
-  check_subrange(static_cast<const Subrange*>(ar2->m_itypes[0]), Int(0), Int(2));
-  EXPECT_EQ(ar2->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
-  EXPECT_EQ(ar2->m_etype->m_name, "Char");
-  EXPECT_EQ(ar2->m_etype->m_type, TYPE_CAT::TC_BASIC);
+  EXPECT_EQ(ar2->index_types().size(), 1);
+  check_subrange(static_cast<const Subrange*>(ar2->index_types()[0]), Int(0), Int(2));
+  EXPECT_EQ(ar2->index_types()[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+  EXPECT_EQ(ar2->element_type()->m_id, "Char");
+  EXPECT_EQ(ar2->element_type()->m_type, TYPE_CAT::TC_BASIC);
 
   auto ar_ = static_cast<const Array *>(Block::get("ar_", parser.m_current_block->m_types));
   EXPECT_EQ(ar_->m_type, TYPE_CAT::TC_ARRAY);
-  EXPECT_EQ(ar_->m_itypes.size(), 2);
-  check_subrange(static_cast<const Subrange *>(ar_->m_itypes[0]), Int(1), Int(4));
-  check_subrange(static_cast<const Subrange *>(ar_->m_itypes[1]), Int(1), Int(4));
-  EXPECT_EQ(ar_->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
-  EXPECT_EQ(ar_->m_etype->m_name, "enum");
-  EXPECT_EQ(ar_->m_etype->m_type, TYPE_CAT::TC_ENUM);
+  EXPECT_EQ(ar_->index_types().size(), 2);
+  check_subrange(static_cast<const Subrange *>(ar_->index_types()[0]), Int(1), Int(4));
+  check_subrange(static_cast<const Subrange *>(ar_->index_types()[1]), Int(1), Int(4));
+  EXPECT_EQ(ar_->index_types()[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+  EXPECT_EQ(ar_->element_type()->m_id, "enum");
+  EXPECT_EQ(ar_->element_type()->m_type, TYPE_CAT::TC_ENUM);
 
   auto ar4 = static_cast<const Array *>(Block::get("ar4", parser.m_current_block->m_types));
   EXPECT_EQ(ar4->m_type, TYPE_CAT::TC_ARRAY);
-  EXPECT_EQ(ar4->m_itypes.size(), 2);
+  EXPECT_EQ(ar4->index_types().size(), 2);
   check_enum(
-    static_cast<const Enum*>(ar4->m_itypes[0]),
+    static_cast<const Enum*>(ar4->index_types()[0]),
     {
       {"small", Int(0)},
       {"medium", Int(1)},
       {"big", Int(2)}
     }
   );
-  EXPECT_EQ(ar4->m_itypes[1]->m_name, "sub");
-  EXPECT_EQ(ar4->m_etype->m_name, "String");
-  EXPECT_EQ(ar4->m_etype->m_type, TYPE_CAT::TC_BASIC);
+  EXPECT_EQ(ar4->index_types()[1]->m_id, "sub");
+  EXPECT_EQ(ar4->element_type()->m_id, "String");
+  EXPECT_EQ(ar4->element_type()->m_type, TYPE_CAT::TC_BASIC);
 
   auto ar3 = static_cast<const Array *>(Block::get("ar3", parser.m_current_block->m_types));
   EXPECT_EQ(ar3->m_type, TYPE_CAT::TC_ARRAY);
-  EXPECT_EQ(ar3->m_itypes.size(), 2);
-  check_subrange(static_cast<const Subrange *>(ar3->m_itypes[0]), Int(1), Int(4));
-  check_subrange(static_cast<const Subrange *>(ar3->m_itypes[1]), Int(1), Int(4));
-  auto _ar = static_cast<const Array *>(ar3->m_etype);
+  EXPECT_EQ(ar3->index_types().size(), 2);
+  check_subrange(static_cast<const Subrange *>(ar3->index_types()[0]), Int(1), Int(4));
+  check_subrange(static_cast<const Subrange *>(ar3->index_types()[1]), Int(1), Int(4));
+  auto _ar = static_cast<const Array *>(ar3->element_type());
   EXPECT_EQ(_ar->m_type, TYPE_CAT::TC_ARRAY);
-  EXPECT_EQ(_ar->m_itypes.size(), 1);
-  check_subrange(static_cast<const Subrange *>(_ar->m_itypes[0]), Int(0), Int(5));
-  EXPECT_EQ(_ar->m_etype->m_name, "Bool");
-  EXPECT_EQ(_ar->m_etype->m_type, TYPE_CAT::TC_BASIC);
+  EXPECT_EQ(_ar->index_types().size(), 1);
+  check_subrange(static_cast<const Subrange *>(_ar->index_types()[0]), Int(0), Int(5));
+  EXPECT_EQ(_ar->element_type()->m_id, "Bool");
+  EXPECT_EQ(_ar->element_type()->m_type, TYPE_CAT::TC_BASIC);
 }
 
 TEST(ParserTest, Records){
@@ -428,13 +428,13 @@ TEST(ParserTest, Records){
     EXPECT_NE(rec, nullptr);
 
     for(const auto& [name, type_id] : l){
-      auto it = rec->m_members.find(name);
-      EXPECT_NE(it, rec->m_members.end());
+      auto it = rec->attributes().find(name);
+      EXPECT_NE(it, rec->attributes().end());
 
       auto type = parser.m_current_block->m_types.find(type_id);
       EXPECT_NE(type, parser.m_current_block->m_types.end());
 
-      EXPECT_EQ(it->second.m_type, type->second.get());
+      EXPECT_EQ(it->second.type(), type->second.get());
     }
 
   };
@@ -482,20 +482,20 @@ TEST(ParserTest, Records){
     EXPECT_NE(rec, nullptr);
 
     const Array* arr = nullptr;
-    if(auto it = rec->m_members.find("val3"); it != rec->m_members.end()){
-      EXPECT_NE(it->second.m_type, nullptr);
-      EXPECT_EQ(it->second.m_type->m_type, TYPE_CAT::TC_ARRAY);
-      arr = static_cast<const Array*>(it->second.m_type);
+    if(auto it = rec->attributes().find("val3"); it != rec->attributes().end()){
+      EXPECT_NE(it->second.type(), nullptr);
+      EXPECT_EQ(it->second.type()->m_type, TYPE_CAT::TC_ARRAY);
+      arr = static_cast<const Array*>(it->second.type());
     }
     EXPECT_NE(arr, nullptr);
 
-    EXPECT_EQ(arr->m_itypes.size(), 1);
-    EXPECT_EQ(arr->m_itypes[0]->m_type, TYPE_CAT::TC_SUBRANGE);
-    auto sub = static_cast<const Subrange*>(arr->m_itypes[0]);
-    EXPECT_EQ(sub->m_beg, -2);
-    EXPECT_EQ(sub->m_end, 2);
+    EXPECT_EQ(arr->index_types().size(), 1);
+    EXPECT_EQ(arr->index_types()[0]->m_type, TYPE_CAT::TC_SUBRANGE);
+    auto sub = static_cast<const Subrange*>(arr->index_types()[0]);
+    EXPECT_EQ(sub->start(), -2);
+    EXPECT_EQ(sub->end(), 2);
     
-    EXPECT_EQ(arr->m_etype->m_name, "Char");
+    EXPECT_EQ(arr->element_type()->m_id, "Char");
   }
 
 }
@@ -517,9 +517,9 @@ TEST(ParserTest, Variables)
     auto it = vars.find("x");
     ASSERT_NE(it, vars.end());
     const Var &var = it->second;
-    EXPECT_EQ(var.m_name, "x");
-    EXPECT_EQ(var.m_type->m_name, "Int");
-    EXPECT_EQ(var.m_type->m_type, TYPE_CAT::TC_BASIC);
+    EXPECT_EQ(var.id(), "x");
+    EXPECT_EQ(var.type()->m_id, "Int");
+    EXPECT_EQ(var.type()->m_type, TYPE_CAT::TC_BASIC);
   }
 
   // Multiple variables
@@ -544,7 +544,7 @@ TEST(ParserTest, Variables)
       for(const auto [name, type] : l){
         auto it = vars.find(name);
         ASSERT_NE(it, vars.end());
-        EXPECT_EQ(it->second.m_type->m_name, type);
+        EXPECT_EQ(it->second.type()->m_id, type);
       }
     };
 
@@ -582,36 +582,36 @@ TEST(ParserTest, Variables)
     auto &vars = block->m_vars;
     ASSERT_EQ(vars.size(), 3);
 
-    const Type *type = vars.at("arr").m_type;
+    const Type *type = vars.at("arr").type();
     ASSERT_EQ(type->m_type, TYPE_CAT::TC_ARRAY);
     const Array *arrType = static_cast<const Array *>(type);
 
-    ASSERT_EQ(arrType->m_itypes.size(), 1);
-    const Type *idxType = arrType->m_itypes[0];
+    ASSERT_EQ(arrType->index_types().size(), 1);
+    const Type *idxType = arrType->index_types()[0];
     ASSERT_EQ(idxType->m_type, TYPE_CAT::TC_SUBRANGE);
     const Subrange *sub = static_cast<const Subrange *>(idxType);
-    EXPECT_EQ(sub->m_beg, 1);
-    EXPECT_EQ(sub->m_end, 10);
-    EXPECT_EQ(sub->m_cat, CONST_CAT::CC_INT);
+    EXPECT_EQ(sub->start(), 1);
+    EXPECT_EQ(sub->end(), 10);
+    EXPECT_EQ(sub->category(), CONST_CAT::CC_INT);
 
-    const Type *elemType = arrType->m_etype;
-    EXPECT_EQ(elemType->m_name, "Int");
+    const Type *elemType = arrType->element_type();
+    EXPECT_EQ(elemType->m_id, "Int");
     EXPECT_EQ(elemType->m_type, TYPE_CAT::TC_BASIC);
 
-    type = vars.at("rec").m_type;
+    type = vars.at("rec").type();
     ASSERT_EQ(type->m_type, TYPE_CAT::TC_RECORD);
     const Record *recType = static_cast<const Record *>(type);
 
-    EXPECT_EQ(recType->m_members.at("f1").m_type->m_name, "Int");
-    EXPECT_EQ(recType->m_members.at("f2").m_type->m_name, "Char");
+    EXPECT_EQ(recType->attributes().at("f1").type()->m_id, "Int");
+    EXPECT_EQ(recType->attributes().at("f2").type()->m_id, "Char");
 
-    type = vars.at("c").m_type;
+    type = vars.at("c").type();
     ASSERT_EQ(type->m_type, TYPE_CAT::TC_ENUM);
-    EXPECT_EQ(type->m_name, "color");
+    EXPECT_EQ(type->m_id, "color");
 
-    EXPECT_EQ(block->m_enums_vals.at("red").m_value, 0);
-    EXPECT_EQ(block->m_enums_vals.at("green").m_value, 1);
-    EXPECT_EQ(block->m_enums_vals.at("blue").m_value, 2);
+    EXPECT_EQ(block->m_enums_vals.at("red").int_value(), 0);
+    EXPECT_EQ(block->m_enums_vals.at("green").int_value(), 1);
+    EXPECT_EQ(block->m_enums_vals.at("blue").int_value(), 2);
   }
 }
 
@@ -651,16 +651,16 @@ TEST(ParserTest, FunctionProcedureTypes) {
     const FunctionType* ft = static_cast<const FunctionType*>(Block::get("SimpleFuncType", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
-    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_EQ(ft->m_ret_type->m_id, "Int");
     EXPECT_TRUE(ft->m_args.empty());
 
     ft = static_cast<const FunctionType*>(Block::get("StringFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->m_ret_type->m_name, "String");
+    EXPECT_EQ(ft->m_ret_type->m_id, "String");
 
     ft = static_cast<const FunctionType*>(Block::get("BoolFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->m_ret_type->m_name, "Bool");
+    EXPECT_EQ(ft->m_ret_type->m_id, "Bool");
   }
 
   // Procedure type with value parameters
@@ -681,22 +681,22 @@ TEST(ParserTest, FunctionProcedureTypes) {
     EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
     EXPECT_EQ(ft->m_ret_type, nullptr);
     EXPECT_EQ(ft->m_args.size(), 1);
-    EXPECT_EQ(ft->m_args[0].m_name, "x");
-    EXPECT_EQ(ft->m_args[0].m_type->m_name, "Int");
-    EXPECT_FALSE(ft->m_args[0].ref);
+    EXPECT_EQ(ft->m_args[0].id(), "x");
+    EXPECT_EQ(ft->m_args[0].type()->m_id, "Int");
+    EXPECT_FALSE(ft->m_args[0].is_ref());
 
     ft = static_cast<const FunctionType*>(Block::get("TwoIntProc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_args.size(), 2);
-    EXPECT_EQ(ft->m_args[0].m_name, "a");
-    EXPECT_EQ(ft->m_args[1].m_name, "b");
+    EXPECT_EQ(ft->m_args[0].id(), "a");
+    EXPECT_EQ(ft->m_args[1].id(), "b");
 
     ft = static_cast<const FunctionType*>(Block::get("MixedParams", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_args.size(), 3);
-    EXPECT_EQ(ft->m_args[0].m_name, "x");
-    EXPECT_EQ(ft->m_args[1].m_name, "s");
-    EXPECT_EQ(ft->m_args[2].m_name, "flag");
+    EXPECT_EQ(ft->m_args[0].id(), "x");
+    EXPECT_EQ(ft->m_args[1].id(), "s");
+    EXPECT_EQ(ft->m_args[2].id(), "flag");
   }
 
   // Function type with value parameters and return type
@@ -715,25 +715,25 @@ TEST(ParserTest, FunctionProcedureTypes) {
     const FunctionType* ft = static_cast<const FunctionType*>(Block::get("IntFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
-    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_EQ(ft->m_ret_type->m_id, "Int");
     EXPECT_EQ(ft->m_args.size(), 1);
-    EXPECT_EQ(ft->m_args[0].m_name, "x");
-    EXPECT_EQ(ft->m_args[0].m_type->m_name, "Int");
-    EXPECT_FALSE(ft->m_args[0].ref);
+    EXPECT_EQ(ft->m_args[0].id(), "x");
+    EXPECT_EQ(ft->m_args[0].type()->m_id, "Int");
+    EXPECT_FALSE(ft->m_args[0].is_ref());
 
     ft = static_cast<const FunctionType*>(Block::get("RealFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->m_ret_type->m_name, "Real");
+    EXPECT_EQ(ft->m_ret_type->m_id, "Real");
     EXPECT_EQ(ft->m_args.size(), 2);
-    EXPECT_EQ(ft->m_args[0].m_name, "x");
-    EXPECT_EQ(ft->m_args[1].m_name, "y");
+    EXPECT_EQ(ft->m_args[0].id(), "x");
+    EXPECT_EQ(ft->m_args[1].id(), "y");
 
     ft = static_cast<const FunctionType*>(Block::get("StringFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->m_ret_type->m_name, "String");
+    EXPECT_EQ(ft->m_ret_type->m_id, "String");
     EXPECT_EQ(ft->m_args.size(), 2);
-    EXPECT_EQ(ft->m_args[0].m_name, "a");
-    EXPECT_EQ(ft->m_args[1].m_name, "b");
+    EXPECT_EQ(ft->m_args[0].id(), "a");
+    EXPECT_EQ(ft->m_args[1].id(), "b");
   }
 
   // Procedure type with VAR (reference) parameters
@@ -753,22 +753,22 @@ TEST(ParserTest, FunctionProcedureTypes) {
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
     EXPECT_EQ(ft->m_args.size(), 1);
-    EXPECT_EQ(ft->m_args[0].m_name, "x");
-    EXPECT_TRUE(ft->m_args[0].ref);
+    EXPECT_EQ(ft->m_args[0].id(), "x");
+    EXPECT_TRUE(ft->m_args[0].is_ref());
 
     ft = static_cast<const FunctionType*>(Block::get("MixedRefProc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_args.size(), 3);
-    EXPECT_FALSE(ft->m_args[0].ref);
-    EXPECT_TRUE(ft->m_args[1].ref);
-    EXPECT_FALSE(ft->m_args[2].ref);
+    EXPECT_FALSE(ft->m_args[0].is_ref());
+    EXPECT_TRUE(ft->m_args[1].is_ref());
+    EXPECT_FALSE(ft->m_args[2].is_ref());
 
     ft = static_cast<const FunctionType*>(Block::get("AllRefPtrs", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_args.size(), 3);
-    EXPECT_TRUE(ft->m_args[0].ref);
-    EXPECT_TRUE(ft->m_args[1].ref);
-    EXPECT_TRUE(ft->m_args[2].ref);
+    EXPECT_TRUE(ft->m_args[0].is_ref());
+    EXPECT_TRUE(ft->m_args[1].is_ref());
+    EXPECT_TRUE(ft->m_args[2].is_ref());
   }
 
   // Function type with VAR parameters and return type
@@ -786,17 +786,17 @@ TEST(ParserTest, FunctionProcedureTypes) {
     const FunctionType* ft = static_cast<const FunctionType*>(Block::get("VarIntFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_type, TYPE_CAT::TC_FUNCTION);
-    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_EQ(ft->m_ret_type->m_id, "Int");
     EXPECT_EQ(ft->m_args.size(), 1);
-    EXPECT_TRUE(ft->m_args[0].ref);
+    EXPECT_TRUE(ft->m_args[0].is_ref());
 
     ft = static_cast<const FunctionType*>(Block::get("ComplexFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->m_ret_type->m_name, "String");
+    EXPECT_EQ(ft->m_ret_type->m_id, "String");
     EXPECT_EQ(ft->m_args.size(), 3);
-    EXPECT_FALSE(ft->m_args[0].ref);
-    EXPECT_TRUE(ft->m_args[1].ref);
-    EXPECT_TRUE(ft->m_args[2].ref);
+    EXPECT_FALSE(ft->m_args[0].is_ref());
+    EXPECT_TRUE(ft->m_args[1].is_ref());
+    EXPECT_TRUE(ft->m_args[2].is_ref());
   }
 
   // Function/procedure types with complex types (arrays, records, enums)
@@ -819,27 +819,27 @@ TEST(ParserTest, FunctionProcedureTypes) {
     const FunctionType* ft = static_cast<const FunctionType*>(Block::get("ArrayProc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_args.size(), 1);
-    EXPECT_EQ(ft->m_args[0].m_name, "arr");
-    EXPECT_EQ(ft->m_args[0].m_type->m_name, "ArrType");
+    EXPECT_EQ(ft->m_args[0].id(), "arr");
+    EXPECT_EQ(ft->m_args[0].type()->m_id, "ArrType");
 
     ft = static_cast<const FunctionType*>(Block::get("RecordFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->m_ret_type->m_name, "Int");
+    EXPECT_EQ(ft->m_ret_type->m_id, "Int");
     EXPECT_EQ(ft->m_args.size(), 1);
-    EXPECT_EQ(ft->m_args[0].m_name, "rec");
-    EXPECT_EQ(ft->m_args[0].m_type->m_name, "RecType");
+    EXPECT_EQ(ft->m_args[0].id(), "rec");
+    EXPECT_EQ(ft->m_args[0].type()->m_id, "RecType");
 
     ft = static_cast<const FunctionType*>(Block::get("EnumProc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
     EXPECT_EQ(ft->m_args.size(), 1);
-    EXPECT_EQ(ft->m_args[0].m_name, "c");
-    EXPECT_EQ(ft->m_args[0].m_type->m_name, "Color");
+    EXPECT_EQ(ft->m_args[0].id(), "c");
+    EXPECT_EQ(ft->m_args[0].type()->m_id, "Color");
 
     ft = static_cast<const FunctionType*>(Block::get("ComplexFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->m_ret_type->m_name, "Color");
+    EXPECT_EQ(ft->m_ret_type->m_id, "Color");
     EXPECT_EQ(ft->m_args.size(), 2);
-    EXPECT_EQ(ft->m_args[0].m_name, "arr");
-    EXPECT_EQ(ft->m_args[1].m_name, "rec");
+    EXPECT_EQ(ft->m_args[0].id(), "arr");
+    EXPECT_EQ(ft->m_args[1].id(), "rec");
   }
 }

@@ -6,7 +6,7 @@ namespace pascal_compiler::validation {
 
 inline bool is_basic_type(const Type* type) {
   if (!type) return false;
-  std::string_view name = type->get_underlying_type()->m_name;
+  std::string_view name = type->get_underlying_type()->m_id;
   return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
@@ -15,7 +15,7 @@ inline bool is_basic_type(const Type* type) {
 
 inline bool is_boolean_type(const Type* type) {
   if (!type) return false;
-  return type->get_underlying_type()->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
+  return type->get_underlying_type()->m_id == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
 }
 
 inline bool is_enum_type(const Type* type) {
@@ -26,12 +26,12 @@ inline bool is_enum_type(const Type* type) {
 inline bool is_array_of_char(const Type* type) {
   if (!type || type->m_type != TYPE_CAT::TC_ARRAY) return false;
   const auto* arr = static_cast<const Array*>(type);
-  return arr->m_etype->get_underlying_type()->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)];
+  return arr->element_type()->get_underlying_type()->m_id == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)];
 }
 
 inline bool is_writable_type(const Type* type) {
   if (!type) return false;
-  std::string_view name = type->get_underlying_type()->m_name;
+  std::string_view name = type->get_underlying_type()->m_id;
   if (name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
@@ -45,7 +45,7 @@ inline bool is_writable_type(const Type* type) {
 
 inline bool is_readable_type(const Type* type) {
   if (!type) return false;
-  std::string_view name = type->get_underlying_type()->m_name;
+  std::string_view name = type->get_underlying_type()->m_id;
   if (name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
@@ -58,7 +58,7 @@ inline bool is_readable_type(const Type* type) {
 
 inline bool is_valid_unary_operand(UnaryOp op, const Type* type) {
   if (!type) return false;
-  std::string_view name = type->get_underlying_type()->m_name;
+  std::string_view name = type->get_underlying_type()->m_id;
   if (op == UnaryOp::Not) {
     return name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
   } else { // Plus or Minus
@@ -89,7 +89,7 @@ inline bool is_valid_binary_operand(BinaryOp op, const Type* left, const Type* r
   const auto* right_under = right->get_underlying_type();
   if (left_under != right_under) return false;
   
-  std::string_view name = left_under->m_name;
+  std::string_view name = left_under->m_id;
   if (is_relational_op(op)) {
     return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
@@ -113,7 +113,7 @@ inline bool types_compatible(const Type* t1, const Type* t2) {
 inline bool is_case_selector_type(const Type* type) {
   if (!type) return false;
   const auto* underlying = type->get_underlying_type();
-  std::string_view name = underlying->m_name;
+  std::string_view name = underlying->m_id;
   return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||

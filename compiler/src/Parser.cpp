@@ -1,5 +1,7 @@
 #include "Parser.hpp"
+#include "Semantics.hpp"
 #include <format>
+#include <utility>
 
 namespace pascal_compiler
 {
@@ -116,7 +118,7 @@ void Parser::label_declaration(){
     Lexeme token = m_lexer.getToken();
     m_current_block->check_used_id(token);
 
-    m_current_block->m_labels[token.id()] = {token.id(), token.line(), token.column()};
+    m_current_block->m_labels.emplace(token.id(), token);
 
     adv();
   }while (check(TOKEN_TYPE::COMMA_TOKEN));
@@ -201,7 +203,7 @@ Const Parser::constant(const Lexeme& token)
             SEMANTIC_ERROR::SE_INVALID_OP,
             std::format(
               "Semantic error: applying a unary operation on the constant ({} at ({},{})) requires it to be an int or real ('{}' in your case) ! ",
-              token.id(), token.line(), token.column(), enum_val->m_type->m_name
+              token.id(), token.line(), token.column(), enum_val->type()->m_id
             ),
             token.line(),
             token.column()
@@ -217,7 +219,7 @@ Const Parser::constant(const Lexeme& token)
             SEMANTIC_ERROR::SE_INVALID_OP,
             std::format(
               "Semantic error: applying a unary operation on the constant ({} at ({},{})) requires it to be an int or real ('{}' in your case) ! ",
-              token.id(), token.line(), token.column(), const_val->type()->m_name
+              token.id(), token.line(), token.column(), const_val->type()->m_id
             ),
             token.line(),
             token.column()
@@ -307,7 +309,7 @@ std::unique_ptr<Enum> Parser::enum_type(const Lexeme& token){
   auto vec = id_list();
   match(TOKEN_TYPE::RP_TOKEN);
   
-  auto type = std::make_unique<Enum>(token.id(), token.line(), token.column());
+  auto type = std::make_unique<Enum>(token);
 
   for(const auto& t : vec){
     m_current_block->check_used_id(t);
@@ -393,7 +395,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
         types.emplace_back(
           m_current_block->m_unamed_types.emplace_back(
-            std::make_unique<Subrange>(beg_token.id(), beg_token.line(), beg_token.column(), std::move(beg), std::move(end))
+            std::make_unique<Subrange>(beg_token, std::move(beg), std::move(end))
           ).get()
         );
       }
@@ -411,9 +413,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
       do{
         if(auto t = Block::get(id, current->m_types); t){
           adv();
-          return std::make_unique<Array>(
-            token.id(), token.line(), token.column(), std::move(types), t
-          );
+          return std::make_unique<Array>(token, std::move(types), t);
         }
       
         current = current->m_parent;
@@ -422,7 +422,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
     auto const beg_token = m_lexer.getToken();
     return std::make_unique<Array>(
-      token.id(), token.line(), token.column(), std::move(types),
+      token, std::move(types),
       m_current_block->m_unamed_types.emplace_back(type_eval(beg_token)).get()
     );
     
@@ -466,7 +466,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
   Const end = constant(m_lexer.next_sym());
   adv();
 
-  return std::make_unique<Subrange>(token.id(), token.line(), token.column(), std::move(beg), std::move(end));
+  return std::make_unique<Subrange>(token, std::move(beg), std::move(end));
 }
 
 const Type* Parser::find_type(bool required)
@@ -539,7 +539,7 @@ std::vector<Arg> Parser::args_list()
 }
 
 std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
-  std::unique_ptr<Record> record = std::make_unique<Record>(token.id(), token.line(), token.column());
+  std::unique_ptr<Record> record = std::make_unique<Record>(token);
   do{
     adv();
     if(check(TOKEN_TYPE::CASE_TOKEN) || check(TOKEN_TYPE::END_TOKEN)) break; // Move to variant part or quit
@@ -549,8 +549,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     auto type = get_type(token, false);
 
     for(const auto& name : var_names){
-      record->check_duplicate_id(token, name);
-      record->m_members[name.id()] = (Var){name.id(), name.line(), name.column(), type};
+      record->add_attribute(token, Var(name, type));
     }
 
   }while(check(TOKEN_TYPE::SEMI_TOKEN));
@@ -576,8 +575,8 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
   }
 
   if(type){ // tag variable not declared explicitly
-    for(const auto &[name, v] : record->m_members){
-      if(v.m_type == type){
+    for(const auto &[name, v] : record->attributes()){
+      if(v.type() == type){
         if(var){ // Already found a tag
           const auto line = m_lexer.getToken().line();
           const auto col = m_lexer.getToken().column();
@@ -585,7 +584,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
             SEMANTIC_ERROR::SE_AMBIGUOUS_TAG_VAR,
             std::format(
               "Semantic error: Ambiguous tag variable for the record '{}' ({} or {} ?) at ({},{}) !\n",
-              record->m_name, name, var->m_name, line, col
+              record->m_id, name, var->id(), line, col
             ),
             line, col
           );
@@ -600,19 +599,19 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
         SEMANTIC_ERROR::SE_MISSING_ID,
         std::format(
           "Semantic error: Missing tag variable for the record '{}' at ({},{}) !\n",
-          record->m_name, line, col),
+          record->m_id, line, col),
         line, col
       );
     }
   }else{
-    if(record->m_members.contains(id)){
+    if(record->attributes().contains(id)){
       const auto line = m_lexer.getToken().line();
       const auto col = m_lexer.getToken().column();
       throw SemanticException(
         SEMANTIC_ERROR::SE_DUPLICATE_ID,
         std::format(
           "Semantic error: tag variable name '{}' is already for the record '{}' at ({},{}) !\n",
-          id, record->m_name, line, col),
+          id, record->m_id, line, col),
         line, col);
     }
     
@@ -638,11 +637,13 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
         SEMANTIC_ERROR::SE_MISSING_ID,
         std::format(
           "Semantic error: tag variable type '{}' for the record '{}' at ({},{}) is not defined !\n",
-          type_id, record->m_name, line, col),
+          type_id, record->m_id, line, col),
         line, col
       );
     }
-    var = &(record->m_members[id] = (Var){id, var_line, var_col, type}); 
+    // var = &(record->attributes()[id] = (Var){id, var_line, var_col, type});
+    // var = &(record->attributes().insert(std::make_pair(id, Var(id, var_line, var_col, type))).first->second);
+    var = record->add_attribute(Var(id, var_line, var_col, type));
   }
 
   match_adv(TOKEN_TYPE::OF_TOKEN);
@@ -658,31 +659,31 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not an enum of the tag type '{}' at ({},{}) !\n",
-              c.name(), record->m_name, c.line(), c.col(), type->m_name, type->m_line, type->m_col),
-            c.line(), c.col()
+              c.id(), record->m_id, c.line(), c.column(), type->m_id, type->m_line, type->m_col),
+            c.line(), c.column()
           );
         }
       }
     }else{ // Type is a subrange
       auto sub = static_cast<const Subrange*>(type);
       for(const auto& c : constants){
-        if(c.category() != sub->m_cat){ // Char, Enum or Int
+        if(c.category() != sub->category()){ // Char, Enum or Int
           throw SemanticException(
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not a subrange of the tag type '{}' at ({},{}) !\n",
-              c.name(), record->m_name, c.line(), c.col(), type->m_name, type->m_line, type->m_col),
-            c.line(), c.col()
+              c.id(), record->m_id, c.line(), c.column(), type->m_id, type->m_line, type->m_col),
+            c.line(), c.column()
           );
         }
         const Int val = c.asInt();
-        if(val < sub->m_beg || val > sub->m_end){
+        if(val < sub->start() || val > sub->end()){
           throw SemanticException(
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not in the subrange ({} <= {}) of the tag type '{}' at ({},{}) !\n",
-              c.name(), record->m_name, c.line(), c.col(), sub->m_beg, sub->m_end, type->m_name, type->m_line, type->m_col),
-            c.line(), c.col()
+              c.id(), record->m_id, c.line(), c.column(), sub->start(), sub->end(), type->m_id, type->m_line, type->m_col),
+            c.line(), c.column()
           );
         }
       }
@@ -694,9 +695,8 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     match(TOKEN_TYPE::RP_TOKEN);
     adv();
 
-    for (const auto &[id,var] : variant->m_members){
-      record->check_duplicate_id(token, var);
-      record->m_members[id] = var;
+    for (const auto &[id,var] : variant->attributes()){
+      record->add_attribute(token, var);
     }
 
   }while(check(TOKEN_TYPE::SEMI_TOKEN));
@@ -731,7 +731,7 @@ void Parser::variable_declaration()
 
     for (const auto &name : names){
       m_current_block->check_used_id(name);
-      m_current_block->m_vars[name.id()] = (Var){name.id(), name.line(), name.column(), type};
+      m_current_block->m_vars.emplace(name.id(), Var(name, type));
     }
     
   }while(check(TOKEN_TYPE::ID_TOKEN));
@@ -777,7 +777,7 @@ void Parser::function_definition(bool is_proc)
   if(!is_proc) m_current_block->m_vars.insert(std::make_pair(id, (Var){token.id(), token.line(), token.column(), func_type->m_ret_type}));
   for (const auto &arg : func_type->m_args)
   {
-    m_current_block->m_vars.insert(std::make_pair(arg.m_name, Var(arg)));
+    m_current_block->m_vars.insert(std::make_pair(arg.id(), Var(arg)));
   }
 
   block();

@@ -50,7 +50,7 @@ static bool checkVariableAccess(const Expression *expr, std::string_view varName
   auto va = dynamic_cast<const VariableAccess *>(expr);
   if (!va)
     return false;
-  return va->baseVar->m_name == varName;
+  return va->baseVar->id() == varName;
 }
 
 // Check if expression is a FunctionCall and get function name
@@ -59,7 +59,7 @@ static bool checkFunctionCall(const Expression *expr, std::string_view funcName)
   auto fc = dynamic_cast<const FunctionCall *>(expr);
   if (!fc)
     return false;
-  return fc->function->m_name == funcName;
+  return fc->function->m_id == funcName;
 }
 
 // Check if expression is a FunctionCall and verify argument count
@@ -68,7 +68,7 @@ static bool checkFunctionCallWithArgs(const Expression *expr, std::string_view f
   auto fc = dynamic_cast<const FunctionCall *>(expr);
   if (!fc)
     return false;
-  if (fc->function->m_name != funcName)
+  if (fc->function->m_id != funcName)
     return false;
   return fc->args.size() == expectedArgs;
 }
@@ -79,11 +79,11 @@ static bool checkProcedureCall(const Statement *stmt, std::string_view procName)
   auto pc = dynamic_cast<const ProcedureCall *>(stmt);
   if (!pc)
     return false;
-  return pc->procedure->m_name == procName;
+  return pc->procedure->m_id == procName;
 }
 
 static bool checkCondition(const Expression *expr)
 {
   if(!expr) return false;
-  return expr->exprType->get_underlying_type()->m_name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
+  return expr->exprType->get_underlying_type()->m_id == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
 }

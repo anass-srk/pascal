@@ -108,7 +108,7 @@ void NExpression::validate()
     }
     const auto op = ops[i];  
     if (!validation::is_valid_binary_operand(op, left->exprType, right->exprType)) {
-      std::string_view left_type = left->exprType->get_underlying_type()->m_name;
+      std::string_view left_type = left->exprType->get_underlying_type()->m_id;
       if (left_type == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]) {
         throw SemanticException(
           SEMANTIC_ERROR::SE_INVALID_OP,
@@ -156,13 +156,13 @@ const Type * ArraySelector::apply(const Type *type)
 
   const Array *arr = static_cast<const Array *>(type);
   
-  if(arr->m_itypes.size() != indices.size())
+  if(arr->index_types().size() != indices.size())
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_INDEX,
       std::format(
         "Semantic error: At ({}), array type ({}) requires {} indices ! Found {} indices !",
-        token.to_string(), type->to_string(), arr->m_itypes.size(), indices.size()
+        token.to_string(), type->to_string(), arr->index_types().size(), indices.size()
       ),
       token.line(),
       token.column()
@@ -173,7 +173,7 @@ const Type * ArraySelector::apply(const Type *type)
   {
     auto itype = indices[i]->exprType->get_underlying_type();
     
-    auto vtype = arr->m_itypes[i]->get_underlying_type();
+    auto vtype = arr->index_types()[i]->get_underlying_type();
     
     if(vtype != itype)
     {
@@ -181,7 +181,7 @@ const Type * ArraySelector::apply(const Type *type)
         SEMANTIC_ERROR::SE_INVALID_INDEX,
         std::format(
           "Semantic error: At ({}), array type ({}) requires the index-{} to be of type ({}) ! Found {} !",
-          token.to_string(), type->to_string(), i+1, arr->m_itypes[i]->to_string(), indices[i]->exprType->to_string()
+          token.to_string(), type->to_string(), i+1, arr->index_types()[i]->to_string(), indices[i]->exprType->to_string()
         ),
         token.line(),
         token.column()
@@ -189,7 +189,7 @@ const Type * ArraySelector::apply(const Type *type)
     }
   }
 
-  return arr->m_etype;
+  return arr->element_type();
 }
 
 const Type* FieldSelector::apply(const Type* type)
@@ -208,8 +208,8 @@ const Type* FieldSelector::apply(const Type* type)
   }
 
   const Record* rec = static_cast<const Record*>(type);
-  auto it = rec->m_members.find(field);
-  if(it == rec->m_members.end())
+  auto it = rec->attributes().find(field);
+  if(it == rec->attributes().end())
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_FIELD_NAME,
@@ -222,13 +222,13 @@ const Type* FieldSelector::apply(const Type* type)
     );
   }
 
-  return it->second.m_type;
+  return it->second.type();
 }
 
 
 void VariableAccess::validate()
 {
-  const Type* current = baseVar->m_type->get_underlying_type();
+  const Type* current = baseVar->type()->get_underlying_type();
   
   for(const auto& s : selectors)
   {
@@ -344,7 +344,7 @@ void RepeatStatement::validate()
 
 void ForStatement::validate()
 {
-  auto type_id = this->loopVar->exprType->get_underlying_type()->m_name;
+  auto type_id = this->loopVar->exprType->get_underlying_type()->m_id;
   if(
     CONST_CAT_NAMES[int(this->start.category())] != type_id ||
     start.category() != end.category()
@@ -430,7 +430,7 @@ void IfStatement::validate()
 
 void CaseStatement::validate()
 {
-  auto type_id = this->selector->exprType->get_underlying_type()->m_name;
+  auto type_id = this->selector->exprType->get_underlying_type()->m_id;
   if (!validation::is_case_selector_type(this->selector->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
@@ -530,9 +530,9 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
 
   for(int i = 0;i < params.size();++i)
   {
-    const Type* ptype = params[i].m_type->get_underlying_type();
+    const Type* ptype = params[i].type()->get_underlying_type();
     const Type* atype = args[i]->exprType->get_underlying_type();
-    if(params[i].ref)
+    if(params[i].is_ref())
     {
       auto tmp = dynamic_cast<VariableAccess*>(args[i].get());
       if(!tmp)

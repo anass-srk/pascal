@@ -988,7 +988,7 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     
     const auto* lhs = getVA(stmt->lhs.get());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->m_name, "arr");
+    EXPECT_EQ(lhs->baseVar->id(), "arr");
     ASSERT_EQ(lhs->selectors.size(), 1);
     
     const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors[0].get());
@@ -1006,7 +1006,7 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
 
     const auto* lhs = getVA(stmt->lhs.get());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->m_name, "arr");
+    EXPECT_EQ(lhs->baseVar->id(), "arr");
     ASSERT_EQ(lhs->selectors.size(), 1);
 
     const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors[0].get());
@@ -1026,7 +1026,7 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
 
     const auto* rhs = getVA(stmt->rhs.get());
     ASSERT_NE(rhs, nullptr);
-    EXPECT_EQ(rhs->baseVar->m_name, "arr");
+    EXPECT_EQ(rhs->baseVar->id(), "arr");
     
     const auto* sel = dynamic_cast<const ArraySelector*>(rhs->selectors[0].get());
     ASSERT_NE(sel, nullptr);
@@ -1040,7 +1040,7 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
 
     const auto* lhs = getVA(stmt->lhs.get());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->m_name, "matrix");
+    EXPECT_EQ(lhs->baseVar->id(), "matrix");
     
     ASSERT_EQ(lhs->selectors.size(), 1);
     const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors[0].get());
@@ -1058,7 +1058,7 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
 
     const auto* lhs = getVA(stmt->lhs.get());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->m_name, "p");
+    EXPECT_EQ(lhs->baseVar->id(), "p");
     ASSERT_EQ(lhs->selectors.size(), 1);
 
     const auto* sel = dynamic_cast<const FieldSelector*>(lhs->selectors[0].get());
@@ -1085,7 +1085,7 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
 
     const auto* rhs = getVA(stmt->rhs.get());
     ASSERT_NE(rhs, nullptr);
-    EXPECT_EQ(rhs->baseVar->m_name, "p");
+    EXPECT_EQ(rhs->baseVar->id(), "p");
     
     const auto* sel = dynamic_cast<const FieldSelector*>(rhs->selectors[0].get());
     ASSERT_NE(sel, nullptr);
@@ -1099,7 +1099,7 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
 
     const auto* lhs = getVA(stmt->lhs.get());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->m_name, "arrPoints");
+    EXPECT_EQ(lhs->baseVar->id(), "arrPoints");
     
     // Should have 2 selectors: Array index, then Field access
     ASSERT_EQ(lhs->selectors.size(), 2);
@@ -1229,7 +1229,7 @@ TEST(FunctionCallTest, NoArguments)
 
   const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->m_name, "getPi");
+  EXPECT_EQ(call->function->m_id, "getPi");
   EXPECT_EQ(call->args.size(), 0);
   EXPECT_NE(call->exprType, nullptr);
 }
@@ -1258,7 +1258,7 @@ TEST(FunctionCallTest, SingleArgument)
 
   const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->m_name, "square");
+  EXPECT_EQ(call->function->m_id, "square");
   EXPECT_EQ(call->args.size(), 1);
   EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 5));
 }
@@ -1294,7 +1294,7 @@ TEST(FunctionCallTest, MultipleArguments)
     ASSERT_NE(stmt, nullptr);
     const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
     ASSERT_NE(call, nullptr);
-    EXPECT_EQ(call->function->m_name, "add");
+    EXPECT_EQ(call->function->m_id, "add");
     EXPECT_EQ(call->args.size(), 2);
     EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 10));
     EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 20));
@@ -1306,7 +1306,7 @@ TEST(FunctionCallTest, MultipleArguments)
     ASSERT_NE(stmt, nullptr);
     const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
     ASSERT_NE(call, nullptr);
-    EXPECT_EQ(call->function->m_name, "combine");
+    EXPECT_EQ(call->function->m_id, "combine");
     EXPECT_EQ(call->args.size(), 3);
     EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 1));
     EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 2));
@@ -1343,14 +1343,14 @@ TEST(FunctionCallTest, NestedCalls)
 
   const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->m_name, "sum");
+  EXPECT_EQ(call->function->m_id, "sum");
   EXPECT_EQ(call->args.size(), 2);
 
   // Check first arg: square(2)
   {
     const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args[0].get());
     ASSERT_NE(innerCall, nullptr);
-    EXPECT_EQ(innerCall->function->m_name, "square");
+    EXPECT_EQ(innerCall->function->m_id, "square");
     EXPECT_EQ(innerCall->args.size(), 1);
     EXPECT_TRUE(checkIntLiteral(innerCall->args[0].get(), 2));
   }
@@ -1359,7 +1359,7 @@ TEST(FunctionCallTest, NestedCalls)
   {
     const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args[1].get());
     ASSERT_NE(innerCall, nullptr);
-    EXPECT_EQ(innerCall->function->m_name, "square");
+    EXPECT_EQ(innerCall->function->m_id, "square");
     EXPECT_EQ(innerCall->args.size(), 1);
     EXPECT_TRUE(checkIntLiteral(innerCall->args[0].get(), 3));
   }
@@ -1626,7 +1626,7 @@ TEST(FunctionCallTest, FunctionCalledAsExpression)
   // Verify it's a FunctionCall (expression) not a ProcedureCall
   const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->m_name, "square");
+  EXPECT_EQ(call->function->m_id, "square");
   ASSERT_NE(call->exprType, nullptr); // Has return type
 }
 
@@ -1653,7 +1653,7 @@ TEST(FunctionCallTest, ProcedureCalledAsStatement)
   // Verify it's a ProcedureCall (statement) not a FunctionCall
   auto* stmt = dynamic_cast<const ProcedureCall*>(body->statements[0].get());
   ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->procedure->m_name, "pr");
+  EXPECT_EQ(stmt->procedure->m_id, "pr");
   EXPECT_EQ(stmt->args.size(), 0);
 }
 

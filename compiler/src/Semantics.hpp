@@ -62,11 +62,25 @@ public:
   }
 };
 
-struct Label
+struct ID{
+  const std::string_view m_id;
+  const size_t m_line, m_col;
+  
+  ID(std::string_view id, size_t line, size_t col)
+    : m_id(id), m_line(line), m_col(col) {}
+  
+  ID(const Lexeme& token) 
+    : m_id(token.id()), m_line(token.line()), m_col(token.column()) {}
+
+
+  std::string_view id() const { return m_id; }
+  size_t line() const { return m_line; }
+  size_t column() const { return m_col; }
+};
+
+struct Label : ID
 {
-  std::string_view m_id;
-  size_t m_line, m_col;
-  // TODO: store Location
+  Label(const Lexeme& token) : ID(token) {}
 };
 
 enum class CONST_CAT : int
@@ -102,24 +116,20 @@ struct EnumValue;
 struct Record;
 struct Function;
 
-class Const
+class Const : public ID
 {
-  std::string_view m_name;
-  size_t m_line, m_col;
   std::variant<Int, Real, std::string, char, bool> m_val;
   const Type *m_type;
-  CONST_CAT m_cat;
+  const CONST_CAT m_cat;
 
 public:
   template <NumConstType T>
   Const(const Lexeme& token, T value, const Block& main_block);
   Const(const Lexeme& token, std::string &&value, const Block &main_block);
   Const(const Lexeme& token, const EnumValue& value);
+  Const(const Lexeme& token, const Const& other);
 
-  std::string_view name() const;
-  size_t line() const;
-  size_t col() const;
-  const Type* type() const;
+  const Type* type() const { return m_type; }
   CONST_CAT category() const { return m_cat; }
 
   template <typename T>
@@ -132,7 +142,7 @@ public:
 
   std::string to_string() const
   {
-    return std::format("\"{}\" at ({},{})", m_name, m_line, m_col);
+    return std::format("\"{}\" at ({},{})", m_id, m_line, m_col);
   }
 };
 
@@ -157,101 +167,129 @@ static inline const char* TYPE_CAT_NAMES[int(TYPE_CAT::TC_MAX) + 1] = {
 
 //TODO: Types don't always have names, in which case we can store them as a unique_ptr for each scope (or block).
 //Remember that when type X = Y, X and Y are the same. Therefore, for named-types we use shared_ptr
-struct Type
+struct Type : ID
 {
-  const std::string_view m_name;
-  const size_t m_line;
-  const size_t m_col;
   const TYPE_CAT m_type;
 
-  Type(std::string_view name, size_t line, size_t col, TYPE_CAT type) : m_name(name), m_line(line), m_col(col), m_type(type) {}
+  Type(std::string_view name, size_t line, size_t col, TYPE_CAT type) : ID(name, line, col), m_type(type) {}
+  Type(const Lexeme& token, TYPE_CAT type_cat) : ID(token), m_type(type_cat) {}
   std::string to_string() const{
-    return std::format("\"{}\" at ({},{})", m_name, m_line, m_col); 
+    return std::format("\"{}\" at ({},{})", m_id, m_line, m_col); 
   }
 
   virtual ~Type() = default;
 
-  virtual const Type* get_underlying_type() const {return this;};
+  virtual const Type* get_underlying_type() const { return this;};
 };
 
-struct Enum : Type
+class Enum : public Type
 {
-  std::unordered_map<std::string_view,Int> m_values;
-  Enum(const std::string_view &name, size_t line, size_t col) : Type(name, line, col, TYPE_CAT::TC_ENUM) {}
 
+private:
+  std::unordered_map<std::string_view,Int> m_values;
+
+public:
+  Enum(const Lexeme& token) : Type(token, TYPE_CAT::TC_ENUM) {}
+  const std::unordered_map<std::string_view,Int>& values() const { return m_values;}; 
   // Automatically inserts EnumValue object to block
   // Use only when Enum is a pointer (uses this internally). Clearly the Enum should outlive EnumValue, which exists to facilitate search 
   void insert(const Lexeme&, Block&);
 };
 
-class EnumValue {
+class EnumValue : public ID{
+
   friend struct Enum;
-public:
-  const Enum* m_type;
-  const std::string_view m_id;
-  const Int m_value;
-  const size_t m_line;
-  const size_t m_col;
+
 private:
-  EnumValue(Enum* type, const Lexeme& token, Int value) : m_type(type), m_id(token.id()), m_value(value), m_line(token.line()), m_col(token.column()) {} 
+  const Enum* m_type;
+  const Int m_value;
+
+  EnumValue(Enum* type, const Lexeme& token, Int value) : m_type(type), m_value(value), ID(token) {} 
+
+public:
+  Int int_value() const { return m_value; }
+  const Enum* type() const { return m_type; }
 };
 
-struct Subrange : Type
+class Subrange : public Type
 {
   Int m_beg, m_end; // Must contain the same type
   CONST_CAT m_cat;
   const Type* m_utype; // Underlying type
-  Subrange(
-    const std::string_view& name, size_t line, size_t col,
-    Const&& beg, Const&& end
-  );
+
+public:
+  Subrange(const Lexeme& token, Const&& beg, Const&& end);
+
+  Int start() const { return m_beg; }
+  Int end() const { return m_end; }
+  const CONST_CAT category() const { return m_cat; }
 
   const Type *get_underlying_type() const override { return m_utype; };
 };
 
-struct Array : Type
+class Array : public Type
 {
 
   std::vector<const Type*> m_itypes;  // index types
   const Type* m_etype;                // element type
 
-  Array(const std::string_view &name, size_t line, size_t col, std::vector<const Type*>&& types, const Type* etype) : 
-  Type(name, line, col, TYPE_CAT::TC_ARRAY), m_itypes(std::move(types)), m_etype(etype) {}
+public:
+
+  Array(const Lexeme& token, std::vector<const Type*>&& types, const Type* etype) 
+    : Type(token, TYPE_CAT::TC_ARRAY), m_itypes(std::move(types)), m_etype(etype) {}
+
+  const std::vector<const Type*>& index_types() const { return m_itypes; }
+  const Type* element_type() const { return m_etype; }
+
 };
 
-struct Var
+class Var : public ID
 {
-  std::string_view m_name;
-  size_t m_line, m_col;
   const Type *m_type;
+
+public:
+
+  Var(const Lexeme& token, const Type* type) 
+    : ID(token), m_type(type) {}
+  Var(std::string_view id, size_t line, size_t col, const Type *type)
+      : ID(id, line, col), m_type(type) {}
+
   std::string to_string() const
   {
-    return std::format("\"{}\" at ({},{})", m_name, m_line, m_col);
+    return std::format("\"{}\" at ({},{})", m_id, m_line, m_col);
   }
+
+  const Type* type() const { return m_type; }
 };
 
-struct Record : Type
+class Record : public Type
 {
 
   std::unordered_map<std::string_view,Var> m_members;
 
-  Record(const std::string_view &name, size_t line, size_t col) : Type(name, line, col, TYPE_CAT::TC_RECORD) {}
+  void check_duplicate_id(const Lexeme &rec, const ID &var);
 
-  void check_duplicate_id(const Lexeme& rec, const Lexeme& name);
-  void check_duplicate_id(const Lexeme &rec, const Var& var);
+public:
+
+  Record(const Lexeme& token)
+    : Type(token, TYPE_CAT::TC_RECORD) {}
+
+  const std::unordered_map<std::string_view,Var>& attributes() const { return m_members; }
+  void add_attribute(const Lexeme&, const Var&);
+  const Var* add_attribute(const Var&);
+
 };
 
-struct Arg : Var
+class Arg : public Var
 {
-  bool ref;
-  Arg(){}
-  Arg(bool by_ref, const Lexeme& token, const Type* t) {
-    ref = by_ref;
-    m_type = t;
-    m_name = token.id();
-    m_line = token.line();
-    m_col = token.column();
-  }
+  bool m_ref;
+
+public:
+
+  Arg(bool by_ref, const Lexeme& token, const Type* type) 
+    : Var(token, type), m_ref(by_ref) {}
+    
+  const bool is_ref() const { return m_ref; }
 };
 
 struct FunctionType : Type
@@ -298,7 +336,7 @@ struct Block
 
 struct Function
 {
-  std::string_view m_name;
+  std::string_view m_id;
   const FunctionType* m_type;
   std::unique_ptr<Block> block;
   Function(std::string_view , const FunctionType*, Block*);
