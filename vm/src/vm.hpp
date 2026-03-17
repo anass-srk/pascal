@@ -35,6 +35,19 @@ namespace pascal_vm
     STOREB,
     STORELQ,
     STORELB,
+    // Register indirect
+    LOADQR,
+    LOADBR,
+    LOADQRO,
+    LOADBRO,
+    LOADQRR,
+    LOADBRR,
+    STOREQR,
+    STOREBR,
+    STOREQRO,
+    STOREBRO,
+    STOREQRR,
+    STOREBRR,
 
     // Stack Operations (from registers)
     PUSHB,
@@ -42,7 +55,7 @@ namespace pascal_vm
     POPB,
     POPQ,
 
-    // Function Operations (stack shape : ret_addr | args | function vars)
+    // Function Operations (stack shape : args | ret_addr | function vars)
     CALL, // takes argument to unwind the stack
     RET,  // takes function stack size
     MODSTK,
@@ -129,6 +142,18 @@ namespace pascal_vm
     "STOREB",
     "STORELQ",
     "STORELB",
+    "LOADQR",
+    "LOADBR",
+    "LOADQRO",
+    "LOADBRO",
+    "LOADQRR",
+    "LOADBRR",
+    "STOREQR",
+    "STOREBR",
+    "STOREQRO",
+    "STOREBRO",
+    "STOREQRR",
+    "STOREBRR",
     "PUSHB",
     "PUSHQ",
     "POPB",
@@ -340,6 +365,59 @@ namespace pascal_vm
       add_value(static_cast<uint8_t>(op));
       add_value(reg);
       add_value((offset >= 0 ? offset : offset - 16));
+    }
+
+    // Register indirect load/store
+    void add_load_reg(OPCODE op, uint8_t dest, uint8_t addr_reg)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(dest);
+      add_value(addr_reg);
+      add_value<uint8_t>(0);
+    }
+
+    void add_store_reg(OPCODE op, uint8_t src, uint8_t addr_reg)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(src);
+      add_value(addr_reg);
+      add_value<uint8_t>(0);
+    }
+
+    // Register + immediate offset (8 bytes total with padding)
+    void add_load_reg_offset(OPCODE op, uint8_t dest, uint8_t base, int32_t offset)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(dest);
+      add_value(base);
+      add_value<uint8_t>(0); // padding for 8-byte alignment
+      add_value(offset);
+    }
+
+    void add_store_reg_offset(OPCODE op, uint8_t src, uint8_t base, int32_t offset)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(src);
+      add_value(base);
+      add_value<uint8_t>(0); // padding for 8-byte alignment
+      add_value(offset);
+    }
+
+    // Register + register offset
+    void add_load_reg_reg(OPCODE op, uint8_t dest, uint8_t base, uint8_t offset_reg)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(dest);
+      add_value(base);
+      add_value(offset_reg);
+    }
+
+    void add_store_reg_reg(OPCODE op, uint8_t src, uint8_t base, uint8_t offset_reg)
+    {
+      add_value(static_cast<uint8_t>(op));
+      add_value(src);
+      add_value(base);
+      add_value(offset_reg);
     }
 
     void add_mov(uint8_t dest, uint8_t src)

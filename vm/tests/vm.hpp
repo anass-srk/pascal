@@ -133,6 +133,126 @@ TEST(VMTest, MovOps)
   }
 }
 
+// Test Register Indirect Load/Store Operations
+TEST(VMTest, RegisterIndirectOps)
+{
+  // Test 1: Register indirect (pointer dereference)
+  {
+    VM vm;
+    
+    // Allocate stack space for test data
+    vm.add_mod_stack(32);
+    
+    // Write test values at specific addresses
+    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)999);
+    vm.add_store(OPCODE::STOREQ, 0, 0);
+    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'X');
+    vm.add_store(OPCODE::STOREB, 1, 8);
+    
+    // Load address into register
+    vm.add_load_inter(OPCODE::LOADIQ, 2, (uint64_t)0);
+    vm.add_load_inter(OPCODE::LOADIQ, 3, (uint64_t)8);
+    
+    // Load via register indirect
+    vm.add_load_reg(OPCODE::LOADQR, 4, 2);
+    vm.add_load_reg(OPCODE::LOADBR, 5, 3);
+    
+    // Store via register indirect (different addresses)
+    vm.add_load_inter(OPCODE::LOADIQ, 6, (int64_t)777);
+    vm.add_load_inter(OPCODE::LOADIB, 7, (int8_t)'Y');
+    vm.add_load_inter(OPCODE::LOADIQ, 8, (uint64_t)16);
+    vm.add_load_inter(OPCODE::LOADIQ, 9, (uint64_t)24);
+
+    vm.add_store_reg(OPCODE::STOREQR, 6, 8);
+    vm.add_store_reg(OPCODE::STOREBR, 7, 9);
+    
+    // Verify stores by loading back
+    vm.add_load(OPCODE::LOADQ, 10, 16);
+    vm.add_load(OPCODE::LOADB, 11, 24);
+    
+    vm.add_halt();
+    vm.run();
+    
+    ASSERT_EQ(vm.get_register(4).i, 999);
+    ASSERT_EQ(vm.get_register(5).c, 'X');
+    ASSERT_EQ(vm.get_register(10).i, 777);
+    ASSERT_EQ(vm.get_register(11).c, 'Y');
+  }
+  
+  // Test 2: Register + immediate offset (record field access)
+  {
+    VM vm;
+    
+    vm.add_mod_stack(65);
+    
+    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)12345);
+    vm.add_store(OPCODE::STOREQ, 0, 24);
+    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'Z');
+    vm.add_store(OPCODE::STOREB, 1, 32);
+    
+    // Base address in register
+    vm.add_load_inter(OPCODE::LOADIQ, 2, (uint64_t)16);
+    
+    // Load with offset (24-16=8, 32-16=16)
+    vm.add_load_reg_offset(OPCODE::LOADQRO, 3, 2, 8);
+    vm.add_load_reg_offset(OPCODE::LOADBRO, 4, 2, 16);
+    
+    // Store with offset
+    vm.add_load_inter(OPCODE::LOADIQ, 5, (int64_t)67890);
+    vm.add_load_inter(OPCODE::LOADIB, 6, (int8_t)'W');
+    vm.add_store_reg_offset(OPCODE::STOREQRO, 5, 2, 40);
+    vm.add_store_reg_offset(OPCODE::STOREBRO, 6, 2, 48);
+    
+    vm.add_load(OPCODE::LOADQ, 7, 56); // 16+40
+    vm.add_load(OPCODE::LOADB, 8, 64); // 16+48
+    
+    vm.add_halt();
+    vm.run();
+    
+    ASSERT_EQ(vm.get_register(3).i, 12345);
+    ASSERT_EQ(vm.get_register(4).c, 'Z');
+    ASSERT_EQ(vm.get_register(7).i, 67890);
+    ASSERT_EQ(vm.get_register(8).c, 'W');
+  }
+  
+  // Test 3: Register + register offset (array access)
+  {
+    VM vm;
+    
+    vm.add_mod_stack(128);
+    
+    // Write array of 4 integers
+    for (int i = 0; i < 4; ++i) {
+      vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)(1000 + i));
+      vm.add_store(OPCODE::STOREQ, 0, i * 8);
+    }
+    
+    // Base address
+    vm.add_load_inter(OPCODE::LOADIQ, 1, (uint64_t)0);
+    
+    // Index register (offset: index * 8)
+    vm.add_load_inter(OPCODE::LOADIQ, 2, (int64_t)2); // index 2
+    vm.add_op_inter(OPCODE::MULI_I, 3, 2, (int64_t)8); // byte offset
+    
+    // Load via register+register
+    vm.add_load_reg_reg(OPCODE::LOADQRR, 4, 1, 3);
+    
+    // Store via register+register (different index)
+    vm.add_load_inter(OPCODE::LOADIQ, 5, (int64_t)9999);
+    vm.add_load_inter(OPCODE::LOADIQ, 6, (int64_t)3); // index 3
+    vm.add_op_inter(OPCODE::MULI_I, 7, 6, (int64_t)8);
+    vm.add_store_reg_reg(OPCODE::STOREQRR, 5, 1, 7);
+    
+    vm.add_load(OPCODE::LOADQ, 8, 24); // index 3 * 8
+    
+    vm.add_halt();
+    vm.run();
+    
+    ASSERT_EQ(vm.get_register(4).i, 1002); // array[2]
+    ASSERT_EQ(vm.get_register(8).i, 9999); // array[3]
+  }
+}
+
 // Test all Arithmetic Operations (Int, Char, Double, Immediate variants)
 TEST(VMTest, AllArithmeticOps)
 {

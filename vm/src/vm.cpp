@@ -98,6 +98,44 @@ void VM::dump_state() const
   const auto len = fetch_value<uint32_t>(); \
   print_op(opcode, reg, -1, -1, std::optional(len));
 
+#define get_load_reg_args() \
+  const uint8_t dest = fetch_reg(); \
+  const uint8_t addr_reg = fetch_reg(); \
+  fetch_byte(); \
+  print_op(opcode, dest, addr_reg, -1, std::optional<int8_t>{});
+
+#define get_store_reg_args() \
+  const uint8_t src = fetch_reg(); \
+  const uint8_t addr_reg = fetch_reg(); \
+  fetch_byte(); \
+  print_op(opcode, src, addr_reg, -1, std::optional<int8_t>{});
+
+#define get_load_reg_offset_args() \
+  const uint8_t dest = fetch_reg(); \
+  const uint8_t base_reg = fetch_reg(); \
+  fetch_byte(); /* skip padding byte */ \
+  const int32_t offset = fetch_offset(); \
+  print_op(opcode, dest, base_reg, -1, std::optional(offset));
+
+#define get_store_reg_offset_args() \
+  const uint8_t src = fetch_reg(); \
+  const uint8_t base_reg = fetch_reg(); \
+  fetch_byte(); /* skip padding byte */ \
+  const int32_t offset = fetch_offset(); \
+  print_op(opcode, src, base_reg, -1, std::optional(offset));
+
+#define get_load_reg_reg_args() \
+  const uint8_t dest = fetch_reg(); \
+  const uint8_t base_reg = fetch_reg(); \
+  const uint8_t offset_reg = fetch_reg(); \
+  print_op(opcode, dest, base_reg, offset_reg, std::optional<int8_t>{});
+
+#define get_store_reg_reg_args() \
+  const uint8_t src = fetch_reg(); \
+  const uint8_t base_reg = fetch_reg(); \
+  const uint8_t offset_reg = fetch_reg(); \
+  print_op(opcode, src, base_reg, offset_reg, std::optional<int8_t>{});
+
 void VM::run() const
 {
   bool running = true;
@@ -162,6 +200,69 @@ void VM::run() const
     case OPCODE::STORELQ:{
       get_store_local_args()
       std::memcpy(&stack[registers[NUM_REGISTERS-1].u + offset], &registers[reg].u, 8);
+    }break;
+    
+    // Register indirect load/store
+    case OPCODE::LOADQR:{
+      get_load_reg_args()
+      uint64_t addr = registers[addr_reg].u;
+      std::memcpy(&registers[dest].u, &stack[addr], 8);
+    }break;
+    case OPCODE::LOADBR:{
+      get_load_reg_args()
+      uint64_t addr = registers[addr_reg].u;
+      std::memcpy(&registers[dest].byte, &stack[addr], 1);
+    }break;
+    case OPCODE::LOADQRO:{
+      get_load_reg_offset_args()
+      uint64_t addr = registers[base_reg].u + offset;
+      std::memcpy(&registers[dest].u, &stack[addr], 8);
+    }break;
+    case OPCODE::LOADBRO:{
+      get_load_reg_offset_args()
+      uint64_t addr = registers[base_reg].u + offset;
+      std::memcpy(&registers[dest].byte, &stack[addr], 1);
+    }break;
+    case OPCODE::LOADQRR:{
+      get_load_reg_reg_args()
+      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
+      std::memcpy(&registers[dest].u, &stack[addr], 8);
+    }break;
+    case OPCODE::LOADBRR:{
+      get_load_reg_reg_args()
+      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
+      std::memcpy(&registers[dest].byte, &stack[addr], 1);
+    }break;
+    
+    case OPCODE::STOREQR:{
+      get_store_reg_args()
+      uint64_t addr = registers[addr_reg].u;
+      std::memcpy(&stack[addr], &registers[src].u, 8);
+    }break;
+    case OPCODE::STOREBR:{
+      get_store_reg_args()
+      uint64_t addr = registers[addr_reg].u;
+      std::memcpy(&stack[addr], &registers[src].byte, 1);
+    }break;
+    case OPCODE::STOREQRO:{
+      get_store_reg_offset_args()
+      uint64_t addr = registers[base_reg].u + offset;
+      std::memcpy(&stack[addr], &registers[src].u, 8);
+    }break;
+    case OPCODE::STOREBRO:{
+      get_store_reg_offset_args()
+      uint64_t addr = registers[base_reg].u + offset;
+      std::memcpy(&stack[addr], &registers[src].byte, 1);
+    }break;
+    case OPCODE::STOREQRR:{
+      get_store_reg_reg_args()
+      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
+      std::memcpy(&stack[addr], &registers[src].u, 8);
+    }break;
+    case OPCODE::STOREBRR:{
+      get_store_reg_reg_args()
+      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
+      std::memcpy(&stack[addr], &registers[src].byte, 1);
     }break;
     
     
