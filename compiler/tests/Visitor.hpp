@@ -21,20 +21,20 @@ public:
   void visit(const UnaryExpression &node, const Context &ctx) override
   {
     expressions++;
-    node.operand->accept(*this, ctx);
+    node.operand()->accept(*this, ctx);
   }
 
   void visit(const BinaryExpression &node, const Context &ctx) override
   {
     expressions++;
-    node.left->accept(*this, ctx);
-    node.right->accept(*this, ctx);
+    node.left()->accept(*this, ctx);
+    node.right()->accept(*this, ctx);
   }
 
   void visit(const NExpression &node, const Context &ctx) override
   {
     expressions++;
-    for (const auto &expr : node.exprs)
+    for (const auto &expr : node.exprs())
     {
       expr->accept(*this, ctx);
     }
@@ -44,7 +44,7 @@ public:
   {
     expressions++;
     // Visit any selectors (array indices, field accesses)
-    for (const auto &sel : node.selectors)
+    for (const auto &sel : node.selectors())
     {
       sel->accept(*this, ctx);
     }
@@ -53,7 +53,7 @@ public:
   void visit(const FunctionCall &node, const Context &ctx) override
   {
     expressions++;
-    for (const auto &arg : node.args)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -66,20 +66,20 @@ public:
   void visit(const LabeledStatement &node, const Context &ctx) override
   {
     statements++;
-    node.stmt->accept(*this, ctx);
+    node.statement()->accept(*this, ctx);
   }
 
   void visit(const AssignmentStatement &node, const Context &ctx) override
   {
     statements++;
-    node.lhs->accept(*this, ctx); // VariableAccess
-    node.rhs->accept(*this, ctx); // Expression
+    node.var()->accept(*this, ctx); // VariableAccess
+    node.expr()->accept(*this, ctx); // Expression
   }
 
   void visit(const ProcedureCall &node, const Context &ctx) override
   {
     statements++;
-    for (const auto &arg : node.args)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -88,7 +88,7 @@ public:
   void visit(const ReadStatement &node, const Context &ctx) override
   {
     statements++;
-    for (const auto &arg : node.arguments)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -97,7 +97,7 @@ public:
   void visit(const WriteStatement &node, const Context &ctx) override
   {
     statements++;
-    for (const auto &arg : node.arguments)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -112,7 +112,7 @@ public:
   void visit(const CompoundStatement &node, const Context &ctx) override
   {
     statements++;
-    for (const auto &stmt : node.statements)
+    for (const auto &stmt : node.statements())
     {
       stmt->accept(*this, ctx);
     }
@@ -121,45 +121,45 @@ public:
   void visit(const WhileStatement &node, const Context &ctx) override
   {
     statements++;
-    node.condition->accept(*this, ctx);
-    node.body->accept(*this, ctx);
+    node.condition()->accept(*this, ctx);
+    node.body()->accept(*this, ctx);
   }
 
   void visit(const RepeatStatement &node, const Context &ctx) override
   {
     statements++;
-    for (const auto &stmt : node.body)
+    for (const auto &stmt : node.body())
     {
       stmt->accept(*this, ctx);
     }
-    node.untilExpr->accept(*this, ctx);
+    node.condition()->accept(*this, ctx);
   }
 
   void visit(const ForStatement &node, const Context &ctx) override
   {
     statements++;
-    node.loopVar->accept(*this, ctx);
-    node.body->accept(*this, ctx);
+    node.var()->accept(*this, ctx);
+    node.body()->accept(*this, ctx);
   }
 
   void visit(const IfStatement &node, const Context &ctx) override
   {
     statements++;
-    node.condition->accept(*this, ctx);
-    node.thenPart->accept(*this, ctx);
-    if (node.elsePart)
+    node.condition()->accept(*this, ctx);
+    node.then_stmt()->accept(*this, ctx);
+    if (node.else_stmt())
     {
-      node.elsePart->accept(*this, ctx);
+      node.else_stmt()->accept(*this, ctx);
     }
   }
 
   void visit(const CaseStatement &node, const Context &ctx) override
   {
     statements++;
-    node.selector->accept(*this, ctx);
-    for (const auto &alt : node.alternatives)
+    node.selector()->accept(*this, ctx);
+    for (const auto &alt : node.alternatives())
     {
-      alt.statement->accept(*this, ctx);
+      alt.statement()->accept(*this, ctx);
     }
   }
 
@@ -169,7 +169,7 @@ public:
 
   void visit(const ArraySelector &node, const Context &ctx) override
   {
-    for (const auto &idx : node.indices)
+    for (const auto &idx : node.indices())
     {
       idx->accept(*this, ctx);
     }
@@ -206,7 +206,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.operand->accept(*this, ctx);
+    node.operand()->accept(*this, ctx);
   }
 
   void visit(const BinaryExpression &node, const Context &ctx) override
@@ -215,8 +215,8 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.left->accept(*this, ctx);
-    node.right->accept(*this, ctx);
+    node.left()->accept(*this, ctx);
+    node.right()->accept(*this, ctx);
   }
 
   void visit(const NExpression &node, const Context &ctx) override
@@ -225,7 +225,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &expr : node.exprs)
+    for (const auto &expr : node.exprs())
     {
       expr->accept(*this, ctx);
     }
@@ -237,7 +237,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &sel : node.selectors)
+    for (const auto &sel : node.selectors())
     {
       sel->accept(*this, ctx);
     }
@@ -249,7 +249,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &arg : node.args)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -265,7 +265,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.stmt->accept(*this, ctx);
+    node.statement()->accept(*this, ctx);
   }
 
   void visit(const AssignmentStatement &node, const Context &ctx) override
@@ -274,8 +274,8 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.lhs->accept(*this, ctx);
-    node.rhs->accept(*this, ctx);
+    node.var()->accept(*this, ctx);
+    node.expr()->accept(*this, ctx);
   }
 
   void visit(const ProcedureCall &node, const Context &ctx) override
@@ -284,7 +284,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &arg : node.args)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -296,7 +296,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &arg : node.arguments)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -308,7 +308,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &arg : node.arguments)
+    for (const auto &arg : node.args())
     {
       arg->accept(*this, ctx);
     }
@@ -328,7 +328,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &stmt : node.statements)
+    for (const auto &stmt : node.statements())
     {
       stmt->accept(*this, ctx);
     }
@@ -340,8 +340,8 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.condition->accept(*this, ctx);
-    node.body->accept(*this, ctx);
+    node.condition()->accept(*this, ctx);
+    node.body()->accept(*this, ctx);
   }
 
   void visit(const RepeatStatement &node, const Context &ctx) override
@@ -350,11 +350,11 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &stmt : node.body)
+    for (const auto &stmt : node.body())
     {
       stmt->accept(*this, ctx);
     }
-    node.untilExpr->accept(*this, ctx);
+    node.condition()->accept(*this, ctx);
   }
 
   void visit(const ForStatement &node, const Context &ctx) override
@@ -363,8 +363,8 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.loopVar->accept(*this, ctx);
-    node.body->accept(*this, ctx);
+    node.var()->accept(*this, ctx);
+    node.body()->accept(*this, ctx);
   }
 
   void visit(const IfStatement &node, const Context &ctx) override
@@ -373,11 +373,11 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.condition->accept(*this, ctx);
-    node.thenPart->accept(*this, ctx);
-    if (node.elsePart)
+    node.condition()->accept(*this, ctx);
+    node.then_stmt()->accept(*this, ctx);
+    if (node.else_stmt())
     {
-      node.elsePart->accept(*this, ctx);
+      node.else_stmt()->accept(*this, ctx);
     }
   }
 
@@ -387,10 +387,10 @@ public:
     {
       nodes.push_back(&node);
     }
-    node.selector->accept(*this, ctx);
-    for (const auto &alt : node.alternatives)
+    node.selector()->accept(*this, ctx);
+    for (const auto &alt : node.alternatives())
     {
-      alt.statement->accept(*this, ctx);
+      alt.statement()->accept(*this, ctx);
     }
   }
 
@@ -404,7 +404,7 @@ public:
     {
       nodes.push_back(&node);
     }
-    for (const auto &idx : node.indices)
+    for (const auto &idx : node.indices())
     {
       idx->accept(*this, ctx);
     }
@@ -458,9 +458,9 @@ TEST(VisitorTest, Pattern_TypeExtractor_IntLiterals)
   parser.m_current_block->body->accept(extractor, *parser.m_current_block);
 
   ASSERT_EQ(extractor.nodes.size(), 3);
-  EXPECT_EQ(std::get<Int>(extractor.nodes[0]->value->value()), 1);
-  EXPECT_EQ(std::get<Int>(extractor.nodes[1]->value->value()), 2);
-  EXPECT_EQ(std::get<Int>(extractor.nodes[2]->value->value()), 42);
+  EXPECT_EQ(std::get<Int>(extractor.nodes[0]->constant()->value()), 1);
+  EXPECT_EQ(std::get<Int>(extractor.nodes[1]->constant()->value()), 2);
+  EXPECT_EQ(std::get<Int>(extractor.nodes[2]->constant()->value()), 42);
 }
 
 TEST(VisitorTest, Pattern_TypeExtractor_Assignments)
@@ -481,7 +481,7 @@ TEST(VisitorTest, Pattern_TypeExtractor_Assignments)
   parser.m_current_block->body->accept(extractor, *parser.m_current_block);
 
   ASSERT_EQ(extractor.nodes.size(), 3);
-  EXPECT_TRUE(checkVariableAccess(extractor.nodes[0]->lhs.get(), "x"));
-  EXPECT_TRUE(checkVariableAccess(extractor.nodes[1]->lhs.get(), "y"));
-  EXPECT_TRUE(checkVariableAccess(extractor.nodes[2]->lhs.get(), "z"));
+  EXPECT_TRUE(checkVariableAccess(extractor.nodes[0]->var(), "x"));
+  EXPECT_TRUE(checkVariableAccess(extractor.nodes[1]->var(), "y"));
+  EXPECT_TRUE(checkVariableAccess(extractor.nodes[2]->var(), "z"));
 }

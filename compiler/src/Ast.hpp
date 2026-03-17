@@ -2,44 +2,55 @@
 #include "Semantics.hpp"
 #include "Visitor.hpp"
 
-#define DEFINE_EXPR_ACCEPT() \
-    void accept(ExpressionVisitor& visitor, const Block& ctx) const override { \
-        visitor.visit(*this, ctx); \
-    }
+#define DEFINE_EXPR_ACCEPT()                                                   \
+  void accept(ExpressionVisitor &visitor, const Block &ctx) const override {   \
+    visitor.visit(*this, ctx);                                                 \
+  }
 
-#define DEFINE_STMT_ACCEPT() \
-    void accept(StatementVisitor& visitor, const Block& ctx) const override { \
-        visitor.visit(*this, ctx); \
-    }
+#define DEFINE_STMT_ACCEPT()                                                   \
+  void accept(StatementVisitor &visitor, const Block &ctx) const override {    \
+    visitor.visit(*this, ctx);                                                 \
+  }
 
-#define DEFINE_SELECTOR_ACCEPT() \
-    void accept(SelectorVisitor& visitor, const Block& ctx) const override { \
-        visitor.visit(*this, ctx); \
-    }
+#define DEFINE_SELECTOR_ACCEPT()                                               \
+  void accept(SelectorVisitor &visitor, const Block &ctx) const override {     \
+    visitor.visit(*this, ctx);                                                 \
+  }
 
-namespace pascal_compiler
-{
+namespace pascal_compiler {
 
-struct AstNode
-{
-  Lexeme token;
+struct AstNode {
+protected:
+  Lexeme m_token;
+
+public:
   virtual ~AstNode() = default;
+  const Lexeme &token() const { return m_token; }
 };
 
 // Expressions
-struct Expression : public AstNode
-{
-  Expression(Lexeme token = Lexeme{}) { this->token = token; }
-  const Type* exprType = nullptr;
+struct Expression : public AstNode {
+protected:
+  const Type *m_expr_type = nullptr;
+
+public:
+  Expression(Lexeme token = Lexeme{}) { m_token = token; }
+  const Type *type() const { return m_expr_type; }
+
   virtual void validate() = 0;
-  virtual void accept(ExpressionVisitor&, const Block&) const = 0;
+  virtual void accept(ExpressionVisitor &, const Block &) const = 0;
 };
 
-struct LiteralExpression : public Expression
-{
-  std::unique_ptr<Const> value;
-  LiteralExpression(std::unique_ptr<Const> c, Lexeme token) : Expression(token), value(std::move(c)) {}
+struct LiteralExpression : public Expression {
+private:
+  std::unique_ptr<Const> m_constant;
+
+public:
+  LiteralExpression(std::unique_ptr<Const> c, Lexeme token)
+      : Expression(token), m_constant(std::move(c)) {}
   void validate() override;
+
+  const Const *constant() const { return m_constant.get(); }
 
   DEFINE_EXPR_ACCEPT()
 };
@@ -47,293 +58,438 @@ struct LiteralExpression : public Expression
 // Unary operations (+, -, not)
 enum struct UnaryOp { Plus, Minus, Not };
 
-struct UnaryExpression : public Expression
-{
-  UnaryOp op;
-  std::unique_ptr<Expression> operand;
+struct UnaryExpression : public Expression {
+private:
+  UnaryOp m_op;
+  std::unique_ptr<Expression> m_operand;
 
+public:
   UnaryExpression(UnaryOp o, std::unique_ptr<Expression> e, Lexeme token)
-    : Expression(token), op(o), operand(std::move(e)) {}
+      : Expression(token), m_op(o), m_operand(std::move(e)) {}
   void validate() override;
+
+  UnaryOp op() const { return m_op; }
+  const Expression *operand() const { return m_operand.get(); }
 
   DEFINE_EXPR_ACCEPT()
 };
 
 // Binary operations
-enum struct BinaryOp 
-{
-  Eq, Ne, Lt, Le, Gt, Ge, // relational
-  Add, Sub, Or, // addition
-  Mul, Div, And // multiplication
+enum struct BinaryOp {
+  Eq,
+  Ne,
+  Lt,
+  Le,
+  Gt,
+  Ge, // relational
+  Add,
+  Sub,
+  Or, // addition
+  Mul,
+  Div,
+  And // multiplication
 };
 
-static const char* BINARY_OP_NAME[] =
-{
-  "=", "<>", "<", "<=", ">", ">=", // relational
-  "+", "-", "or", // addition
-  "*", "(/ or div)", "and" // multiplication
+static const char *BINARY_OP_NAME[] = {
+    "=", "<>",         "<",  "<=", ">", ">=", // relational
+    "+", "-",          "or",                  // addition
+    "*", "(/ or div)", "and"                  // multiplication
 };
+
 // Only for relational operations
-struct BinaryExpression : public Expression
-{
-  BinaryOp op;
-  std::unique_ptr<Expression> left, right;
+struct BinaryExpression : public Expression {
+private:
+  BinaryOp m_op;
+  std::unique_ptr<Expression> m_left;
+  std::unique_ptr<Expression> m_right;
 
-  BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, Lexeme token, const Type* bool_type)
-    : Expression(token), op(o), left(std::move(l)), right(std::move(r)) {this->exprType = bool_type;}
+public:
+  BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l,
+                   std::unique_ptr<Expression> r, Lexeme token,
+                   const Type *bool_type)
+      : Expression(token), m_op(o), m_left(std::move(l)),
+        m_right(std::move(r)) {
+    m_expr_type = bool_type;
+  }
   void validate() override;
+
+  BinaryOp op() const { return m_op; }
+  const Expression *left() const { return m_left.get(); }
+  const Expression *right() const { return m_right.get(); }
 
   DEFINE_EXPR_ACCEPT()
 };
 
-struct NExpression : public Expression
-{
-  std::vector<BinaryOp> ops;
-  std::vector<std::unique_ptr<Expression>> exprs;
+struct NExpression : public Expression {
+private:
+  std::vector<BinaryOp> m_ops;
+  std::vector<std::unique_ptr<Expression>> m_exprs;
 
-  NExpression(std::unique_ptr<Expression> first, Lexeme token) : Expression(token)
-  {exprs.push_back(std::move(first));}
+public:
+  NExpression(std::unique_ptr<Expression> first, Lexeme token)
+      : Expression(token) {
+    m_exprs.push_back(std::move(first));
+  }
 
-  void add(BinaryOp op, std::unique_ptr<Expression> exp)
-  {
-    ops.push_back(op);
-    exprs.push_back(std::move(exp));
+  void add(BinaryOp op, std::unique_ptr<Expression> exp) {
+    m_ops.push_back(op);
+    m_exprs.push_back(std::move(exp));
   }
 
   void validate() override;
+
+  const std::vector<BinaryOp> &ops() const { return m_ops; }
+  const std::vector<std::unique_ptr<Expression>> &exprs() const {
+    return m_exprs;
+  }
 
   DEFINE_EXPR_ACCEPT()
 };
 
 // Selectors for array and record accesses
-struct Selector : public AstNode
-{
+struct Selector : public AstNode {
   virtual ~Selector() = default;
-  virtual const Type* apply(const Type*) = 0;
+  virtual const Type *apply(const Type *) = 0;
 
-  virtual void accept(SelectorVisitor&, const Block&) const = 0;
+  virtual void accept(SelectorVisitor &, const Block &) const = 0;
 };
 
-struct ArraySelector : public Selector
-{
-  std::vector<std::unique_ptr<Expression>> indices;
-  ArraySelector(std::vector<std::unique_ptr<Expression>>&& idx, Lexeme token)
-  : indices(std::move(idx)){ this->token = token; }
-  const Type* apply(const Type*) override;
+struct ArraySelector : public Selector {
+private:
+  std::vector<std::unique_ptr<Expression>> m_indices;
+
+public:
+  ArraySelector(std::vector<std::unique_ptr<Expression>> &&idx, Lexeme token)
+      : m_indices(std::move(idx)) {
+    m_token = token;
+  }
+  const Type *apply(const Type *) override;
+
+  const std::vector<std::unique_ptr<Expression>> &indices() const {
+    return m_indices;
+  }
 
   DEFINE_SELECTOR_ACCEPT()
 };
 
-struct FieldSelector : public Selector
-{
-  std::string_view field;
-  FieldSelector(std::string_view f, Lexeme token) : field(f) { this->token = token; }
-  const Type* apply(const Type*) override;
+struct FieldSelector : public Selector {
+private:
+  std::string_view m_field;
+
+public:
+  FieldSelector(std::string_view f, Lexeme token) : m_field(f) {
+    m_token = token;
+  }
+  const Type *apply(const Type *) override;
+
+  std::string_view field() const { return m_field; }
 
   DEFINE_SELECTOR_ACCEPT()
 };
 
 // Variable access (l‑value)
-struct VariableAccess : public Expression
-{
-  const Var* baseVar = nullptr;               // the base variable (must be a Var)
-  std::vector<std::unique_ptr<Selector>> selectors;
-  VariableAccess(const Var *v, std::vector<std::unique_ptr<Selector>>&& sels, Lexeme token)
-  : Expression(token), selectors(std::move(sels)),  baseVar(v) {}
+struct VariableAccess : public Expression {
+private:
+  const Var *m_base_var = nullptr;
+  std::vector<std::unique_ptr<Selector>> m_selectors;
+
+public:
+  VariableAccess(const Var *v, std::vector<std::unique_ptr<Selector>> &&sels,
+                 Lexeme token)
+      : Expression(token), m_selectors(std::move(sels)), m_base_var(v) {}
   void validate() override;
+
+  const Var *base_var() const { return m_base_var; }
+  const std::vector<std::unique_ptr<Selector>> &selectors() const {
+    return m_selectors;
+  }
 
   DEFINE_EXPR_ACCEPT()
 };
 
 // Function call (returns a value)
-struct FunctionCall : public Expression
-{
-  const Function* function = nullptr;         // resolved function
-  std::vector<std::unique_ptr<Expression>> args;
-  FunctionCall(const Function *func, std::vector<std::unique_ptr<Expression>> &&arguments, Lexeme token)
-      : Expression(token), args(std::move(arguments)), function(func) {}
+struct FunctionCall : public Expression {
+private:
+  const Function *m_function = nullptr;
+  std::vector<std::unique_ptr<Expression>> m_args;
+
+public:
+  FunctionCall(const Function *func,
+               std::vector<std::unique_ptr<Expression>> &&arguments,
+               Lexeme token)
+      : Expression(token), m_args(std::move(arguments)), m_function(func) {}
   void validate() override;
+
+  const Function *function() const { return m_function; }
+  const std::vector<std::unique_ptr<Expression>> &args() const {
+    return m_args;
+  }
 
   DEFINE_EXPR_ACCEPT()
 };
 
-
-
 // Statements
 
-struct Statement : public AstNode
-{
-  Statement(Lexeme token = Lexeme{}) { this->token = token; }
+struct Statement : public AstNode {
+  Statement(Lexeme token = Lexeme{}) { m_token = token; }
   virtual void validate() = 0;
-  virtual void accept(StatementVisitor&, const Block&) const = 0;
+  virtual void accept(StatementVisitor &, const Block &) const = 0;
 };
 
-struct LabeledStatement : public Statement
-{
-  const Label* label;
-  std::unique_ptr<Statement> stmt;
-  LabeledStatement(const Label* lbl, std::unique_ptr<Statement> s, Lexeme token)
-    : Statement(token), label(lbl), stmt(std::move(s)) {}
+struct LabeledStatement : public Statement {
+private:
+  const Label *m_label;
+  std::unique_ptr<Statement> m_stmt;
+
+public:
+  LabeledStatement(const Label *lbl, std::unique_ptr<Statement> s, Lexeme token)
+      : Statement(token), m_label(lbl), m_stmt(std::move(s)) {}
   void validate() override;
+
+  const Label *label() const { return m_label; }
+  const Statement *statement() const { return m_stmt.get(); }
 
   DEFINE_STMT_ACCEPT()
 };
 
-struct AssignmentStatement : public Statement
-{
-  std::unique_ptr<VariableAccess> lhs;
-  std::unique_ptr<Expression> rhs;
-  AssignmentStatement(std::unique_ptr<VariableAccess> l, std::unique_ptr<Expression> r, Lexeme token)
-    : Statement(token), lhs(std::move(l)), rhs(std::move(r)) {}
+struct AssignmentStatement : public Statement {
+private:
+  std::unique_ptr<VariableAccess> m_lhs;
+  std::unique_ptr<Expression> m_rhs;
+
+public:
+  AssignmentStatement(std::unique_ptr<VariableAccess> l,
+                      std::unique_ptr<Expression> r, Lexeme token)
+      : Statement(token), m_lhs(std::move(l)), m_rhs(std::move(r)) {}
   void validate() override;
+
+  const VariableAccess *var() const { return m_lhs.get(); }
+  const Expression *expr() const { return m_rhs.get(); }
 
   DEFINE_STMT_ACCEPT()
 };
 
-struct ProcedureCall : public Statement
-{
-  const Function* procedure = nullptr;
-  std::vector<std::unique_ptr<Expression>> args;
-  ProcedureCall(const Function *func, std::vector<std::unique_ptr<Expression>> &&arguments, Lexeme token)
-      : Statement(token), args(std::move(arguments)), procedure(func) {}
+struct ProcedureCall : public Statement {
+private:
+  const Function *m_procedure = nullptr;
+  std::vector<std::unique_ptr<Expression>> m_args;
+
+public:
+  ProcedureCall(const Function *func,
+                std::vector<std::unique_ptr<Expression>> &&arguments,
+                Lexeme token)
+      : Statement(token), m_args(std::move(arguments)), m_procedure(func) {}
   void validate() override;
+
+  const Function *procedure() const { return m_procedure; }
+  const std::vector<std::unique_ptr<Expression>> &args() const {
+    return m_args;
+  }
 
   DEFINE_STMT_ACCEPT()
 };
 
 // Read statement (built‑in)
-struct ReadStatement : public Statement
-{
-  std::vector<std::unique_ptr<VariableAccess>> arguments;
-  ReadStatement(Lexeme token, std::vector<std::unique_ptr<VariableAccess>>&& args)
-    : Statement(token), arguments(std::move(args)) {}
+struct ReadStatement : public Statement {
+private:
+  std::vector<std::unique_ptr<VariableAccess>> m_arguments;
+
+public:
+  ReadStatement(Lexeme token,
+                std::vector<std::unique_ptr<VariableAccess>> &&args)
+      : Statement(token), m_arguments(std::move(args)) {}
   void validate() override;
+
+  const std::vector<std::unique_ptr<VariableAccess>> &args() const {
+    return m_arguments;
+  }
 
   DEFINE_STMT_ACCEPT()
 };
 
 // Write statement (built‑in)
-struct WriteStatement : public Statement
-{
-  std::vector<std::unique_ptr<Expression>> arguments;
-  WriteStatement(Lexeme token, std::vector<std::unique_ptr<Expression>>&& args)
-    : Statement(token), arguments(std::move(args)) {}
+struct WriteStatement : public Statement {
+private:
+  std::vector<std::unique_ptr<Expression>> m_arguments;
+
+public:
+  WriteStatement(Lexeme token, std::vector<std::unique_ptr<Expression>> &&args)
+      : Statement(token), m_arguments(std::move(args)) {}
   void validate() override;
+
+  const std::vector<std::unique_ptr<Expression>> &args() const {
+    return m_arguments;
+  }
 
   DEFINE_STMT_ACCEPT()
 };
 
-struct GotoStatement : public Statement
-{
-  const Label *label;
+struct GotoStatement : public Statement {
+private:
+  const Label *m_label;
+
+public:
   GotoStatement(const Label *lbl, Lexeme token)
-    : Statement(token), label(lbl) {}
+      : Statement(token), m_label(lbl) {}
   void validate() override {}
+
+  const Label *label() const { return m_label; }
 
   DEFINE_STMT_ACCEPT()
 };
 
 // Compound statement (BEGIN ... END)
-struct CompoundStatement : public Statement
-{
-  std::vector<std::unique_ptr<Statement>> statements;
-  CompoundStatement(std::vector<std::unique_ptr<Statement>>&& stmts, Lexeme token) : Statement(token), statements(std::move(stmts)) {}
+struct CompoundStatement : public Statement {
+private:
+  std::vector<std::unique_ptr<Statement>> m_statements;
+
+public:
+  CompoundStatement(std::vector<std::unique_ptr<Statement>> &&stmts,
+                    Lexeme token)
+      : Statement(token), m_statements(std::move(stmts)) {}
   void validate() override;
+
+  const std::vector<std::unique_ptr<Statement>> &statements() const {
+    return m_statements;
+  }
 
   DEFINE_STMT_ACCEPT()
 };
 
-struct WhileStatement : public Statement
-{
-  std::unique_ptr<Expression> condition;
-  std::unique_ptr<Statement> body;
-  WhileStatement(std::unique_ptr<Expression> cond, std::unique_ptr<Statement> content, Lexeme token)
-    : Statement(token), condition(std::move(cond)), body(std::move(content)) {}
+struct WhileStatement : public Statement {
+private:
+  std::unique_ptr<Expression> m_condition;
+  std::unique_ptr<Statement> m_body;
+
+public:
+  WhileStatement(std::unique_ptr<Expression> cond,
+                 std::unique_ptr<Statement> content, Lexeme token)
+      : Statement(token), m_condition(std::move(cond)),
+        m_body(std::move(content)) {}
   void validate() override;
+
+  const Expression *condition() const { return m_condition.get(); }
+  const Statement *body() const { return m_body.get(); }
 
   DEFINE_STMT_ACCEPT()
 };
 
-struct RepeatStatement : public Statement
-{
-  std::vector<std::unique_ptr<Statement>> body;
-  std::unique_ptr<Expression> untilExpr;
-  RepeatStatement(std::vector<std::unique_ptr<Statement>> &&content, std::unique_ptr<Expression> cond, Lexeme token)
-    : Statement(token), body(std::move(content)), untilExpr(std::move(cond)) {}
+struct RepeatStatement : public Statement {
+private:
+  std::vector<std::unique_ptr<Statement>> m_body;
+  std::unique_ptr<Expression> m_until_expr;
+
+public:
+  RepeatStatement(std::vector<std::unique_ptr<Statement>> &&content,
+                  std::unique_ptr<Expression> cond, Lexeme token)
+      : Statement(token), m_body(std::move(content)),
+        m_until_expr(std::move(cond)) {}
   void validate() override;
+
+  const std::vector<std::unique_ptr<Statement>> &body() const { return m_body; }
+  const Expression *condition() const { return m_until_expr.get(); }
 
   DEFINE_STMT_ACCEPT()
 };
 
 // For
-struct ForStatement : public Statement
-{
-  std::unique_ptr<VariableAccess> loopVar;
-  Const start, end;
-  bool increasing;   // to -> true, downto -> false
-  std::unique_ptr<Statement> body;
+struct ForStatement : public Statement {
+private:
+  std::unique_ptr<VariableAccess> m_loop_var;
+  Const m_start, m_end;
+  bool m_increasing; // to -> true, downto -> false
+  std::unique_ptr<Statement> m_body;
 
-  ForStatement(
-    std::unique_ptr<VariableAccess> var,
-    Const s,
-    Const e,
-    std::unique_ptr<Statement> content,
-    bool to,
-    Lexeme token
-  ) : Statement(token), loopVar(std::move(var)), start(std::move(s)),
-      end(std::move(e)),body(std::move(content)), increasing(to) {}
+public:
+  ForStatement(std::unique_ptr<VariableAccess> var, Const s, Const e,
+               std::unique_ptr<Statement> content, bool to, Lexeme token)
+      : Statement(token), m_loop_var(std::move(var)), m_start(std::move(s)),
+        m_end(std::move(e)), m_body(std::move(content)), m_increasing(to) {}
   void validate() override;
+
+  const VariableAccess *var() const { return m_loop_var.get(); }
+  const Const &start() const { return m_start; }
+  const Const &end() const { return m_end; }
+  bool increasing() const { return m_increasing; }
+  const Statement *body() const { return m_body.get(); }
 
   DEFINE_STMT_ACCEPT()
 };
 
-struct IfStatement : public Statement
-{
-  std::unique_ptr<Expression> condition;
-  std::unique_ptr<Statement> thenPart;
-  std::unique_ptr<Statement> elsePart;   // nullptr if no else
+struct IfStatement : public Statement {
+private:
+  std::unique_ptr<Expression> m_condition;
+  std::unique_ptr<Statement> m_then_part;
+  std::unique_ptr<Statement> m_else_part; // nullptr if no else
 
-  IfStatement(
-    std::unique_ptr<Expression> cond,
-    std::unique_ptr<Statement> thenStmt,
-    std::unique_ptr<Statement> elseStmt,
-    Lexeme token
-  ) : Statement(token), condition(std::move(cond)),
-      thenPart(std::move(thenStmt)), elsePart(std::move(elseStmt)) {}
+public:
+  IfStatement(std::unique_ptr<Expression> cond,
+              std::unique_ptr<Statement> thenStmt,
+              std::unique_ptr<Statement> elseStmt, Lexeme token)
+      : Statement(token), m_condition(std::move(cond)),
+        m_then_part(std::move(thenStmt)), m_else_part(std::move(elseStmt)) {}
   void validate() override;
+
+  const Expression *condition() const { return m_condition.get(); }
+  const Statement *then_stmt() const { return m_then_part.get(); }
+  const Statement *else_stmt() const { return m_else_part.get(); }
 
   DEFINE_STMT_ACCEPT()
 };
 
-struct CaseStatement : public Statement
-{
+struct CaseStatement : public Statement {
   struct CaseAlternative {
-    std::vector<Const> labels;
-    std::unique_ptr<Statement> statement;
-    Lexeme token;
-    CaseAlternative(std::vector<Const>&& lbls, std::unique_ptr<Statement> stmt, Lexeme token)
-      : labels(std::move(lbls)), statement(std::move(stmt)) {this->token = token;}
+  private:
+    std::vector<Const> m_labels;
+    std::unique_ptr<Statement> m_statement;
+    Lexeme m_token;
+
+  public:
+    CaseAlternative(std::vector<Const> &&lbls, std::unique_ptr<Statement> stmt,
+                    Lexeme token)
+        : m_labels(std::move(lbls)), m_statement(std::move(stmt)) {
+      m_token = token;
+    }
+
+    const std::vector<Const> &labels() const { return m_labels; }
+    const Statement *statement() const { return m_statement.get(); }
+    const Lexeme &token() const { return m_token; }
   };
 
-  std::unique_ptr<Expression> selector;
-  std::vector<CaseAlternative> alternatives;
+private:
+  std::unique_ptr<Expression> m_selector;
+  std::vector<CaseAlternative> m_alternatives;
 
-  CaseStatement(std::unique_ptr<Expression> sel, std::vector<CaseAlternative>&& cases, Lexeme token)
-    : Statement(token), selector(std::move(sel)), alternatives(std::move(cases)) {}
+public:
+  CaseStatement(std::unique_ptr<Expression> sel,
+                std::vector<CaseAlternative> &&cases, Lexeme token)
+      : Statement(token), m_selector(std::move(sel)),
+        m_alternatives(std::move(cases)) {}
   void validate() override;
+
+  const Expression *selector() const { return m_selector.get(); }
+  const std::vector<CaseAlternative> &alternatives() const {
+    return m_alternatives;
+  }
 
   DEFINE_STMT_ACCEPT()
 };
 
 // Program root
-struct Program
-{
-  std::string_view name;
-  std::unique_ptr<Block> block;               // the top‑level block (already contains symbol tables)
-  std::unique_ptr<CompoundStatement> mainBody; // the main statement part
+struct Program {
+private:
+  std::string_view m_name;
+  std::unique_ptr<Block> m_block;
+  std::unique_ptr<CompoundStatement> m_main_body;
 
-  Program(std::string_view id, std::unique_ptr<Block> defs, std::unique_ptr<CompoundStatement> body)
-    : name(id), block(std::move(defs)), mainBody(std::move(body)) {}
+public:
+  Program(std::string_view id, std::unique_ptr<Block> defs,
+          std::unique_ptr<CompoundStatement> body)
+      : m_name(id), m_block(std::move(defs)), m_main_body(std::move(body)) {}
+
+  std::string_view name() const { return m_name; }
+  const Block *block() const { return m_block.get(); }
+  const CompoundStatement *main_body() const { return m_main_body.get(); }
 };
 
-}
+} // namespace pascal_compiler

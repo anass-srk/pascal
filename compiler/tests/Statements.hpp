@@ -20,13 +20,13 @@ TEST(LabeledStatementTest, BasicLabeledStatement) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto *labeled = dynamic_cast<const LabeledStatement *>(body->statements[0].get());
+  auto *labeled = dynamic_cast<const LabeledStatement *>(body->statements()[0].get());
   ASSERT_NE(labeled, nullptr);
-  ASSERT_NE(labeled->label, nullptr);
-  EXPECT_EQ(labeled->label->id(), "asd");
-  ASSERT_NE(labeled->stmt.get(), nullptr);
+  ASSERT_NE(labeled->label(), nullptr);
+  EXPECT_EQ(labeled->label()->id(), "asd");
+  ASSERT_NE(labeled->statement(), nullptr);
 }
 
 TEST(LabeledStatementTest, MultipleLabeledStatements) {
@@ -45,12 +45,12 @@ TEST(LabeledStatementTest, MultipleLabeledStatements) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 3);
+  ASSERT_EQ(body->statements().size(), 3);
 
   for (size_t i = 0; i < 3; ++i) {
-    auto* labeled = dynamic_cast<const LabeledStatement*>(body->statements[i].get());
+    auto* labeled = dynamic_cast<const LabeledStatement*>(body->statements()[i].get());
     ASSERT_NE(labeled, nullptr);
-    EXPECT_EQ(labeled->label->id(), std::to_string((i + 1) * 10));
+    EXPECT_EQ(labeled->label()->id(), std::to_string((i + 1) * 10));
   }
 }
 
@@ -71,12 +71,12 @@ TEST(WhileStatementTest, SimpleWhileLoop) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* whileStmt = dynamic_cast<const WhileStatement*>(body->statements[0].get());
+  auto* whileStmt = dynamic_cast<const WhileStatement*>(body->statements()[0].get());
   ASSERT_NE(whileStmt, nullptr);
-  EXPECT_TRUE(checkCondition(whileStmt->condition.get()));
-  ASSERT_NE(whileStmt->body.get(), nullptr);
+  EXPECT_TRUE(checkCondition(whileStmt->condition()));
+  ASSERT_NE(whileStmt->body(), nullptr);
 }
 
 TEST(WhileStatementTest, WhileLoopWithBooleanCondition) {
@@ -92,12 +92,12 @@ TEST(WhileStatementTest, WhileLoopWithBooleanCondition) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* whileStmt = dynamic_cast<const WhileStatement*>(body->statements[0].get());
+  auto* whileStmt = dynamic_cast<const WhileStatement*>(body->statements()[0].get());
   ASSERT_NE(whileStmt, nullptr);
-  EXPECT_TRUE(checkCondition(whileStmt->condition.get()));
-  ASSERT_NE(whileStmt->body.get(), nullptr);
+  EXPECT_TRUE(checkCondition(whileStmt->condition()));
+  ASSERT_NE(whileStmt->body(), nullptr);
 }
 
 TEST(WhileStatementTest, NestedWhileLoops) {
@@ -114,17 +114,17 @@ TEST(WhileStatementTest, NestedWhileLoops) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* outerWhile = dynamic_cast<const WhileStatement*>(body->statements[0].get());
+  auto* outerWhile = dynamic_cast<const WhileStatement*>(body->statements()[0].get());
   ASSERT_NE(outerWhile, nullptr);
-  EXPECT_TRUE(checkCondition(outerWhile->condition.get()));
-  ASSERT_NE(outerWhile->body.get(), nullptr);
+  EXPECT_TRUE(checkCondition(outerWhile->condition()));
+  ASSERT_NE(outerWhile->body(), nullptr);
 
-  auto* innerWhile = dynamic_cast<const WhileStatement*>(outerWhile->body.get());
+  auto* innerWhile = dynamic_cast<const WhileStatement*>(outerWhile->body());
   ASSERT_NE(innerWhile, nullptr);
-  EXPECT_TRUE(checkCondition(innerWhile->condition.get()));
-  ASSERT_NE(innerWhile->body.get(), nullptr);
+  EXPECT_TRUE(checkCondition(innerWhile->condition()));
+  ASSERT_NE(innerWhile->body(), nullptr);
 }
 
 // =============================================================================
@@ -144,12 +144,12 @@ TEST(RepeatStatementTest, SimpleRepeatUntilLoop) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* repeatStmt = dynamic_cast<const RepeatStatement*>(body->statements[0].get());
+  auto* repeatStmt = dynamic_cast<const RepeatStatement*>(body->statements()[0].get());
   ASSERT_NE(repeatStmt, nullptr);
-  EXPECT_TRUE(checkCondition(repeatStmt->untilExpr.get()));
-  EXPECT_EQ(repeatStmt->body.size(), 1);
+  EXPECT_TRUE(checkCondition(repeatStmt->condition()));
+  EXPECT_EQ(repeatStmt->body().size(), 1);
 }
 
 TEST(RepeatStatementTest, RepeatLoopWithMultipleStatements) {
@@ -168,12 +168,12 @@ TEST(RepeatStatementTest, RepeatLoopWithMultipleStatements) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* repeatStmt = dynamic_cast<const RepeatStatement*>(body->statements[0].get());
+  auto* repeatStmt = dynamic_cast<const RepeatStatement*>(body->statements()[0].get());
   ASSERT_NE(repeatStmt, nullptr);
-  EXPECT_TRUE(checkCondition(repeatStmt->untilExpr.get()));
-  EXPECT_EQ(repeatStmt->body.size(), 2);
+  EXPECT_TRUE(checkCondition(repeatStmt->condition()));
+  EXPECT_EQ(repeatStmt->body().size(), 2);
 }
 
 // =============================================================================
@@ -185,15 +185,15 @@ static void checkFor(const ForStatement *stmt, std::string_view id, bool increas
   requires std::is_same_v<T, Int> || std::is_same_v<T, char> || std::is_same_v<T, bool> 
 {
   ASSERT_NE(stmt, nullptr);
-  EXPECT_NE(stmt->body.get(), nullptr);
-  EXPECT_EQ(stmt->increasing, increasing);
-  EXPECT_TRUE(checkVariableAccess(stmt->loopVar.get(), id));
-  EXPECT_EQ(stmt->loopVar->exprType->get_underlying_type(), stmt->start.type());
-  EXPECT_EQ(stmt->end.type(), stmt->start.type());
-  ASSERT_TRUE(std::holds_alternative<T>(stmt->start.value()));
-  ASSERT_TRUE(std::holds_alternative<T>(stmt->end.value()));
-  EXPECT_EQ(std::get<T>(stmt->start.value()), beg);
-  EXPECT_EQ(std::get<T>(stmt->end.value()), end);
+  EXPECT_NE(stmt->body(), nullptr);
+  EXPECT_EQ(stmt->increasing(), increasing);
+  EXPECT_TRUE(checkVariableAccess(stmt->var(), id));
+  EXPECT_EQ(stmt->var()->type()->get_underlying_type(), stmt->start().type());
+  EXPECT_EQ(stmt->end().type(), stmt->start().type());
+  ASSERT_TRUE(std::holds_alternative<T>(stmt->start().value()));
+  ASSERT_TRUE(std::holds_alternative<T>(stmt->end().value()));
+  EXPECT_EQ(std::get<T>(stmt->start().value()), beg);
+  EXPECT_EQ(std::get<T>(stmt->end().value()), end);
 }
 
 
@@ -210,9 +210,9 @@ TEST(ForStatementTest, ForLoopWithToIncreasing) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements[0].get());
+  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements()[0].get());
   checkFor<Int>(forStmt, "i", true, 1, 10);
 }
 
@@ -229,9 +229,9 @@ TEST(ForStatementTest, ForLoopWithDownToDecreasing) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements[0].get());
+  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements()[0].get());
   checkFor<Int>(forStmt, "i", false, 10, 1);
 }
 
@@ -248,9 +248,9 @@ TEST(ForStatementTest, ForLoopWithCharType) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements[0].get());
+  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements()[0].get());
   checkFor(forStmt, "c", true, 'a', 'z');
 }
 
@@ -267,9 +267,9 @@ TEST(ForStatementTest, ForLoopWithBoolType) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements[0].get());
+  auto* forStmt = dynamic_cast<const ForStatement*>(body->statements()[0].get());
   checkFor(forStmt, "b", true, false, true);
 }
 
@@ -304,13 +304,13 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 1);
+    ASSERT_EQ(body->statements().size(), 1);
 
-    auto *ifStmt = dynamic_cast<const IfStatement *>(body->statements[0].get());
+    auto *ifStmt = dynamic_cast<const IfStatement *>(body->statements()[0].get());
     ASSERT_NE(ifStmt, nullptr);
-    EXPECT_TRUE(checkCondition(ifStmt->condition.get()));
-    ASSERT_NE(ifStmt->thenPart.get(), nullptr);
-    ASSERT_EQ(ifStmt->elsePart.get(), nullptr);
+    EXPECT_TRUE(checkCondition(ifStmt->condition()));
+    ASSERT_NE(ifStmt->then_stmt(), nullptr);
+    ASSERT_EQ(ifStmt->else_stmt(), nullptr);
   }
 
   TEST(IfStatementTest, IfWithElseBranch)
@@ -327,13 +327,13 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 1);
+    ASSERT_EQ(body->statements().size(), 1);
 
-    auto *ifStmt = dynamic_cast<const IfStatement *>(body->statements[0].get());
+    auto *ifStmt = dynamic_cast<const IfStatement *>(body->statements()[0].get());
     ASSERT_NE(ifStmt, nullptr);
-    EXPECT_TRUE(checkCondition(ifStmt->condition.get()));
-    ASSERT_NE(ifStmt->thenPart.get(), nullptr);
-    ASSERT_NE(ifStmt->elsePart.get(), nullptr);
+    EXPECT_TRUE(checkCondition(ifStmt->condition()));
+    ASSERT_NE(ifStmt->then_stmt(), nullptr);
+    ASSERT_NE(ifStmt->else_stmt(), nullptr);
   }
 
   TEST(IfStatementTest, NestedIfStatements)
@@ -351,19 +351,19 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 1);
+    ASSERT_EQ(body->statements().size(), 1);
 
-    auto *outerIf = dynamic_cast<const IfStatement *>(body->statements[0].get());
+    auto *outerIf = dynamic_cast<const IfStatement *>(body->statements()[0].get());
     ASSERT_NE(outerIf, nullptr);
-    EXPECT_TRUE(checkCondition(outerIf->condition.get()));
-    ASSERT_NE(outerIf->thenPart.get(), nullptr);
-    ASSERT_EQ(outerIf->elsePart.get(), nullptr);
+    EXPECT_TRUE(checkCondition(outerIf->condition()));
+    ASSERT_NE(outerIf->then_stmt(), nullptr);
+    ASSERT_EQ(outerIf->else_stmt(), nullptr);
     // else part belongs to the inner if-statement
-    auto *innerIf = dynamic_cast<const IfStatement *>(outerIf->thenPart.get());
+    auto *innerIf = dynamic_cast<const IfStatement *>(outerIf->then_stmt());
     ASSERT_NE(innerIf, nullptr);
-    EXPECT_TRUE(checkCondition(innerIf->condition.get()));
-    ASSERT_NE(outerIf->thenPart.get(), nullptr);
-    ASSERT_NE(innerIf->elsePart.get(), nullptr);
+    EXPECT_TRUE(checkCondition(innerIf->condition()));
+    ASSERT_NE(outerIf->then_stmt(), nullptr);
+    ASSERT_NE(innerIf->else_stmt(), nullptr);
   }
 
   // =============================================================================
@@ -375,19 +375,19 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
     requires std::is_same_v<T, Int> || std::is_same_v<T, char> || std::is_same_v<T, bool>
   {
     ASSERT_NE(stmt, nullptr);
-    ASSERT_EQ(stmt->alternatives.size(), ll.size());
+    ASSERT_EQ(stmt->alternatives().size(), ll.size());
     int index = 0;
     for (const auto &l : ll)
     {
-      const auto &alt = stmt->alternatives[index++];
-      ASSERT_EQ(alt.labels.size(), l.size());
-      EXPECT_NE(alt.statement.get(), nullptr);
+      const auto &alt = stmt->alternatives()[index++];
+      ASSERT_EQ(alt.labels().size(), l.size());
+      EXPECT_NE(alt.statement(), nullptr);
 
       int i = 0;
       for (auto v : l)
       {
-        ASSERT_TRUE(std::holds_alternative<T>(alt.labels[i].value()));
-        EXPECT_EQ(v, std::get<T>(alt.labels[i].value()));
+        ASSERT_TRUE(std::holds_alternative<T>(alt.labels()[i].value()));
+        EXPECT_EQ(v, std::get<T>(alt.labels()[i].value()));
         ++i;
       }
     }
@@ -410,9 +410,9 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 1);
+    ASSERT_EQ(body->statements().size(), 1);
 
-    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements[0].get());
+    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements()[0].get());
     checkCase<Int>(caseStmt, {{1}, {2}});
   }
 
@@ -433,9 +433,9 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 1);
+    ASSERT_EQ(body->statements().size(), 1);
 
-    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements[0].get());
+    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements()[0].get());
     checkCase<Int>(caseStmt, {{1, 3, 5}, {2, 4, 6}});
   }
 
@@ -456,9 +456,9 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 1);
+    ASSERT_EQ(body->statements().size(), 1);
 
-    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements[0].get());
+    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements()[0].get());
     checkCase(caseStmt, {{'a'}, {'z'}});
   }
 
@@ -479,9 +479,9 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 1);
+    ASSERT_EQ(body->statements().size(), 1);
 
-    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements[0].get());
+    auto *caseStmt = dynamic_cast<const CaseStatement *>(body->statements()[0].get());
     checkCase(caseStmt, {{true}, {false}});
   }
 
@@ -509,15 +509,15 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 2);
+    ASSERT_EQ(body->statements().size(), 2);
 
-    auto *outerComp = dynamic_cast<const CompoundStatement *>(body->statements[0].get());
+    auto *outerComp = dynamic_cast<const CompoundStatement *>(body->statements()[0].get());
     ASSERT_NE(outerComp, nullptr);
-    EXPECT_EQ(outerComp->statements.size(), 2);
+    EXPECT_EQ(outerComp->statements().size(), 2);
 
-    auto *innerComp = dynamic_cast<const CompoundStatement *>(outerComp->statements[0].get());
+    auto *innerComp = dynamic_cast<const CompoundStatement *>(outerComp->statements()[0].get());
     ASSERT_NE(innerComp, nullptr);
-    EXPECT_EQ(innerComp->statements.size(), 1);
+    EXPECT_EQ(innerComp->statements().size(), 1);
   }
 
   TEST(CompoundStatementTest, NestedCompoundWithSingleStatement)
@@ -535,11 +535,11 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 2);
+    ASSERT_EQ(body->statements().size(), 2);
 
-    auto *stmt1 = dynamic_cast<const CompoundStatement *>(body->statements[0].get());
+    auto *stmt1 = dynamic_cast<const CompoundStatement *>(body->statements()[0].get());
     ASSERT_NE(stmt1, nullptr);
-    EXPECT_EQ(stmt1->statements.size(), 1);
+    EXPECT_EQ(stmt1->statements().size(), 1);
   }
 
   // =============================================================================
@@ -562,15 +562,15 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 2);
+    ASSERT_EQ(body->statements().size(), 2);
 
-    auto *gotoStmt = dynamic_cast<const GotoStatement *>(body->statements[0].get());
+    auto *gotoStmt = dynamic_cast<const GotoStatement *>(body->statements()[0].get());
     ASSERT_NE(gotoStmt, nullptr);
-    EXPECT_EQ(gotoStmt->label->id(), "10");
+    EXPECT_EQ(gotoStmt->label()->id(), "10");
 
-    auto *labelStmt = dynamic_cast<const LabeledStatement *>(body->statements[1].get());
+    auto *labelStmt = dynamic_cast<const LabeledStatement *>(body->statements()[1].get());
     ASSERT_NE(labelStmt, nullptr);
-    EXPECT_EQ(labelStmt->label, gotoStmt->label);
+    EXPECT_EQ(labelStmt->label(), gotoStmt->label());
   }
 
   TEST(GotoStatementTest, GotoWithLabelDeclaration)
@@ -591,23 +591,23 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 4);
+    ASSERT_EQ(body->statements().size(), 4);
 
-    auto *gotoStmt = dynamic_cast<const GotoStatement *>(body->statements[0].get());
+    auto *gotoStmt = dynamic_cast<const GotoStatement *>(body->statements()[0].get());
     ASSERT_NE(gotoStmt, nullptr);
-    EXPECT_EQ(gotoStmt->label->id(), "10");
+    EXPECT_EQ(gotoStmt->label()->id(), "10");
 
-    auto *labelStmt = dynamic_cast<const LabeledStatement *>(body->statements[1].get());
+    auto *labelStmt = dynamic_cast<const LabeledStatement *>(body->statements()[1].get());
     ASSERT_NE(labelStmt, nullptr);
-    EXPECT_EQ(labelStmt->label, gotoStmt->label);
+    EXPECT_EQ(labelStmt->label(), gotoStmt->label());
 
-    auto *gotoStmt2 = dynamic_cast<const GotoStatement *>(body->statements[2].get());
+    auto *gotoStmt2 = dynamic_cast<const GotoStatement *>(body->statements()[2].get());
     ASSERT_NE(gotoStmt2, nullptr);
-    EXPECT_EQ(gotoStmt2->label->id(), "20");
+    EXPECT_EQ(gotoStmt2->label()->id(), "20");
 
-    auto *labelStmt2 = dynamic_cast<const LabeledStatement *>(body->statements[3].get());
+    auto *labelStmt2 = dynamic_cast<const LabeledStatement *>(body->statements()[3].get());
     ASSERT_NE(labelStmt2, nullptr);
-    EXPECT_EQ(labelStmt2->label, gotoStmt2->label);
+    EXPECT_EQ(labelStmt2->label(), gotoStmt2->label());
   }
 
   // =============================================================================
@@ -633,11 +633,11 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     const auto &body = parser.m_current_block->body;
     ASSERT_NE(body, nullptr);
-    ASSERT_EQ(body->statements.size(), 5);
+    ASSERT_EQ(body->statements().size(), 5);
 
-    EXPECT_TRUE(dynamic_cast<const AssignmentStatement *>(body->statements[0].get()) != nullptr);
-    EXPECT_TRUE(dynamic_cast<const WhileStatement *>(body->statements[1].get()));
-    EXPECT_TRUE(dynamic_cast<const IfStatement *>(body->statements[2].get()));
-    EXPECT_TRUE(dynamic_cast<const ForStatement *>(body->statements[3].get()));
-    EXPECT_TRUE(dynamic_cast<const RepeatStatement *>(body->statements[4].get()));
+    EXPECT_TRUE(dynamic_cast<const AssignmentStatement *>(body->statements()[0].get()) != nullptr);
+    EXPECT_TRUE(dynamic_cast<const WhileStatement *>(body->statements()[1].get()));
+    EXPECT_TRUE(dynamic_cast<const IfStatement *>(body->statements()[2].get()));
+    EXPECT_TRUE(dynamic_cast<const ForStatement *>(body->statements()[3].get()));
+    EXPECT_TRUE(dynamic_cast<const RepeatStatement *>(body->statements()[4].get()));
   }

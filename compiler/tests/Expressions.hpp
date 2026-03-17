@@ -20,19 +20,19 @@ TEST(ExpressionTest, LiteralInteger) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 2);
+  ASSERT_EQ(body->statements().size(), 2);
 
-  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt1, nullptr);
-  EXPECT_TRUE(checkVariableAccess(stmt1->lhs.get(), "x"));
-  ASSERT_NE(stmt1->rhs.get(), nullptr);
-  EXPECT_TRUE(checkIntLiteral(stmt1->rhs.get(), 42));
+  EXPECT_TRUE(checkVariableAccess(stmt1->var(), "x"));
+  ASSERT_NE(stmt1->expr(), nullptr);
+  EXPECT_TRUE(checkIntLiteral(stmt1->expr(), 42));
 
-  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
   ASSERT_NE(stmt2, nullptr);
-  EXPECT_TRUE(checkVariableAccess(stmt2->lhs.get(), "x"));
-  ASSERT_NE(stmt2->rhs.get(), nullptr);
-  EXPECT_TRUE(checkIntLiteral(stmt2->rhs.get(), 0));
+  EXPECT_TRUE(checkVariableAccess(stmt2->var(), "x"));
+  ASSERT_NE(stmt2->expr(), nullptr);
+  EXPECT_TRUE(checkIntLiteral(stmt2->expr(), 0));
 
 }
 
@@ -50,15 +50,15 @@ TEST(ExpressionTest, LiteralReal) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 2);
+  ASSERT_EQ(body->statements().size(), 2);
 
-  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt1, nullptr);
-  EXPECT_TRUE(checkRealLiteral(stmt1->rhs.get(), Real(3.14)));
+  EXPECT_TRUE(checkRealLiteral(stmt1->expr(), Real(3.14)));
 
-  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
   ASSERT_NE(stmt2, nullptr);
-  EXPECT_TRUE(checkRealLiteral(stmt2->rhs.get(), Real(1.0)));
+  EXPECT_TRUE(checkRealLiteral(stmt2->expr(), Real(1.0)));
 }
 
 TEST(ExpressionTest, LiteralChar) {
@@ -75,15 +75,15 @@ TEST(ExpressionTest, LiteralChar) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 2);
+  ASSERT_EQ(body->statements().size(), 2);
 
-  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt1, nullptr);
-  EXPECT_TRUE(checkCharLiteral(stmt1->rhs.get(), 'a'));
+  EXPECT_TRUE(checkCharLiteral(stmt1->expr(), 'a'));
 
-  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
   ASSERT_NE(stmt2, nullptr);
-  EXPECT_TRUE(checkCharLiteral(stmt2->rhs.get(), '\n'));
+  EXPECT_TRUE(checkCharLiteral(stmt2->expr(), '\n'));
 
 }
 
@@ -101,15 +101,15 @@ TEST(ExpressionTest, LiteralBool) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 2);
+  ASSERT_EQ(body->statements().size(), 2);
 
-  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt1, nullptr);
-  EXPECT_TRUE(checkBoolLiteral(stmt1->rhs.get(), true));
+  EXPECT_TRUE(checkBoolLiteral(stmt1->expr(), true));
 
-  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
   ASSERT_NE(stmt2, nullptr);
-  EXPECT_TRUE(checkBoolLiteral(stmt2->rhs.get(), false));
+  EXPECT_TRUE(checkBoolLiteral(stmt2->expr(), false));
 }
 
 TEST(ExpressionTest, VariableReference) {
@@ -126,17 +126,17 @@ TEST(ExpressionTest, VariableReference) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 2);
+  ASSERT_EQ(body->statements().size(), 2);
 
-  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt1, nullptr);
-  EXPECT_TRUE(checkVariableAccess(stmt1->lhs.get(), "x"));
-  EXPECT_TRUE(checkIntLiteral(stmt1->rhs.get(), 10));
+  EXPECT_TRUE(checkVariableAccess(stmt1->var(), "x"));
+  EXPECT_TRUE(checkIntLiteral(stmt1->expr(), 10));
 
-  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
   ASSERT_NE(stmt2, nullptr);
-  EXPECT_TRUE(checkVariableAccess(stmt2->lhs.get(), "myVar"));
-  EXPECT_TRUE(checkVariableAccess(stmt2->rhs.get(), "x"));
+  EXPECT_TRUE(checkVariableAccess(stmt2->var(), "myVar"));
+  EXPECT_TRUE(checkVariableAccess(stmt2->expr(), "x"));
 }
 
 TEST(ExpressionTest, ConstantReference) {
@@ -164,31 +164,31 @@ TEST(ExpressionTest, ConstantReference) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 4);
+  ASSERT_EQ(body->statements().size(), 4);
 
   {
-    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
     ASSERT_NE(stmt, nullptr);
     // MAX should be a literal expression with value 100
-    EXPECT_TRUE(checkIntLiteral(stmt->rhs.get(), 100));
+    EXPECT_TRUE(checkIntLiteral(stmt->expr(), 100));
   }
 
   {
-    auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements[1].get());
+    auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements()[1].get());
     ASSERT_NE(stmt, nullptr);
-    EXPECT_TRUE(checkRealLiteral(stmt->rhs.get(), 3.14159));
+    EXPECT_TRUE(checkRealLiteral(stmt->expr(), 3.14159));
   }
 
   {
-    auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements[2].get());
+    auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements()[2].get());
     ASSERT_NE(stmt, nullptr);
-    EXPECT_TRUE(checkCharLiteral(stmt->rhs.get(), '\n'));
+    EXPECT_TRUE(checkCharLiteral(stmt->expr(), '\n'));
   }
 
   {
-    auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements[3].get());
+    auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements()[3].get());
     ASSERT_NE(stmt, nullptr);
-    EXPECT_TRUE(checkBoolLiteral(stmt->rhs.get(), true));
+    EXPECT_TRUE(checkBoolLiteral(stmt->expr(), true));
   }
 }
 
@@ -220,17 +220,17 @@ TEST(ExpressionTest, EnumValueReference) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 2);
+  ASSERT_EQ(body->statements().size(), 2);
 
-  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt1 = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt1, nullptr);
   // Red is 0
-  EXPECT_TRUE(checkLiteral<Int>(stmt1->rhs.get(), 0, CONST_CAT::CC_ENUM));
+  EXPECT_TRUE(checkLiteral<Int>(stmt1->expr(), 0, CONST_CAT::CC_ENUM));
 
-  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
   ASSERT_NE(stmt2, nullptr);
   // Green is 1
-  EXPECT_TRUE(checkLiteral<Int>(stmt2->rhs.get(), 1, CONST_CAT::CC_ENUM));
+  EXPECT_TRUE(checkLiteral<Int>(stmt2->expr(), 1, CONST_CAT::CC_ENUM));
 }
 
 // =============================================================================
@@ -269,64 +269,64 @@ TEST(ExpressionTest, UnaryOperators)
 
   const auto &body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 9);
+  ASSERT_EQ(body->statements().size(), 9);
 
   auto checkUnary = [&](size_t idx, UnaryOp op) -> const UnaryExpression *
   {
-    const auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements[idx].get());
+    const auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements()[idx].get());
     [&]{ASSERT_NE(stmt, nullptr);}();
-    const auto *unary = dynamic_cast<const UnaryExpression *>(stmt->rhs.get());
+    const auto *unary = dynamic_cast<const UnaryExpression *>(stmt->expr());
     [&]{ASSERT_NE(unary, nullptr);}();
-    EXPECT_EQ(unary->op, op);
+    EXPECT_EQ(unary->op(), op);
     return unary;
   };
 
   // (+XInt)
   {
     auto *unary = checkUnary(0, UnaryOp::Plus);
-    EXPECT_TRUE(checkIntLiteral(unary->operand.get(), 10));
+    EXPECT_TRUE(checkIntLiteral(unary->operand(), 10));
   }
 
   // (+5)
   {
     auto *unary = checkUnary(1, UnaryOp::Plus);
-    EXPECT_TRUE(checkIntLiteral(unary->operand.get(), 5));
+    EXPECT_TRUE(checkIntLiteral(unary->operand(), 5));
   }
 
   // (+XReal)
   {
     auto *unary = checkUnary(2, UnaryOp::Plus);
-    EXPECT_TRUE(checkRealLiteral(unary->operand.get(), 3.14));
+    EXPECT_TRUE(checkRealLiteral(unary->operand(), 3.14));
   }
 
   // (+CConst)
   {
     auto *unary = checkUnary(3, UnaryOp::Plus);
-    EXPECT_TRUE(checkCharLiteral(unary->operand.get(), 'a'));
+    EXPECT_TRUE(checkCharLiteral(unary->operand(), 'a'));
   }
 
   // (-5)
   {
     auto *unary = checkUnary(4, UnaryOp::Minus);
-    EXPECT_TRUE(checkIntLiteral(unary->operand.get(), 5));
+    EXPECT_TRUE(checkIntLiteral(unary->operand(), 5));
   }
 
   // (-y3)
   {
     auto *unary = checkUnary(5, UnaryOp::Minus);
-    EXPECT_TRUE(checkVariableAccess(unary->operand.get(), "y3"));
+    EXPECT_TRUE(checkVariableAccess(unary->operand(), "y3"));
   }
 
   // (-3.14)
   {
     auto *unary = checkUnary(6, UnaryOp::Minus);
-    EXPECT_TRUE(checkRealLiteral(unary->operand.get(), 3.14));
+    EXPECT_TRUE(checkRealLiteral(unary->operand(), 3.14));
   }
 
   // (-c2)
   {
     auto *unary = checkUnary(8, UnaryOp::Minus);
-    EXPECT_TRUE(checkVariableAccess(unary->operand.get(), "c2"));
+    EXPECT_TRUE(checkVariableAccess(unary->operand(), "c2"));
   }
 }
 
@@ -384,22 +384,22 @@ TEST(ExpressionTest, NotBool) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 3);
+  ASSERT_EQ(body->statements().size(), 3);
 
-  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+  auto* stmt2 = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
   ASSERT_NE(stmt2, nullptr);
-  auto* unary2 = dynamic_cast<const UnaryExpression*>(stmt2->rhs.get());
+  auto* unary2 = dynamic_cast<const UnaryExpression*>(stmt2->expr());
   ASSERT_NE(unary2, nullptr);
-  EXPECT_EQ(unary2->op, UnaryOp::Not);
-  EXPECT_TRUE(checkVariableAccess(unary2->operand.get(), "x"));
+  EXPECT_EQ(unary2->op(), UnaryOp::Not);
+  EXPECT_TRUE(checkVariableAccess(unary2->operand(), "x"));
 
-  auto* stmt3 = dynamic_cast<const AssignmentStatement*>(body->statements[2].get());
+  auto* stmt3 = dynamic_cast<const AssignmentStatement*>(body->statements()[2].get());
   ASSERT_NE(stmt3, nullptr);
-  auto* unary3 = dynamic_cast<const UnaryExpression*>(stmt3->rhs.get());
+  auto* unary3 = dynamic_cast<const UnaryExpression*>(stmt3->expr());
   ASSERT_NE(unary3, nullptr);
-  EXPECT_EQ(unary3->op, UnaryOp::Not);
+  EXPECT_EQ(unary3->op(), UnaryOp::Not);
   // NOT is not applied on the expression since this is the AST
-  EXPECT_TRUE(checkBoolLiteral(unary3->operand.get(), true));
+  EXPECT_TRUE(checkBoolLiteral(unary3->operand(), true));
 }
 
 TEST(ExpressionTest, NotIntInvalid) {
@@ -477,18 +477,18 @@ TEST(ExpressionTest, RelationalOperations) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->statements.size(), 20);
+  EXPECT_EQ(body->statements().size(), 20);
 
   auto checkRelational = [&](size_t idx, BinaryOp op, const char* left, const char* right) {
-    const auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[idx].get());
+    const auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[idx].get());
     ASSERT_NE(stmt, nullptr);
     
-    const auto* bin = dynamic_cast<const BinaryExpression*>(stmt->rhs.get());
+    const auto* bin = dynamic_cast<const BinaryExpression*>(stmt->expr());
     ASSERT_NE(bin, nullptr);
     
-    EXPECT_EQ(bin->op, op);
-    EXPECT_TRUE(checkVariableAccess(bin->left.get(), left));
-    EXPECT_TRUE(checkVariableAccess(bin->right.get(), right));
+    EXPECT_EQ(bin->op(), op);
+    EXPECT_TRUE(checkVariableAccess(bin->left(), left));
+    EXPECT_TRUE(checkVariableAccess(bin->right(), right));
   };
 
   checkRelational(2, BinaryOp::Eq,  "x", "y");
@@ -540,12 +540,12 @@ TEST(ExpressionTest, LogicalOperations) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 11);
+  ASSERT_EQ(body->statements().size(), 11);
 
   auto getNExpr = [&](size_t idx) -> const NExpression* {
-    const auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[idx].get());
+    const auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[idx].get());
     [&]{ASSERT_NE(stmt, nullptr);}();
-    const auto* nexpr = dynamic_cast<const NExpression*>(stmt->rhs.get());
+    const auto* nexpr = dynamic_cast<const NExpression*>(stmt->expr());
     [&]{ASSERT_NE(nexpr, nullptr);}();
     return nexpr;
   };
@@ -553,106 +553,106 @@ TEST(ExpressionTest, LogicalOperations) {
   auto checkBoolLiteral = [](const Expression* expr, bool val) -> bool {
     const auto* lit = dynamic_cast<const LiteralExpression*>(expr);
     if (!lit) return false;
-    return std::get<bool>(lit->value->value()) == val;
+    return std::get<bool>(lit->constant()->value()) == val;
   };
 
   // 4. Check: result := a or b
   {
     auto* nexpr = getNExpr(4);
-    EXPECT_EQ(nexpr->ops.size(), 1);
-    EXPECT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Or);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "b"));
+    EXPECT_EQ(nexpr->ops().size(), 1);
+    EXPECT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
   }
 
   // 5. Check: result := a or b or c
   {
     auto* nexpr = getNExpr(5);
-    EXPECT_EQ(nexpr->ops.size(), 2);
-    EXPECT_EQ(nexpr->exprs.size(), 3);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Or);
-    EXPECT_EQ(nexpr->ops[1], BinaryOp::Or);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "b"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[2].get(), "c"));
+    EXPECT_EQ(nexpr->ops().size(), 2);
+    EXPECT_EQ(nexpr->exprs().size(), 3);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Or);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
   }
 
   // 6. Check: result := false or true or false
   {
     auto* nexpr = getNExpr(6);
-    EXPECT_EQ(nexpr->ops.size(), 2);
-    EXPECT_EQ(nexpr->exprs.size(), 3);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Or);
-    EXPECT_EQ(nexpr->ops[1], BinaryOp::Or);
-    EXPECT_TRUE(checkBoolLiteral(nexpr->exprs[0].get(), false));
-    EXPECT_TRUE(checkBoolLiteral(nexpr->exprs[1].get(), true));
-    EXPECT_TRUE(checkBoolLiteral(nexpr->exprs[2].get(), false));
+    EXPECT_EQ(nexpr->ops().size(), 2);
+    EXPECT_EQ(nexpr->exprs().size(), 3);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Or);
+    EXPECT_TRUE(checkBoolLiteral(nexpr->exprs()[0].get(), false));
+    EXPECT_TRUE(checkBoolLiteral(nexpr->exprs()[1].get(), true));
+    EXPECT_TRUE(checkBoolLiteral(nexpr->exprs()[2].get(), false));
   }
 
   // 7. Check: result := a and b
   {
     auto* nexpr = getNExpr(7);
-    EXPECT_EQ(nexpr->ops.size(), 1);
-    EXPECT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::And);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "b"));
+    EXPECT_EQ(nexpr->ops().size(), 1);
+    EXPECT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::And);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
   }
 
   // 8. Check: result := a and b and c
   {
     auto* nexpr = getNExpr(8);
-    EXPECT_EQ(nexpr->ops.size(), 2);
-    EXPECT_EQ(nexpr->exprs.size(), 3);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::And);
-    EXPECT_EQ(nexpr->ops[1], BinaryOp::And);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "b"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[2].get(), "c"));
+    EXPECT_EQ(nexpr->ops().size(), 2);
+    EXPECT_EQ(nexpr->exprs().size(), 3);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::And);
+    EXPECT_EQ(nexpr->ops()[1], BinaryOp::And);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
   }
 
   // 9. Check: result := a and b or c
   {
     auto* nexpr = getNExpr(9);
-    EXPECT_EQ(nexpr->ops.size(), 1);
-    EXPECT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops().size(), 1);
+    EXPECT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
 
     // Check Left operand (a and b)
-    const auto* left = dynamic_cast<const NExpression*>(nexpr->exprs[0].get());
+    const auto* left = dynamic_cast<const NExpression*>(nexpr->exprs()[0].get());
     ASSERT_NE(left, nullptr);
-    EXPECT_EQ(left->ops.size(), 1);
-    EXPECT_EQ(left->ops[0], BinaryOp::And);
-    EXPECT_TRUE(checkVariableAccess(left->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(left->exprs[1].get(), "b"));
+    EXPECT_EQ(left->ops().size(), 1);
+    EXPECT_EQ(left->ops()[0], BinaryOp::And);
+    EXPECT_TRUE(checkVariableAccess(left->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(left->exprs()[1].get(), "b"));
 
     // Check Right operand (c)
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "c"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "c"));
   }
 
   // 10. Check: result := (a and b) or (c and d)
   {
     auto* nexpr = getNExpr(10);
-    EXPECT_EQ(nexpr->ops.size(), 1);
-    EXPECT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops().size(), 1);
+    EXPECT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
 
     // Check Left operand (a and b)
-    const auto* left = dynamic_cast<const NExpression*>(nexpr->exprs[0].get());
+    const auto* left = dynamic_cast<const NExpression*>(nexpr->exprs()[0].get());
     ASSERT_NE(left, nullptr);
-    EXPECT_EQ(left->ops.size(), 1);
-    EXPECT_EQ(left->ops[0], BinaryOp::And);
-    EXPECT_TRUE(checkVariableAccess(left->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(left->exprs[1].get(), "b"));
+    EXPECT_EQ(left->ops().size(), 1);
+    EXPECT_EQ(left->ops()[0], BinaryOp::And);
+    EXPECT_TRUE(checkVariableAccess(left->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(left->exprs()[1].get(), "b"));
 
     // Check Right operand (c and d)
-    const auto* right = dynamic_cast<const NExpression*>(nexpr->exprs[1].get());
+    const auto* right = dynamic_cast<const NExpression*>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
-    EXPECT_EQ(right->ops.size(), 1);
-    EXPECT_EQ(right->ops[0], BinaryOp::And);
-    EXPECT_TRUE(checkVariableAccess(right->exprs[0].get(), "c"));
-    EXPECT_TRUE(checkVariableAccess(right->exprs[1].get(), "d"));
+    EXPECT_EQ(right->ops().size(), 1);
+    EXPECT_EQ(right->ops()[0], BinaryOp::And);
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "c"));
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "d"));
   }
 }
 // =============================================================================
@@ -696,13 +696,13 @@ TEST(ExpressionTest, AdditiveOperations)
 
   const auto &body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 14);
+  ASSERT_EQ(body->statements().size(), 14);
 
   auto getNExpr = [&](size_t idx) -> const NExpression *
   {
-    const auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements[idx].get());
+    const auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements()[idx].get());
     [&]{ASSERT_NE(stmt, nullptr);}();
-    const auto *nexpr = dynamic_cast<const NExpression *>(stmt->rhs.get());
+    const auto *nexpr = dynamic_cast<const NExpression *>(stmt->expr());
     [&]{ASSERT_NE(nexpr, nullptr);}();
     return nexpr;
   };
@@ -710,61 +710,61 @@ TEST(ExpressionTest, AdditiveOperations)
   // 2. Check: iz := ix + iy
   {
     auto *nexpr = getNExpr(2);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Add);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "ix"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "iy"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "ix"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "iy"));
   }
 
   // 3. Check: iz := ix + 100 (Completing the ignored test from input)
   {
     auto *nexpr = getNExpr(3);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Add);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "ix"));
-    EXPECT_TRUE(checkIntLiteral(nexpr->exprs[1].get(), 100));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "ix"));
+    EXPECT_TRUE(checkIntLiteral(nexpr->exprs()[1].get(), 100));
   }
 
   // 6. Check: rz := rx + ry
   {
     auto *nexpr = getNExpr(6);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Add);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "rx"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "ry"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "ry"));
   }
 
   // 9. Check: iz := ix - iy
   {
     auto *nexpr = getNExpr(9);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Sub);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "ix"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "iy"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "ix"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "iy"));
   }
 
   // 10. Check: iz := 100 - iy
   {
     auto *nexpr = getNExpr(10);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Sub);
-    EXPECT_TRUE(checkIntLiteral(nexpr->exprs[0].get(), 100));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "iy"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
+    EXPECT_TRUE(checkIntLiteral(nexpr->exprs()[0].get(), 100));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "iy"));
   }
 
   // 13. Check: rz := rx - ry
   {
     auto *nexpr = getNExpr(13);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Sub);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "rx"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "ry"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "ry"));
   }
 }
 
@@ -805,13 +805,13 @@ TEST(ExpressionTest, ComplexExpressions)
 
   const auto &body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  EXPECT_EQ(body->statements.size(), 14);
+  EXPECT_EQ(body->statements().size(), 14);
 
   auto getNExpr = [&](size_t idx) -> const NExpression *
   {
-    const auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements[idx].get());
+    const auto *stmt = dynamic_cast<const AssignmentStatement *>(body->statements()[idx].get());
     [&]{ASSERT_NE(stmt, nullptr);}();
-    const auto *nexpr = dynamic_cast<const NExpression *>(stmt->rhs.get());
+    const auto *nexpr = dynamic_cast<const NExpression *>(stmt->expr());
     [&]{ASSERT_NE(nexpr, nullptr);}();
     return nexpr;
   };
@@ -819,115 +819,115 @@ TEST(ExpressionTest, ComplexExpressions)
   // 6. Check: resInt := a + b + c
   {
     auto *nexpr = getNExpr(6);
-    ASSERT_EQ(nexpr->ops.size(), 2);
-    ASSERT_EQ(nexpr->exprs.size(), 3);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Add);
-    EXPECT_EQ(nexpr->ops[1], BinaryOp::Add);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "b"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[2].get(), "c"));
+    ASSERT_EQ(nexpr->ops().size(), 2);
+    ASSERT_EQ(nexpr->exprs().size(), 3);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Add);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
   }
 
   // 7. Check: resInt := a - b - c
   {
     auto *nexpr = getNExpr(7);
-    ASSERT_EQ(nexpr->ops.size(), 2);
-    ASSERT_EQ(nexpr->exprs.size(), 3);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Sub);
-    EXPECT_EQ(nexpr->ops[1], BinaryOp::Sub);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "b"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[2].get(), "c"));
+    ASSERT_EQ(nexpr->ops().size(), 2);
+    ASSERT_EQ(nexpr->exprs().size(), 3);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
+    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Sub);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
   }
 
   // 8. Check: resInt := a * b * c
   {
     auto *nexpr = getNExpr(8);
-    ASSERT_EQ(nexpr->ops.size(), 2);
-    ASSERT_EQ(nexpr->exprs.size(), 3);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Mul);
-    EXPECT_EQ(nexpr->ops[1], BinaryOp::Mul);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "b"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[2].get(), "c"));
+    ASSERT_EQ(nexpr->ops().size(), 2);
+    ASSERT_EQ(nexpr->exprs().size(), 3);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Mul);
+    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Mul);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
   }
 
   // 9. Check: resReal := rx / ry
   {
     auto *nexpr = getNExpr(9);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Div);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "rx"));
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[1].get(), "ry"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Div);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "ry"));
   }
 
   // 10. Check: resReal := rx / 5.0
   {
     auto *nexpr = getNExpr(10);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Div);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "rx"));
-    EXPECT_TRUE(checkRealLiteral(nexpr->exprs[1].get(), 5.0));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Div);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
+    EXPECT_TRUE(checkRealLiteral(nexpr->exprs()[1].get(), 5.0));
   }
 
   // 11. Check: resInt := a + b * c
   {
     auto *nexpr = getNExpr(11);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Add);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
 
     // Verify right operand is a multiplication
-    auto *right = dynamic_cast<const NExpression *>(nexpr->exprs[1].get());
+    auto *right = dynamic_cast<const NExpression *>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
-    ASSERT_EQ(right->ops.size(), 1);
-    EXPECT_EQ(right->ops[0], BinaryOp::Mul);
-    EXPECT_TRUE(checkVariableAccess(right->exprs[0].get(), "b"));
-    EXPECT_TRUE(checkVariableAccess(right->exprs[1].get(), "c"));
+    ASSERT_EQ(right->ops().size(), 1);
+    EXPECT_EQ(right->ops()[0], BinaryOp::Mul);
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "b"));
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "c"));
   }
 
   // 12. Check: resInt := (a + b) * (c - d)
   {
     auto *nexpr = getNExpr(12);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Mul);
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Mul);
 
     // Check Left (a + b)
-    auto *left = dynamic_cast<const NExpression *>(nexpr->exprs[0].get());
+    auto *left = dynamic_cast<const NExpression *>(nexpr->exprs()[0].get());
     ASSERT_NE(left, nullptr);
-    ASSERT_EQ(left->ops.size(), 1);
-    EXPECT_EQ(left->ops[0], BinaryOp::Add);
-    EXPECT_TRUE(checkVariableAccess(left->exprs[0].get(), "a"));
-    EXPECT_TRUE(checkVariableAccess(left->exprs[1].get(), "b"));
+    ASSERT_EQ(left->ops().size(), 1);
+    EXPECT_EQ(left->ops()[0], BinaryOp::Add);
+    EXPECT_TRUE(checkVariableAccess(left->exprs()[0].get(), "a"));
+    EXPECT_TRUE(checkVariableAccess(left->exprs()[1].get(), "b"));
 
     // Check Right (c - d)
-    auto *right = dynamic_cast<const NExpression *>(nexpr->exprs[1].get());
+    auto *right = dynamic_cast<const NExpression *>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
-    ASSERT_EQ(right->ops.size(), 1);
-    EXPECT_EQ(right->ops[0], BinaryOp::Sub);
-    EXPECT_TRUE(checkVariableAccess(right->exprs[0].get(), "c"));
-    EXPECT_TRUE(checkVariableAccess(right->exprs[1].get(), "d"));
+    ASSERT_EQ(right->ops().size(), 1);
+    EXPECT_EQ(right->ops()[0], BinaryOp::Sub);
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "c"));
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "d"));
   }
 
   // 13. Check: resInt := a + (b * c)
   {
     auto *nexpr = getNExpr(13);
-    ASSERT_EQ(nexpr->ops.size(), 1);
-    ASSERT_EQ(nexpr->exprs.size(), 2);
-    EXPECT_EQ(nexpr->ops[0], BinaryOp::Add);
-    EXPECT_TRUE(checkVariableAccess(nexpr->exprs[0].get(), "a"));
+    ASSERT_EQ(nexpr->ops().size(), 1);
+    ASSERT_EQ(nexpr->exprs().size(), 2);
+    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
 
     // Verify right operand is parenthesized multiplication
-    auto *right = dynamic_cast<const NExpression *>(nexpr->exprs[1].get());
+    auto *right = dynamic_cast<const NExpression *>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
-    ASSERT_EQ(right->ops.size(), 1);
-    EXPECT_EQ(right->ops[0], BinaryOp::Mul);
-    EXPECT_TRUE(checkVariableAccess(right->exprs[0].get(), "b"));
-    EXPECT_TRUE(checkVariableAccess(right->exprs[1].get(), "c"));
+    ASSERT_EQ(right->ops().size(), 1);
+    EXPECT_EQ(right->ops()[0], BinaryOp::Mul);
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "b"));
+    EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "c"));
   }
 }
 
@@ -971,10 +971,10 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 10); 
+  ASSERT_EQ(body->statements().size(), 10); 
 
   auto getStmt = [&](size_t idx) -> const AssignmentStatement* {
-    return dynamic_cast<const AssignmentStatement*>(body->statements[idx].get());
+    return dynamic_cast<const AssignmentStatement*>(body->statements()[idx].get());
   };
 
   auto getVA = [](const Expression* expr) -> const VariableAccess* {
@@ -986,17 +986,17 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(2);
     ASSERT_NE(stmt, nullptr);
     
-    const auto* lhs = getVA(stmt->lhs.get());
+    const auto* lhs = getVA(stmt->var());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->id(), "arr");
-    ASSERT_EQ(lhs->selectors.size(), 1);
+    EXPECT_EQ(lhs->base_var()->id(), "arr");
+    ASSERT_EQ(lhs->selectors().size(), 1);
     
-    const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors[0].get());
+    const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors()[0].get());
     ASSERT_NE(sel, nullptr);
-    EXPECT_EQ(sel->indices.size(), 1);
-    EXPECT_TRUE(checkVariableAccess(sel->indices[0].get(), "i"));
+    EXPECT_EQ(sel->indices().size(), 1);
+    EXPECT_TRUE(checkVariableAccess(sel->indices()[0].get(), "i"));
 
-    EXPECT_TRUE(checkVariableAccess(stmt->rhs.get(), "value"));
+    EXPECT_TRUE(checkVariableAccess(stmt->expr(), "value"));
   }
 
   // --- Check 3: arr[5] := 10 ---
@@ -1004,17 +1004,17 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(3);
     ASSERT_NE(stmt, nullptr);
 
-    const auto* lhs = getVA(stmt->lhs.get());
+    const auto* lhs = getVA(stmt->var());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->id(), "arr");
-    ASSERT_EQ(lhs->selectors.size(), 1);
+    EXPECT_EQ(lhs->base_var()->id(), "arr");
+    ASSERT_EQ(lhs->selectors().size(), 1);
 
-    const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors[0].get());
+    const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors()[0].get());
     ASSERT_NE(sel, nullptr);
-    EXPECT_EQ(sel->indices.size(), 1);
-    EXPECT_TRUE(checkIntLiteral(sel->indices[0].get(), 5));
+    EXPECT_EQ(sel->indices().size(), 1);
+    EXPECT_TRUE(checkIntLiteral(sel->indices()[0].get(), 5));
 
-    EXPECT_TRUE(checkIntLiteral(stmt->rhs.get(), 10));
+    EXPECT_TRUE(checkIntLiteral(stmt->expr(), 10));
   }
 
   // --- Check 4: value := arr[3] ---
@@ -1022,15 +1022,15 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(4);
     ASSERT_NE(stmt, nullptr);
 
-    EXPECT_TRUE(checkVariableAccess(stmt->lhs.get(), "value"));
+    EXPECT_TRUE(checkVariableAccess(stmt->var(), "value"));
 
-    const auto* rhs = getVA(stmt->rhs.get());
+    const auto* rhs = getVA(stmt->expr());
     ASSERT_NE(rhs, nullptr);
-    EXPECT_EQ(rhs->baseVar->id(), "arr");
+    EXPECT_EQ(rhs->base_var()->id(), "arr");
     
-    const auto* sel = dynamic_cast<const ArraySelector*>(rhs->selectors[0].get());
+    const auto* sel = dynamic_cast<const ArraySelector*>(rhs->selectors()[0].get());
     ASSERT_NE(sel, nullptr);
-    EXPECT_TRUE(checkIntLiteral(sel->indices[0].get(), 3));
+    EXPECT_TRUE(checkIntLiteral(sel->indices()[0].get(), 3));
   }
 
   // --- Check 5: matrix[i, j] := value ---
@@ -1038,17 +1038,17 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(5);
     ASSERT_NE(stmt, nullptr);
 
-    const auto* lhs = getVA(stmt->lhs.get());
+    const auto* lhs = getVA(stmt->var());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->id(), "matrix");
+    EXPECT_EQ(lhs->base_var()->id(), "matrix");
     
-    ASSERT_EQ(lhs->selectors.size(), 1);
-    const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors[0].get());
+    ASSERT_EQ(lhs->selectors().size(), 1);
+    const auto* sel = dynamic_cast<const ArraySelector*>(lhs->selectors()[0].get());
     ASSERT_NE(sel, nullptr);
-    ASSERT_EQ(sel->indices.size(), 2);
+    ASSERT_EQ(sel->indices().size(), 2);
     
-    EXPECT_TRUE(checkVariableAccess(sel->indices[0].get(), "i"));
-    EXPECT_TRUE(checkVariableAccess(sel->indices[1].get(), "j"));
+    EXPECT_TRUE(checkVariableAccess(sel->indices()[0].get(), "i"));
+    EXPECT_TRUE(checkVariableAccess(sel->indices()[1].get(), "j"));
   }
 
   // --- Check 6: p.x := 10 ---
@@ -1056,14 +1056,14 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(6);
     ASSERT_NE(stmt, nullptr);
 
-    const auto* lhs = getVA(stmt->lhs.get());
+    const auto* lhs = getVA(stmt->var());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->id(), "p");
-    ASSERT_EQ(lhs->selectors.size(), 1);
+    EXPECT_EQ(lhs->base_var()->id(), "p");
+    ASSERT_EQ(lhs->selectors().size(), 1);
 
-    const auto* sel = dynamic_cast<const FieldSelector*>(lhs->selectors[0].get());
+    const auto* sel = dynamic_cast<const FieldSelector*>(lhs->selectors()[0].get());
     ASSERT_NE(sel, nullptr);
-    EXPECT_EQ(sel->field, "x");
+    EXPECT_EQ(sel->field(), "x");
   }
 
   // --- Check 7: p.y := 20 ---
@@ -1071,11 +1071,11 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(7);
     ASSERT_NE(stmt, nullptr);
 
-    const auto* lhs = getVA(stmt->lhs.get());
+    const auto* lhs = getVA(stmt->var());
     ASSERT_NE(lhs, nullptr);
-    const auto* sel = dynamic_cast<const FieldSelector*>(lhs->selectors[0].get());
+    const auto* sel = dynamic_cast<const FieldSelector*>(lhs->selectors()[0].get());
     ASSERT_NE(sel, nullptr);
-    EXPECT_EQ(sel->field, "y");
+    EXPECT_EQ(sel->field(), "y");
   }
 
   // --- Check 8: value := p.x ---
@@ -1083,13 +1083,13 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(8);
     ASSERT_NE(stmt, nullptr);
 
-    const auto* rhs = getVA(stmt->rhs.get());
+    const auto* rhs = getVA(stmt->expr());
     ASSERT_NE(rhs, nullptr);
-    EXPECT_EQ(rhs->baseVar->id(), "p");
+    EXPECT_EQ(rhs->base_var()->id(), "p");
     
-    const auto* sel = dynamic_cast<const FieldSelector*>(rhs->selectors[0].get());
+    const auto* sel = dynamic_cast<const FieldSelector*>(rhs->selectors()[0].get());
     ASSERT_NE(sel, nullptr);
-    EXPECT_EQ(sel->field, "x");
+    EXPECT_EQ(sel->field(), "x");
   }
 
   // --- Check 9: arrPoints[i].x := 10 (Nested Access) ---
@@ -1097,21 +1097,21 @@ TEST(ExpressionTest, VariableAndFieldAccess) {
     const auto* stmt = getStmt(9);
     ASSERT_NE(stmt, nullptr);
 
-    const auto* lhs = getVA(stmt->lhs.get());
+    const auto* lhs = getVA(stmt->var());
     ASSERT_NE(lhs, nullptr);
-    EXPECT_EQ(lhs->baseVar->id(), "arrPoints");
+    EXPECT_EQ(lhs->base_var()->id(), "arrPoints");
     
-    // Should have 2 selectors: Array index, then Field access
-    ASSERT_EQ(lhs->selectors.size(), 2);
+    // Should have 2 selectors(): Array index, then Field access
+    ASSERT_EQ(lhs->selectors().size(), 2);
 
-    const auto* arrSel = dynamic_cast<const ArraySelector*>(lhs->selectors[0].get());
+    const auto* arrSel = dynamic_cast<const ArraySelector*>(lhs->selectors()[0].get());
     ASSERT_NE(arrSel, nullptr);
-    EXPECT_EQ(arrSel->indices.size(), 1);
-    EXPECT_TRUE(checkVariableAccess(arrSel->indices[0].get(), "i"));
+    EXPECT_EQ(arrSel->indices().size(), 1);
+    EXPECT_TRUE(checkVariableAccess(arrSel->indices()[0].get(), "i"));
 
-    const auto* fieldSel = dynamic_cast<const FieldSelector*>(lhs->selectors[1].get());
+    const auto* fieldSel = dynamic_cast<const FieldSelector*>(lhs->selectors()[1].get());
     ASSERT_NE(fieldSel, nullptr);
-    EXPECT_EQ(fieldSel->field, "x");
+    EXPECT_EQ(fieldSel->field(), "x");
   }
 }
 
@@ -1221,17 +1221,17 @@ TEST(FunctionCallTest, NoArguments)
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt, nullptr);
-  EXPECT_TRUE(checkVariableAccess(stmt->lhs.get(), "x"));
+  EXPECT_TRUE(checkVariableAccess(stmt->var(), "x"));
 
-  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->id(), "getPi");
-  EXPECT_EQ(call->args.size(), 0);
-  EXPECT_NE(call->exprType, nullptr);
+  EXPECT_EQ(call->function()->id(), "getPi");
+  EXPECT_EQ(call->args().size(), 0);
+  EXPECT_NE(call->type(), nullptr);
 }
 
 TEST(FunctionCallTest, SingleArgument)
@@ -1253,14 +1253,14 @@ TEST(FunctionCallTest, SingleArgument)
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
 
-  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt, nullptr);
 
-  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->id(), "square");
-  EXPECT_EQ(call->args.size(), 1);
-  EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 5));
+  EXPECT_EQ(call->function()->id(), "square");
+  EXPECT_EQ(call->args().size(), 1);
+  EXPECT_TRUE(checkIntLiteral(call->args()[0].get(), 5));
 }
 
 TEST(FunctionCallTest, MultipleArguments)
@@ -1286,31 +1286,31 @@ TEST(FunctionCallTest, MultipleArguments)
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 2);
+  ASSERT_EQ(body->statements().size(), 2);
 
   // Check r1 := add(10, 20)
   {
-    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
     ASSERT_NE(stmt, nullptr);
-    const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+    const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
     ASSERT_NE(call, nullptr);
-    EXPECT_EQ(call->function->id(), "add");
-    EXPECT_EQ(call->args.size(), 2);
-    EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 10));
-    EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 20));
+    EXPECT_EQ(call->function()->id(), "add");
+    EXPECT_EQ(call->args().size(), 2);
+    EXPECT_TRUE(checkIntLiteral(call->args()[0].get(), 10));
+    EXPECT_TRUE(checkIntLiteral(call->args()[1].get(), 20));
   }
 
   // Check r2 := combine(1, 2, 3)
   {
-    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
     ASSERT_NE(stmt, nullptr);
-    const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+    const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
     ASSERT_NE(call, nullptr);
-    EXPECT_EQ(call->function->id(), "combine");
-    EXPECT_EQ(call->args.size(), 3);
-    EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 1));
-    EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 2));
-    EXPECT_TRUE(checkIntLiteral(call->args[2].get(), 3));
+    EXPECT_EQ(call->function()->id(), "combine");
+    EXPECT_EQ(call->args().size(), 3);
+    EXPECT_TRUE(checkIntLiteral(call->args()[0].get(), 1));
+    EXPECT_TRUE(checkIntLiteral(call->args()[1].get(), 2));
+    EXPECT_TRUE(checkIntLiteral(call->args()[2].get(), 3));
   }
 }
 
@@ -1336,32 +1336,32 @@ TEST(FunctionCallTest, NestedCalls)
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
-  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt, nullptr);
 
-  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->id(), "sum");
-  EXPECT_EQ(call->args.size(), 2);
+  EXPECT_EQ(call->function()->id(), "sum");
+  EXPECT_EQ(call->args().size(), 2);
 
   // Check first arg: square(2)
   {
-    const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args[0].get());
+    const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args()[0].get());
     ASSERT_NE(innerCall, nullptr);
-    EXPECT_EQ(innerCall->function->id(), "square");
-    EXPECT_EQ(innerCall->args.size(), 1);
-    EXPECT_TRUE(checkIntLiteral(innerCall->args[0].get(), 2));
+    EXPECT_EQ(innerCall->function()->id(), "square");
+    EXPECT_EQ(innerCall->args().size(), 1);
+    EXPECT_TRUE(checkIntLiteral(innerCall->args()[0].get(), 2));
   }
 
   // Check second arg: square(3)
   {
-    const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args[1].get());
+    const auto* innerCall = dynamic_cast<const FunctionCall*>(call->args()[1].get());
     ASSERT_NE(innerCall, nullptr);
-    EXPECT_EQ(innerCall->function->id(), "square");
-    EXPECT_EQ(innerCall->args.size(), 1);
-    EXPECT_TRUE(checkIntLiteral(innerCall->args[0].get(), 3));
+    EXPECT_EQ(innerCall->function()->id(), "square");
+    EXPECT_EQ(innerCall->args().size(), 1);
+    EXPECT_TRUE(checkIntLiteral(innerCall->args()[0].get(), 3));
   }
 }
 
@@ -1384,14 +1384,14 @@ TEST(FunctionCallTest, LiteralArguments)
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
 
-  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt, nullptr);
 
-  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
   ASSERT_NE(call, nullptr);
-  EXPECT_TRUE(checkFunctionCallWithArgs(stmt->rhs.get(), "max", 2));
-  EXPECT_TRUE(checkIntLiteral(call->args[0].get(), 10));
-  EXPECT_TRUE(checkIntLiteral(call->args[1].get(), 20));
+  EXPECT_TRUE(checkFunctionCallWithArgs(stmt->expr(), "max", 2));
+  EXPECT_TRUE(checkIntLiteral(call->args()[0].get(), 10));
+  EXPECT_TRUE(checkIntLiteral(call->args()[1].get(), 20));
 }
 
 TEST(FunctionCallTest, VariableArguments)
@@ -1415,14 +1415,14 @@ TEST(FunctionCallTest, VariableArguments)
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
 
-  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[2].get());
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[2].get());
   ASSERT_NE(stmt, nullptr);
 
-  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
   ASSERT_NE(call, nullptr);
-  EXPECT_TRUE(checkFunctionCallWithArgs(stmt->rhs.get(), "add", 2));
-  EXPECT_TRUE(checkVariableAccess(call->args[0].get(), "x"));
-  EXPECT_TRUE(checkVariableAccess(call->args[1].get(), "y"));
+  EXPECT_TRUE(checkFunctionCallWithArgs(stmt->expr(), "add", 2));
+  EXPECT_TRUE(checkVariableAccess(call->args()[0].get(), "x"));
+  EXPECT_TRUE(checkVariableAccess(call->args()[1].get(), "y"));
 }
 
 TEST(FunctionCallTest, DifferentReturnTypes)
@@ -1461,34 +1461,34 @@ TEST(FunctionCallTest, DifferentReturnTypes)
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 4);
+  ASSERT_EQ(body->statements().size(), 4);
 
   // Check i := intFunc
   {
-    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
     ASSERT_NE(stmt, nullptr);
-    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "intFunc"));
+    EXPECT_TRUE(checkFunctionCall(stmt->expr(), "intFunc"));
   }
 
   // Check r := realFunc
   {
-    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[1].get());
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[1].get());
     ASSERT_NE(stmt, nullptr);
-    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "realFunc"));
+    EXPECT_TRUE(checkFunctionCall(stmt->expr(), "realFunc"));
   }
 
   // Check b := boolFunc
   {
-    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[2].get());
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[2].get());
     ASSERT_NE(stmt, nullptr);
-    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "boolFunc"));
+    EXPECT_TRUE(checkFunctionCall(stmt->expr(), "boolFunc"));
   }
 
   // Check c := charFunc
   {
-    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[3].get());
+    auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[3].get());
     ASSERT_NE(stmt, nullptr);
-    EXPECT_TRUE(checkFunctionCall(stmt->rhs.get(), "charFunc"));
+    EXPECT_TRUE(checkFunctionCall(stmt->expr(), "charFunc"));
   }
 }
 
@@ -1568,15 +1568,15 @@ TEST(FunctionCallTest, VarParameterValid)
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 3);
+  ASSERT_EQ(body->statements().size(), 3);
 
   // Check swap(x, y) statement
-  auto* stmt = dynamic_cast<const ProcedureCall*>(body->statements[2].get());
+  auto* stmt = dynamic_cast<const ProcedureCall*>(body->statements()[2].get());
   ASSERT_NE(stmt, nullptr);
   EXPECT_TRUE(checkProcedureCall(stmt, "swap"));
-  EXPECT_EQ(stmt->args.size(), 2);
-  EXPECT_TRUE(checkVariableAccess(stmt->args[0].get(), "x"));
-  EXPECT_TRUE(checkVariableAccess(stmt->args[1].get(), "y"));
+  EXPECT_EQ(stmt->args().size(), 2);
+  EXPECT_TRUE(checkVariableAccess(stmt->args()[0].get(), "x"));
+  EXPECT_TRUE(checkVariableAccess(stmt->args()[1].get(), "y"));
 }
 
 TEST(FunctionCallTest, VarParameterInvalidExpression)
@@ -1620,14 +1620,14 @@ TEST(FunctionCallTest, FunctionCalledAsExpression)
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
 
-  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements[0].get());
+  auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[0].get());
   ASSERT_NE(stmt, nullptr);
 
   // Verify it's a FunctionCall (expression) not a ProcedureCall
-  const auto* call = dynamic_cast<const FunctionCall*>(stmt->rhs.get());
+  const auto* call = dynamic_cast<const FunctionCall*>(stmt->expr());
   ASSERT_NE(call, nullptr);
-  EXPECT_EQ(call->function->id(), "square");
-  ASSERT_NE(call->exprType, nullptr); // Has return type
+  EXPECT_EQ(call->function()->id(), "square");
+  ASSERT_NE(call->type(), nullptr); // Has return type
 }
 
 TEST(FunctionCallTest, ProcedureCalledAsStatement)
@@ -1648,13 +1648,13 @@ TEST(FunctionCallTest, ProcedureCalledAsStatement)
 
   const auto& body = parser.m_current_block->body;
   ASSERT_NE(body, nullptr);
-  ASSERT_EQ(body->statements.size(), 1);
+  ASSERT_EQ(body->statements().size(), 1);
 
   // Verify it's a ProcedureCall (statement) not a FunctionCall
-  auto* stmt = dynamic_cast<const ProcedureCall*>(body->statements[0].get());
+  auto* stmt = dynamic_cast<const ProcedureCall*>(body->statements()[0].get());
   ASSERT_NE(stmt, nullptr);
-  EXPECT_EQ(stmt->procedure->id(), "pr");
-  EXPECT_EQ(stmt->args.size(), 0);
+  EXPECT_EQ(stmt->procedure()->id(), "pr");
+  EXPECT_EQ(stmt->args().size(), 0);
 }
 
 TEST(FunctionCallTest, ParenthesesWithNoArgs)

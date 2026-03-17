@@ -6,17 +6,17 @@ namespace pascal_compiler
 
 void UnaryExpression::validate()
 {
-  this->exprType = operand->exprType->get_underlying_type();
-  if (!validation::is_valid_unary_operand(op, operand->exprType)) {
-    const std::string expected = (op == UnaryOp::Not ? "Bool" : "Int, Char or Real");
+  this->m_expr_type = m_operand->type()->get_underlying_type();
+  if (!validation::is_valid_unary_operand(m_op, m_operand->type())) {
+    const std::string expected = (m_op == UnaryOp::Not ? "Bool" : "Int, Char or Real");
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
         "Semantic error: Cannot apply unary operation ({}) on expression of type ({})! Expected {} !",
-        token.to_string(), operand->exprType->to_string(), expected
+        m_token.to_string(), m_operand->type()->to_string(), expected
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 }
@@ -25,19 +25,19 @@ void BinaryExpression::validate()
 {
   // For now, both expression are required to be bools
   // if an expression's type is a subrange, get the underlying type
-  if (!validation::is_valid_binary_operand(op, left->exprType, right->exprType)) {
+  if (!validation::is_valid_binary_operand(m_op, m_left->type(), m_right->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
         "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected compatible basic types for relational operation!",
-        token.to_string(), left->exprType->to_string(), right->exprType->to_string()
+        m_token.to_string(), m_left->type()->to_string(), m_right->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
-  switch(op)
+  switch(m_op)
   {
     case BinaryOp::Le:
     case BinaryOp::Lt:
@@ -51,10 +51,10 @@ void BinaryExpression::validate()
         SEMANTIC_ERROR::SE_INVALID_OP,
         std::format(
           "Semantic error: At ({}), expected comparison !",
-          token.to_string()
+          m_token.to_string()
         ),
-        token.line(),
-        token.column()
+        m_token.line(),
+        m_token.column()
       );
   }
 }
@@ -64,70 +64,70 @@ void NExpression::validate()
   // For now, all expression are required to be of the same type
   // if an expression's type is a subrange, get the underlying type
 
-  const auto left = exprs[0].get();
+  const auto left = m_exprs[0].get();
 
-  if(exprs.size() != ops.size()+1)
+  if(m_exprs.size() != m_ops.size()+1)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
         "Semantic error: At {}, found {} expressions and {} binary operations ! Expected {} binary operations !",
-        token.to_string(), exprs.size(), ops.size(), exprs.size()-1
+        m_token.to_string(), m_exprs.size(), m_ops.size(), m_exprs.size()-1
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
-  this->exprType = left->exprType->get_underlying_type();
-  if (!validation::is_basic_type(exprType)) {
+  this->m_expr_type = left->type()->get_underlying_type();
+  if (!validation::is_basic_type(type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
         "Semantic error: Cannot apply binary operation ({}) on an expressions of type ({})! Expected Ints, Reals, Chars or Bools !",
-        token.to_string(), left->exprType->to_string()
+        m_token.to_string(), left->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
-  for(int i = 0;i < ops.size();++i)
+  for(int i = 0;i < m_ops.size();++i)
   {
-    const auto right = exprs[i+1].get();
-    if (!validation::types_compatible(left->exprType, right->exprType)) {
+    const auto right = m_exprs[i+1].get();
+    if (!validation::types_compatible(left->type(), right->type())) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_OP,
         std::format(
           "Semantic error: Cannot apply binary operation ({}) on 2 expressions of different types ({}) and ({})!",
-          token.to_string(), left->exprType->to_string(), right->exprType->to_string()
+          m_token.to_string(), left->type()->to_string(), right->type()->to_string()
         ),
-        right->token.line(),
-        right->token.column()
+        right->token().line(),
+        right->token().column()
       );
     }
-    const auto op = ops[i];  
-    if (!validation::is_valid_binary_operand(op, left->exprType, right->exprType)) {
-      std::string_view left_type = left->exprType->get_underlying_type()->id();
+    const auto op = m_ops[i];  
+    if (!validation::is_valid_binary_operand(op, left->type(), right->type())) {
+      std::string_view left_type = left->type()->get_underlying_type()->id();
       if (left_type == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]) {
         throw SemanticException(
           SEMANTIC_ERROR::SE_INVALID_OP,
           std::format(
             "Semantic error: Cannot apply binary operation ({}) on 2 boolean expressions !",
-            right->token.to_string()
+            right->token().to_string()
           ),
-          right->token.line(),
-          right->token.column()
+          right->token().line(),
+          right->token().column()
         );
       } else {
         throw SemanticException(
           SEMANTIC_ERROR::SE_INVALID_OP,
           std::format(
             "Semantic error: Cannot apply binary operation ({}) on 2 expressions of underlying type '{}' !",
-            right->token.to_string(), left_type
+            right->token().to_string(), left_type
           ),
-          right->token.line(),
-          right->token.column()
+          right->token().line(),
+          right->token().column()
         );
       }
     }
@@ -136,7 +136,7 @@ void NExpression::validate()
 
 void LiteralExpression::validate()
 {
-  this->exprType = value->type();
+  this->m_expr_type = m_constant->type();
 }
 
 const Type * ArraySelector::apply(const Type *type)
@@ -147,31 +147,31 @@ const Type * ArraySelector::apply(const Type *type)
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format(
         "Semantic error: At ({}), type ({}) is not indexable ! Expected an array !",
-        token.to_string(), type->to_string()
+        m_token.to_string(), type->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
   const Array *arr = static_cast<const Array *>(type);
   
-  if(arr->index_types().size() != indices.size())
+  if(arr->index_types().size() != m_indices.size())
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_INDEX,
       std::format(
         "Semantic error: At ({}), array type ({}) requires {} indices ! Found {} indices !",
-        token.to_string(), type->to_string(), arr->index_types().size(), indices.size()
+        m_token.to_string(), type->to_string(), arr->index_types().size(), m_indices.size()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
-  for(int i = 0;i < indices.size();++i)
+  for(int i = 0;i < m_indices.size();++i)
   {
-    auto itype = indices[i]->exprType->get_underlying_type();
+    auto itype = m_indices[i]->type()->get_underlying_type();
     
     auto vtype = arr->index_types()[i]->get_underlying_type();
     
@@ -181,10 +181,10 @@ const Type * ArraySelector::apply(const Type *type)
         SEMANTIC_ERROR::SE_INVALID_INDEX,
         std::format(
           "Semantic error: At ({}), array type ({}) requires the index-{} to be of type ({}) ! Found {} !",
-          token.to_string(), type->to_string(), i+1, arr->index_types()[i]->to_string(), indices[i]->exprType->to_string()
+          m_token.to_string(), type->to_string(), i+1, arr->index_types()[i]->to_string(), m_indices[i]->type()->to_string()
         ),
-        token.line(),
-        token.column()
+        m_token.line(),
+        m_token.column()
       );
     }
   }
@@ -200,25 +200,25 @@ const Type* FieldSelector::apply(const Type* type)
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format(
         "Semantic error: At ({}), Field name '{}' does not exists for non-record type ({}) ! Expected a record !",
-        token.to_string(), field, type->to_string()
+        m_token.to_string(), m_field, type->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
   const Record* rec = static_cast<const Record*>(type);
-  auto it = rec->attributes().find(field);
+  auto it = rec->attributes().find(m_field);
   if(it == rec->attributes().end())
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_FIELD_NAME,
       std::format(
         "Semantic error: Field name '{}' does not exists for record type ({}) !",
-        field, type->to_string()
+        m_field, type->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
@@ -228,20 +228,20 @@ const Type* FieldSelector::apply(const Type* type)
 
 void VariableAccess::validate()
 {
-  const Type* current = baseVar->type()->get_underlying_type();
+  const Type* current = m_base_var->type()->get_underlying_type();
   
-  for(const auto& s : selectors)
+  for(const auto& s : m_selectors)
   {
     current = s->apply(current);
   }
 
-  this->exprType = current;
+  this->m_expr_type = current;
 }
 
 
 void CompoundStatement::validate()
 {
-  for(const auto& stmt : statements)
+  for(const auto& stmt : m_statements)
   {
     stmt->validate();
   }
@@ -249,26 +249,26 @@ void CompoundStatement::validate()
 
 void AssignmentStatement::validate()
 {
-  if (!validation::is_basic_type(lhs->exprType) && !validation::is_enum_type(lhs->exprType)) {
+  if (!validation::is_basic_type(m_lhs->type()) && !validation::is_enum_type(m_lhs->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
         "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars, Bools or enums !",
-        token.to_string(), lhs->exprType->to_string()
+        m_token.to_string(), m_lhs->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
-  if (!validation::types_compatible(lhs->exprType, rhs->exprType)) {
+  if (!validation::types_compatible(m_lhs->type(), m_rhs->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_ASSIGN,
       std::format(
         "Semantic error: Variable access ({}) of type ({}) cannot be assigned value of different type ({}) !",
-        lhs->baseVar->to_string(), lhs->exprType->to_string(), rhs->exprType->to_string()
+        m_lhs->base_var()->to_string(), m_lhs->type()->to_string(), m_rhs->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 }
@@ -278,17 +278,17 @@ void LabeledStatement::validate()
 
 void WriteStatement::validate()
 {
-  for(const auto &exp : arguments)
+  for(const auto &exp : m_arguments)
   {
-    if (!validation::is_writable_type(exp->exprType)) {
+    if (!validation::is_writable_type(exp->type())) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
           "Semantic error: In ({}), cannot write an expressions of type ({})! Expected Ints, Reals, Chars, Strings, Bools or array of Chars !",
-          token.to_string(), exp->exprType->to_string()
+          m_token.to_string(), exp->type()->to_string()
         ),
-        token.line(),
-        token.column()
+        m_token.line(),
+        m_token.column()
       );
     }
   }
@@ -296,17 +296,17 @@ void WriteStatement::validate()
 
 void ReadStatement::validate()
 {
-  for(const auto &exp : arguments)
+  for(const auto &exp : m_arguments)
   {
-    if (!validation::is_readable_type(exp->exprType)) {
+    if (!validation::is_readable_type(exp->type())) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
           "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars, Bools or array of Chars !",
-          token.to_string(), exp->exprType->to_string()
+          m_token.to_string(), exp->type()->to_string()
         ),
-        token.line(),
-        token.column()
+        m_token.line(),
+        m_token.column()
       );
     }
   }
@@ -314,151 +314,151 @@ void ReadStatement::validate()
 
 void WhileStatement::validate()
 {
-  if (!validation::is_boolean_type(this->condition->exprType)) {
+  if (!validation::is_boolean_type(this->m_condition->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_COND,
       std::format(
         "Semantic error: In ({}), the while loop's condition is required to be a boolean ! Found {} !",
-        this->token.to_string(), this->condition->exprType->to_string()
+        this->m_token.to_string(), this->m_condition->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 }
 
 void RepeatStatement::validate()
 {
-  if (!validation::is_boolean_type(this->untilExpr->exprType)) {
+  if (!validation::is_boolean_type(this->m_until_expr->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_COND,
       std::format(
         "Semantic error: In ({}), the repeat loop's condition is required to be a boolean ! Found {} !",
-        this->token.to_string(), this->untilExpr->exprType->to_string()
+        this->m_token.to_string(), this->m_until_expr->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 }
 
 void ForStatement::validate()
 {
-  auto type_id = this->loopVar->exprType->get_underlying_type()->id();
+  auto type_id = this->m_loop_var->type()->get_underlying_type()->id();
   if(
-    CONST_CAT_NAMES[int(this->start.category())] != type_id ||
-    start.category() != end.category()
+    CONST_CAT_NAMES[int(this->m_start.category())] != type_id ||
+    m_start.category() != m_end.category()
   )
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format(
         "Semantic error: In ({}), the for loop expects the bounds and the loop variable to be of the same type ! Found ({}) for the start, ({}) for the end and ({}) for the variable !",
-        token.to_string(), CONST_CAT_NAMES[int(start.category())], CONST_CAT_NAMES[int(end.category())], loopVar->exprType->to_string()
+        m_token.to_string(), CONST_CAT_NAMES[int(m_start.category())], CONST_CAT_NAMES[int(m_end.category())], m_loop_var->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
   Int a,b;
-  switch (start.category())
+  switch (m_start.category())
   {
     case CONST_CAT::CC_CHAR:
-      a = start.get<char>();
-      b = end.get<char>();
+      a = m_start.get<char>();
+      b = m_end.get<char>();
     break;
     case CONST_CAT::CC_BOOL:
-      a = start.get<bool>();
-      b = end.get<bool>();
+      a = m_start.get<bool>();
+      b = m_end.get<bool>();
     break;
     case CONST_CAT::CC_ENUM:
     case CONST_CAT::CC_INT:
-      a = start.get<Int>();
-      b = end.get<Int>();
+      a = m_start.get<Int>();
+      b = m_end.get<Int>();
     break;
     default:
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_SUBRANGE,
         std::format(
             "Semantic error: In ({}), bounds can be made only using chars, enums or ints (constants) ! Found '{}' !",
-            token.to_string(), CONST_CAT_NAMES[int(start.category())]
+            m_token.to_string(), CONST_CAT_NAMES[int(m_start.category())]
           ),
-        token.line(),
-        token.column()
+        m_token.line(),
+        m_token.column()
       );
   }
-  if(increasing && a > b)
+  if(m_increasing && a > b)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_SUBRANGE,
       std::format(
         "Semantic error: In ({}), the lower bound should be less than the upper bound ! Found {}->{} !",
-        token.to_string(), a, b
+        m_token.to_string(), a, b
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
-  else if(!increasing && a < b)
+  else if(!m_increasing && a < b)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_SUBRANGE,
       std::format(
         "Semantic error: In ({}), the lower bound should be greater than the upper bound ! Found {}->{} !",
-        token.to_string(), a, b
+        m_token.to_string(), a, b
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 }
 
 void IfStatement::validate()
 {
-  if (!validation::is_boolean_type(this->condition->exprType)) {
+  if (!validation::is_boolean_type(this->m_condition->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_COND,
       std::format(
         "Semantic error: In ({}), the condition of if statement is required to be a boolean ! Found {} !",
-        this->token.to_string(), this->condition->exprType->to_string()
+        this->m_token.to_string(), this->m_condition->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 }
 
 void CaseStatement::validate()
 {
-  auto type_id = this->selector->exprType->get_underlying_type()->id();
-  if (!validation::is_case_selector_type(this->selector->exprType)) {
+  auto type_id = this->m_selector->type()->get_underlying_type()->id();
+  if (!validation::is_case_selector_type(this->m_selector->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
       std::format(
         "Semantic error: In ({}), case statement's expression is of type ({}) ! Expected Int, Char, Bool or Enum type !",
-        token.to_string(), this->selector->exprType->to_string()
+        m_token.to_string(), this->m_selector->type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
   auto check = [&]<typename T>(CONST_CAT cat)
   {
     std::unordered_set<T> values;
-    for(const auto& alt : this->alternatives){
-      for(int index = 0;index < alt.labels.size();++index){
-        const auto current = alt.labels[index];
+    for(const auto& alt : this->m_alternatives){
+      for(int index = 0;index < alt.labels().size();++index){
+        const auto current = alt.labels()[index];
         if(!std::holds_alternative<T>(current.value()))
         {
           throw SemanticException(
             SEMANTIC_ERROR::SE_INVALID_TYPE,
             std::format(
               "Semantic error: In ({}), case statement's label ({}) is of type ({}) ! Expected {} !",
-              alt.token.to_string(), current.to_string(), CONST_CAT_NAMES[int(current.category())], CONST_CAT_NAMES[int(cat)]
+              alt.token().to_string(), current.to_string(), CONST_CAT_NAMES[int(current.category())], CONST_CAT_NAMES[int(cat)]
             ),
-            alt.token.line(),
-            alt.token.column()
+            alt.token().line(),
+            alt.token().column()
           );
         }
         if(values.contains(current.get<T>()))
@@ -467,10 +467,10 @@ void CaseStatement::validate()
             SEMANTIC_ERROR::SE_INVALID_TYPE,
             std::format(
               "Semantic error: In ({}), case statement's label ({}) is duplicated !",
-              alt.token.to_string(), current.to_string()
+              alt.token().to_string(), current.to_string()
             ),
-            alt.token.line(),
-            alt.token.column()
+            alt.token().line(),
+            alt.token().column()
           );
         }
         values.insert(current.get<T>());
@@ -478,7 +478,7 @@ void CaseStatement::validate()
     }
   };
 
-  for(const auto& alt : alternatives)
+  for(const auto& alt : m_alternatives)
   {
     if(type_id == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)])
     {
@@ -502,17 +502,17 @@ void CaseStatement::validate()
         SEMANTIC_ERROR::SE_INVALID_TYPE,
         std::format(
           "Semantic error: In ({}), case statement's expression is of type ({}) ! Expected Int, Char, Bool or Enum type !",
-          token.to_string(), this->selector->exprType->to_string()
+          m_token.to_string(), this->m_selector->type()->to_string()
         ),
-        token.line(),
-        token.column()
+        m_token.line(),
+        m_token.column()
       );
     }
   }
 }
 
 // How will we deal with references ? what about arrays ?
-void validate(const Function *func, const std::vector<std::unique_ptr<Expression>> &args, Lexeme token)
+void validate(const Function *func, const std::vector<std::unique_ptr<Expression>> &args, Lexeme m_token)
 {
   const auto& params = func->type()->args();  
   if(params.size() != args.size())
@@ -521,17 +521,17 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
         "Semantic error: At ({}), found {} arguments ! Expected {} arguments !",
-        token.to_string(), args.size(), params.size()
+        m_token.to_string(), args.size(), params.size()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
 
   for(int i = 0;i < params.size();++i)
   {
     const Type* ptype = params[i].type()->get_underlying_type();
-    const Type* atype = args[i]->exprType->get_underlying_type();
+    const Type* atype = args[i]->type()->get_underlying_type();
     if(params[i].is_ref())
     {
       auto tmp = dynamic_cast<VariableAccess*>(args[i].get());
@@ -541,10 +541,10 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
           SEMANTIC_ERROR::SE_INVALID_CALL,
           std::format(
             "Semantic error: At ({}), the {}-argument is not a variable but an expression !",
-            token.to_string(), i+1
+            m_token.to_string(), i+1
           ),
-          token.line(),
-          token.column()
+          m_token.line(),
+          m_token.column()
         );
       }
     }
@@ -554,10 +554,10 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
           "Semantic error: At ({}), the {}-argument is of type ({}) ! Expected type ({}) !",
-          token.to_string(), i+1, atype->to_string(), ptype->to_string()
+          m_token.to_string(), i+1, atype->to_string(), ptype->to_string()
         ),
-        token.line(),
-        token.column()
+        m_token.line(),
+        m_token.column()
       );
     }
   }
@@ -565,37 +565,37 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
 
 void ProcedureCall::validate()
 {
-  if(procedure->type()->return_type() != nullptr)
+  if(m_procedure->type()->return_type() != nullptr)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
         "Semantic error: At ({}), invalid procedure with return-type ({}) !",
-        token.to_string(), procedure->type()->return_type()->to_string()
+        m_token.to_string(), m_procedure->type()->return_type()->to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
-  pascal_compiler::validate(procedure, args, token);
+  pascal_compiler::validate(m_procedure, m_args, m_token);
 }
 
 void FunctionCall::validate()
 {
-  if(function->type()->return_type() == nullptr)
+  if(m_function->type()->return_type() == nullptr)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
         "Semantic error: At ({}), invalid function with no return-type !",
-        token.to_string()
+        m_token.to_string()
       ),
-      token.line(),
-      token.column()
+      m_token.line(),
+      m_token.column()
     );
   }
-  pascal_compiler::validate(function, args, token);
-  this->exprType = function->type()->return_type();
+  pascal_compiler::validate(m_function, m_args, m_token);
+  this->m_expr_type = m_function->type()->return_type();
 }
 
 }

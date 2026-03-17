@@ -13,11 +13,11 @@ bool checkLiteral(const Expression *expr, T expected, CONST_CAT cat)
   auto lit = dynamic_cast<const LiteralExpression *>(expr);
   if (!lit)
     return false;
-  if (lit->value->category() != cat)
+  if (lit->constant()->category() != cat)
     return false;
-  if (!std::holds_alternative<T>(lit->value->value()))
+  if (!std::holds_alternative<T>(lit->constant()->value()))
     return false;
-  return std::get<T>(lit->value->value()) == expected;
+  return std::get<T>(lit->constant()->value()) == expected;
 }
 
 static bool checkIntLiteral(const Expression *expr, Int expected)
@@ -50,7 +50,7 @@ static bool checkVariableAccess(const Expression *expr, std::string_view varName
   auto va = dynamic_cast<const VariableAccess *>(expr);
   if (!va)
     return false;
-  return va->baseVar->id() == varName;
+  return va->base_var()->id() == varName;
 }
 
 // Check if expression is a FunctionCall and get function name
@@ -59,7 +59,7 @@ static bool checkFunctionCall(const Expression *expr, std::string_view funcName)
   auto fc = dynamic_cast<const FunctionCall *>(expr);
   if (!fc)
     return false;
-  return fc->function->id() == funcName;
+  return fc->function()->id() == funcName;
 }
 
 // Check if expression is a FunctionCall and verify argument count
@@ -68,9 +68,9 @@ static bool checkFunctionCallWithArgs(const Expression *expr, std::string_view f
   auto fc = dynamic_cast<const FunctionCall *>(expr);
   if (!fc)
     return false;
-  if (fc->function->id() != funcName)
+  if (fc->function()->id() != funcName)
     return false;
-  return fc->args.size() == expectedArgs;
+  return fc->args().size() == expectedArgs;
 }
 
 // Check if statement is a ProcedureCall and get procedure name
@@ -79,11 +79,11 @@ static bool checkProcedureCall(const Statement *stmt, std::string_view procName)
   auto pc = dynamic_cast<const ProcedureCall *>(stmt);
   if (!pc)
     return false;
-  return pc->procedure->id() == procName;
+  return pc->procedure()->id() == procName;
 }
 
 static bool checkCondition(const Expression *expr)
 {
   if(!expr) return false;
-  return expr->exprType->get_underlying_type()->id() == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
+  return expr->type()->get_underlying_type()->id() == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
 }

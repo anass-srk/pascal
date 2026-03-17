@@ -861,7 +861,7 @@ std::unique_ptr<Expression> Parser::expression()
     return uexp;
   }
 
-  const auto loc = first->token;
+  const auto loc = first->token();
   auto nexp = std::make_unique<NExpression>(std::move(first), loc);
 
   while (check({TOKEN_TYPE::PLUS_TOKEN, TOKEN_TYPE::MINUS_TOKEN, TOKEN_TYPE::OR_TOKEN}))
@@ -903,7 +903,7 @@ std::unique_ptr<Expression> Parser::term()
 
   if(!check({TOKEN_TYPE::STAR_TOKEN, TOKEN_TYPE::SLASH_TOKEN, TOKEN_TYPE::DIV_TOKEN, TOKEN_TYPE::AND_TOKEN})) return first;
 
-  const auto loc = first->token;
+  const auto loc = first->token();
   auto nexp = std::make_unique<NExpression>(std::move(first), loc);
 
   while (check({TOKEN_TYPE::STAR_TOKEN, TOKEN_TYPE::SLASH_TOKEN, TOKEN_TYPE::DIV_TOKEN, TOKEN_TYPE::AND_TOKEN}))
@@ -1117,7 +1117,7 @@ std::unique_ptr<VariableAccess> Parser::variable_access(const Var *v)
     }while(check(TOKEN_TYPE::COMMA_TOKEN));
     match(TOKEN_TYPE::RB_TOKEN);
     adv();
-    Lexeme loc = indices[0]->token;
+    Lexeme loc = indices[0]->token();
     selectors.push_back(std::make_unique<ArraySelector>(std::move(indices), loc));
   }
 
