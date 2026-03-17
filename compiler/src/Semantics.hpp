@@ -62,10 +62,15 @@ public:
   }
 };
 
-struct ID{
+class ID{
+
+protected:
+
   const std::string_view m_id;
   const size_t m_line, m_col;
   
+public:
+
   ID(std::string_view id, size_t line, size_t col)
     : m_id(id), m_line(line), m_col(col) {}
   
@@ -167,15 +172,19 @@ static inline const char* TYPE_CAT_NAMES[int(TYPE_CAT::TC_MAX) + 1] = {
 
 //TODO: Types don't always have names, in which case we can store them as a unique_ptr for each scope (or block).
 //Remember that when type X = Y, X and Y are the same. Therefore, for named-types we use shared_ptr
-struct Type : ID
+class Type : public ID
 {
   const TYPE_CAT m_type;
+
+public:
 
   Type(std::string_view name, size_t line, size_t col, TYPE_CAT type) : ID(name, line, col), m_type(type) {}
   Type(const Lexeme& token, TYPE_CAT type_cat) : ID(token), m_type(type_cat) {}
   std::string to_string() const{
     return std::format("\"{}\" at ({},{})", m_id, m_line, m_col); 
   }
+
+  const TYPE_CAT category() const { return m_type; }
 
   virtual ~Type() = default;
 
@@ -292,13 +301,19 @@ public:
   const bool is_ref() const { return m_ref; }
 };
 
-struct FunctionType : Type
+class FunctionType : public Type
 {
 
   std::vector<Arg> m_args;
   const Type* m_ret_type; // Null for procedures
 
-  FunctionType(const std::string_view &name, size_t line, size_t col, Type* ret_type) : Type(name, line, col, TYPE_CAT::TC_FUNCTION), m_ret_type(ret_type) {}
+public:
+
+  FunctionType(const Lexeme& token, Type* ret_type) : Type(token, TYPE_CAT::TC_FUNCTION), m_ret_type(ret_type) {}
+  const std::vector<Arg>& args() const { return m_args; }
+  const Type* return_type() const { return m_ret_type; }
+  void set_args(std::vector<Arg>&& args) { m_args = std::move(args); }
+  void set_return_type(const Type* type) { m_ret_type = type; }
 };
 
 template <typename T>
@@ -334,12 +349,17 @@ struct Block
   get(std::string_view, const std::unordered_map<std::string_view, T> &);
 };
 
-struct Function
+class Function : public ID
 {
-  std::string_view m_id;
   const FunctionType* m_type;
   std::unique_ptr<Block> block;
-  Function(std::string_view , const FunctionType*, Block*);
+
+public:
+
+  Function(const Lexeme& , const FunctionType*, Block*);
+  const FunctionType* type() const { return m_type; }
+  const Block* ctx() const { return block.get(); };
+
 };
 
 }

@@ -25,7 +25,7 @@ TEST(LabeledStatementTest, BasicLabeledStatement) {
   auto *labeled = dynamic_cast<const LabeledStatement *>(body->statements[0].get());
   ASSERT_NE(labeled, nullptr);
   ASSERT_NE(labeled->label, nullptr);
-  EXPECT_EQ(labeled->label->m_id, "asd");
+  EXPECT_EQ(labeled->label->id(), "asd");
   ASSERT_NE(labeled->stmt.get(), nullptr);
 }
 
@@ -50,7 +50,7 @@ TEST(LabeledStatementTest, MultipleLabeledStatements) {
   for (size_t i = 0; i < 3; ++i) {
     auto* labeled = dynamic_cast<const LabeledStatement*>(body->statements[i].get());
     ASSERT_NE(labeled, nullptr);
-    EXPECT_EQ(labeled->label->m_id, std::to_string((i + 1) * 10));
+    EXPECT_EQ(labeled->label->id(), std::to_string((i + 1) * 10));
   }
 }
 
@@ -566,7 +566,7 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     auto *gotoStmt = dynamic_cast<const GotoStatement *>(body->statements[0].get());
     ASSERT_NE(gotoStmt, nullptr);
-    EXPECT_EQ(gotoStmt->label->m_id, "10");
+    EXPECT_EQ(gotoStmt->label->id(), "10");
 
     auto *labelStmt = dynamic_cast<const LabeledStatement *>(body->statements[1].get());
     ASSERT_NE(labelStmt, nullptr);
@@ -595,7 +595,7 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     auto *gotoStmt = dynamic_cast<const GotoStatement *>(body->statements[0].get());
     ASSERT_NE(gotoStmt, nullptr);
-    EXPECT_EQ(gotoStmt->label->m_id, "10");
+    EXPECT_EQ(gotoStmt->label->id(), "10");
 
     auto *labelStmt = dynamic_cast<const LabeledStatement *>(body->statements[1].get());
     ASSERT_NE(labelStmt, nullptr);
@@ -603,7 +603,7 @@ TEST(ForStatementTest, ForLoopWithInvalidOrder)
 
     auto *gotoStmt2 = dynamic_cast<const GotoStatement *>(body->statements[2].get());
     ASSERT_NE(gotoStmt2, nullptr);
-    EXPECT_EQ(gotoStmt2->label->m_id, "20");
+    EXPECT_EQ(gotoStmt2->label->id(), "20");
 
     auto *labelStmt2 = dynamic_cast<const LabeledStatement *>(body->statements[3].get());
     ASSERT_NE(labelStmt2, nullptr);

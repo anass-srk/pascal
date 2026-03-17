@@ -108,7 +108,7 @@ void NExpression::validate()
     }
     const auto op = ops[i];  
     if (!validation::is_valid_binary_operand(op, left->exprType, right->exprType)) {
-      std::string_view left_type = left->exprType->get_underlying_type()->m_id;
+      std::string_view left_type = left->exprType->get_underlying_type()->id();
       if (left_type == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)]) {
         throw SemanticException(
           SEMANTIC_ERROR::SE_INVALID_OP,
@@ -141,7 +141,7 @@ void LiteralExpression::validate()
 
 const Type * ArraySelector::apply(const Type *type)
 {
-  if(type->m_type != TYPE_CAT::TC_ARRAY)
+  if(type->category() != TYPE_CAT::TC_ARRAY)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
@@ -194,7 +194,7 @@ const Type * ArraySelector::apply(const Type *type)
 
 const Type* FieldSelector::apply(const Type* type)
 {
-  if(type->m_type != TYPE_CAT::TC_RECORD)
+  if(type->category() != TYPE_CAT::TC_RECORD)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
@@ -344,7 +344,7 @@ void RepeatStatement::validate()
 
 void ForStatement::validate()
 {
-  auto type_id = this->loopVar->exprType->get_underlying_type()->m_id;
+  auto type_id = this->loopVar->exprType->get_underlying_type()->id();
   if(
     CONST_CAT_NAMES[int(this->start.category())] != type_id ||
     start.category() != end.category()
@@ -430,7 +430,7 @@ void IfStatement::validate()
 
 void CaseStatement::validate()
 {
-  auto type_id = this->selector->exprType->get_underlying_type()->m_id;
+  auto type_id = this->selector->exprType->get_underlying_type()->id();
   if (!validation::is_case_selector_type(this->selector->exprType)) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_TYPE,
@@ -514,7 +514,7 @@ void CaseStatement::validate()
 // How will we deal with references ? what about arrays ?
 void validate(const Function *func, const std::vector<std::unique_ptr<Expression>> &args, Lexeme token)
 {
-  const auto& params = func->m_type->m_args;  
+  const auto& params = func->type()->args();  
   if(params.size() != args.size())
   {
     throw SemanticException(
@@ -565,13 +565,13 @@ void validate(const Function *func, const std::vector<std::unique_ptr<Expression
 
 void ProcedureCall::validate()
 {
-  if(procedure->m_type->m_ret_type != nullptr)
+  if(procedure->type()->return_type() != nullptr)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
         "Semantic error: At ({}), invalid procedure with return-type ({}) !",
-        token.to_string(), procedure->m_type->m_ret_type->to_string()
+        token.to_string(), procedure->type()->return_type()->to_string()
       ),
       token.line(),
       token.column()
@@ -582,7 +582,7 @@ void ProcedureCall::validate()
 
 void FunctionCall::validate()
 {
-  if(function->m_type->m_ret_type == nullptr)
+  if(function->type()->return_type() == nullptr)
   {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
@@ -595,7 +595,7 @@ void FunctionCall::validate()
     );
   }
   pascal_compiler::validate(function, args, token);
-  this->exprType = function->m_type->m_ret_type;
+  this->exprType = function->type()->return_type();
 }
 
 }

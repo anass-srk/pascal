@@ -1,5 +1,6 @@
 #include "Semantics.hpp"
 #include "Ast.hpp"
+#include "Lexer.hpp"
 
 namespace pascal_compiler
 {
@@ -186,10 +187,10 @@ size_t getInfoLine(const T& t){
     return t.line();
   }
   else if constexpr(std::is_same_v<T, std::shared_ptr<Type>>){
-    return t.get()->m_line;
+    return t.get()->line();
   }
   else if constexpr(std::is_same_v<T, Function>){
-    return t.m_type->m_line;
+    return t.type()->line();
   }
 }
 
@@ -199,10 +200,10 @@ size_t getInfoCol(const T& t){
     return t.column();
   }
   else if constexpr(std::is_same_v<T, std::shared_ptr<Type>>){
-    return t.get()->m_col;
+    return t.get()->column();
   }
   else if constexpr(std::is_same_v<T, Function>){
-    return t.m_type->m_col;
+    return t.type()->column();
   }
 }
 
@@ -295,6 +296,6 @@ const Var* Record::add_attribute(const Var& attribute)
 }
 
 
-Function::Function(std::string_view id, const FunctionType *func_type, Block *b)
-  : m_id(id), m_type(func_type), block(b) {}
+Function::Function(const Lexeme& token, const FunctionType *func_type, Block *b)
+  : ID(token), m_type(func_type), block(b) {}
 };

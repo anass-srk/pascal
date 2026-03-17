@@ -203,7 +203,7 @@ Const Parser::constant(const Lexeme& token)
             SEMANTIC_ERROR::SE_INVALID_OP,
             std::format(
               "Semantic error: applying a unary operation on the constant ({} at ({},{})) requires it to be an int or real ('{}' in your case) ! ",
-              token.id(), token.line(), token.column(), enum_val->type()->m_id
+              token.id(), token.line(), token.column(), enum_val->type()->id()
             ),
             token.line(),
             token.column()
@@ -219,7 +219,7 @@ Const Parser::constant(const Lexeme& token)
             SEMANTIC_ERROR::SE_INVALID_OP,
             std::format(
               "Semantic error: applying a unary operation on the constant ({} at ({},{})) requires it to be an int or real ('{}' in your case) ! ",
-              token.id(), token.line(), token.column(), const_val->type()->m_id
+              token.id(), token.line(), token.column(), const_val->type()->id()
             ),
             token.line(),
             token.column()
@@ -367,7 +367,7 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
         Block *current = m_current_block;
         
         do{
-          if(auto t = Block::get(id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE)){
+          if(auto t = Block::get(id, current->m_types); t && (t->category() == TYPE_CAT::TC_ENUM || t->category() == TYPE_CAT::TC_SUBRANGE)){
             types.emplace_back(t);
             first = true;
             adv();
@@ -436,10 +436,10 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
   }
 
   else if(check(TOKEN_TYPE::PROCEDURE_TOKEN)){
-    auto proc_type = std::make_unique<FunctionType>(token.id(), token.line(), token.column(), nullptr);
+    auto proc_type = std::make_unique<FunctionType>(token, nullptr);
     adv();
     if(check(TOKEN_TYPE::LP_TOKEN)){
-      proc_type->m_args = args_list();
+      proc_type->set_args(args_list());
       adv();
     }
     return proc_type;
@@ -447,15 +447,15 @@ std::unique_ptr<Type> Parser::type_eval(const Lexeme& token){
 
   else if (check(TOKEN_TYPE::FUNCTION_TOKEN))
   {
-    auto func_type = std::make_unique<FunctionType>(token.id(), token.line(), token.column(), nullptr);
+    auto func_type = std::make_unique<FunctionType>(token, nullptr);
     adv();
     if (check(TOKEN_TYPE::LP_TOKEN)){
-      func_type->m_args = args_list();
+      func_type->set_args(args_list());
       adv();
     }
     match(TOKEN_TYPE::COLON_TOKEN);
     match_adv(TOKEN_TYPE::ID_TOKEN);
-    func_type->m_ret_type = find_type(true);
+    func_type->set_return_type(find_type(true));
     adv();
     return func_type;
   }
@@ -567,7 +567,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
   {
     Block *current = m_current_block;
     do{
-      if(auto t = Block::get(id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE) ){
+      if(auto t = Block::get(id, current->m_types); t && (t->category() == TYPE_CAT::TC_ENUM || t->category() == TYPE_CAT::TC_SUBRANGE) ){
         type = t;
       }
       current = current->m_parent;
@@ -584,7 +584,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
             SEMANTIC_ERROR::SE_AMBIGUOUS_TAG_VAR,
             std::format(
               "Semantic error: Ambiguous tag variable for the record '{}' ({} or {} ?) at ({},{}) !\n",
-              record->m_id, name, var->id(), line, col
+              record->id(), name, var->id(), line, col
             ),
             line, col
           );
@@ -599,7 +599,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
         SEMANTIC_ERROR::SE_MISSING_ID,
         std::format(
           "Semantic error: Missing tag variable for the record '{}' at ({},{}) !\n",
-          record->m_id, line, col),
+          record->id(), line, col),
         line, col
       );
     }
@@ -611,7 +611,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
         SEMANTIC_ERROR::SE_DUPLICATE_ID,
         std::format(
           "Semantic error: tag variable name '{}' is already for the record '{}' at ({},{}) !\n",
-          id, record->m_id, line, col),
+          id, record->id(), line, col),
         line, col);
     }
     
@@ -624,7 +624,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     {
       Block *current = m_current_block;
       do{
-        if (auto t = Block::get(type_id, current->m_types); t && (t->m_type == TYPE_CAT::TC_ENUM || t->m_type == TYPE_CAT::TC_SUBRANGE)){
+        if (auto t = Block::get(type_id, current->m_types); t && (t->category() == TYPE_CAT::TC_ENUM || t->category() == TYPE_CAT::TC_SUBRANGE)){
           type = t;
         }
         current = current->m_parent;
@@ -637,7 +637,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
         SEMANTIC_ERROR::SE_MISSING_ID,
         std::format(
           "Semantic error: tag variable type '{}' for the record '{}' at ({},{}) is not defined !\n",
-          type_id, record->m_id, line, col),
+          type_id, record->id(), line, col),
         line, col
       );
     }
@@ -652,14 +652,14 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
     adv();
     auto constants = case_label_list();
 
-    if(type->m_type == TYPE_CAT::TC_ENUM){
+    if(type->category() == TYPE_CAT::TC_ENUM){
       for (const auto &c : constants){
         if (c.type() != type){
           throw SemanticException(
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not an enum of the tag type '{}' at ({},{}) !\n",
-              c.id(), record->m_id, c.line(), c.column(), type->m_id, type->m_line, type->m_col),
+              c.id(), record->id(), c.line(), c.column(), type->id(), type->line(), type->column()),
             c.line(), c.column()
           );
         }
@@ -672,7 +672,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not a subrange of the tag type '{}' at ({},{}) !\n",
-              c.id(), record->m_id, c.line(), c.column(), type->m_id, type->m_line, type->m_col),
+              c.id(), record->id(), c.line(), c.column(), type->id(), type->line(), type->column()),
             c.line(), c.column()
           );
         }
@@ -682,7 +682,7 @@ std::unique_ptr<Record> Parser::field_list(const Lexeme& token){
             SEMANTIC_ERROR::SE_MISSING_ID,
             std::format(
               "Semantic error: case label '{}' for the record '{}' at ({},{}) is not in the subrange ({} <= {}) of the tag type '{}' at ({},{}) !\n",
-              c.id(), record->m_id, c.line(), c.column(), sub->start(), sub->end(), type->m_id, type->m_line, type->m_col),
+              c.id(), record->id(), c.line(), c.column(), sub->start(), sub->end(), type->id(), type->line(), type->column()),
             c.line(), c.column()
           );
         }
@@ -743,14 +743,14 @@ void Parser::function_definition(bool is_proc)
 
   auto token = m_lexer.getToken();
   const auto id = token.id();
-  auto func_type_unique = std::make_unique<FunctionType>(token.id(), token.line(), token.column(), nullptr);
+  auto func_type_unique = std::make_unique<FunctionType>(token, nullptr);
   auto func_type = func_type_unique.get();
 
   m_current_block->check_used_id(token);
 
   adv();
   if(check(TOKEN_TYPE::LP_TOKEN)){
-    func_type->m_args = args_list();
+    func_type->set_args(args_list());
     adv();
   }
 
@@ -762,7 +762,7 @@ void Parser::function_definition(bool is_proc)
   {
     match(TOKEN_TYPE::COLON_TOKEN);
     match_adv(TOKEN_TYPE::ID_TOKEN);
-    func_type->m_ret_type = find_type(true);
+    func_type->set_return_type(find_type(true));
     match_adv(TOKEN_TYPE::SEMI_TOKEN);
   }
 
@@ -774,8 +774,8 @@ void Parser::function_definition(bool is_proc)
   m_current_block->m_parent = parent;
 
   // to return a value, we assign to a variable with the id of the function (not for procedures)
-  if(!is_proc) m_current_block->m_vars.insert(std::make_pair(id, (Var){token.id(), token.line(), token.column(), func_type->m_ret_type}));
-  for (const auto &arg : func_type->m_args)
+  if(!is_proc) m_current_block->m_vars.insert(std::make_pair(id, Var(token, func_type->return_type())));
+  for (const auto &arg : func_type->args())
   {
     m_current_block->m_vars.insert(std::make_pair(arg.id(), Var(arg)));
   }
@@ -787,7 +787,7 @@ void Parser::function_definition(bool is_proc)
   auto *func_block = m_current_block;
   m_current_block = parent;
 
-  m_current_block->m_funcs.insert(std::make_pair(id, Function(id, func_type, new_block.release())));
+  m_current_block->m_funcs.insert(std::make_pair(id, Function(token, func_type, new_block.release())));
 }
 
 std::unique_ptr<Expression> Parser::gexpression()
@@ -990,7 +990,7 @@ std::unique_ptr<Expression> Parser::factor()
       var = v;
       break;
     }
-    if(auto f = Block::get(id, current->m_funcs); f && f->m_type->m_ret_type != nullptr) // A function, not a procedure
+    if(auto f = Block::get(id, current->m_funcs); f && f->type()->return_type() != nullptr) // A function, not a procedure
     {
       func = f;
       break;
@@ -1046,7 +1046,7 @@ std::unique_ptr<Expression> Parser::factor()
 std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> Parser::function_call(const Function *f, bool is_procedure)
 {
   const auto tkn = m_lexer.getToken();
-  const auto func_type = f->m_type;
+  const auto func_type = f->type();
   std::vector<std::unique_ptr<Expression>> args;
   match(TOKEN_TYPE::ID_TOKEN);
   adv();
@@ -1167,7 +1167,7 @@ std::unique_ptr<Statement> Parser::statement()
         var = v;
         break;
       }
-      if (auto f = Block::get(id, current->m_funcs); f && f->m_type->m_ret_type == nullptr) // Not a function, a procedure
+      if (auto f = Block::get(id, current->m_funcs); f && f->type()->return_type() == nullptr) // Not a function, a procedure
       {
         func = f;
         break;
