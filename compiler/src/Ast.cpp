@@ -29,7 +29,7 @@ void BinaryExpression::validate()
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
-        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected compatible basic types for relational operation!",
+        "Semantic error: Cannot apply binary operation ({}) on 2 expressions of type ({}) and ({})! Expected compatible basic types (including subranges and enums) for relational operation!",
         m_token.to_string(), m_left->type()->to_string(), m_right->type()->to_string()
       ),
       m_token.line(),
@@ -39,12 +39,12 @@ void BinaryExpression::validate()
 
   switch(m_op)
   {
-    case BinaryOp::Le:
-    case BinaryOp::Lt:
-    case BinaryOp::Ge:
-    case BinaryOp::Gt:
-    case BinaryOp::Eq:
-    case BinaryOp::Ne:
+    case RelOp::Le:
+    case RelOp::Lt:
+    case RelOp::Ge:
+    case RelOp::Gt:
+    case RelOp::Eq:
+    case RelOp::Ne:
     break;
     default:
       throw SemanticException(
@@ -84,7 +84,7 @@ void NExpression::validate()
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
-        "Semantic error: Cannot apply binary operation ({}) on an expressions of type ({})! Expected Ints, Reals, Chars or Bools !",
+        "Semantic error: Cannot apply binary operation ({}) on an expressions of type ({})! Expected Ints, Reals, Chars, Bools or Strings !",
         m_token.to_string(), left->type()->to_string()
       ),
       m_token.line(),
@@ -253,7 +253,7 @@ void AssignmentStatement::validate()
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
-        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars, Bools or enums !",
+        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars, Bools, Enums or Strings !",
         m_token.to_string(), m_lhs->type()->to_string()
       ),
       m_token.line(),
@@ -280,7 +280,7 @@ void WriteStatement::validate()
 {
   for(const auto &exp : m_arguments)
   {
-    if (!validation::is_writable_type(exp->type())) {
+    if (!validation::is_io_compatible(exp->type())) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
@@ -298,11 +298,11 @@ void ReadStatement::validate()
 {
   for(const auto &exp : m_arguments)
   {
-    if (!validation::is_readable_type(exp->type())) {
+    if (!validation::is_io_compatible(exp->type())) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
-          "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars, Bools or array of Chars !",
+          "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars, Strings, Bools or array of Chars !",
           m_token.to_string(), exp->type()->to_string()
         ),
         m_token.line(),

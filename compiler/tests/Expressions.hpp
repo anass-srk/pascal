@@ -479,7 +479,7 @@ TEST(ExpressionTest, RelationalOperations) {
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(body->statements().size(), 20);
 
-  auto checkRelational = [&](size_t idx, BinaryOp op, const char* left, const char* right) {
+  auto checkRelational = [&](size_t idx, RelOp op, const char* left, const char* right) {
     const auto* stmt = dynamic_cast<const AssignmentStatement*>(body->statements()[idx].get());
     ASSERT_NE(stmt, nullptr);
     
@@ -491,22 +491,22 @@ TEST(ExpressionTest, RelationalOperations) {
     EXPECT_TRUE(checkVariableAccess(bin->right(), right));
   };
 
-  checkRelational(2, BinaryOp::Eq,  "x", "y");
-  checkRelational(3, BinaryOp::Ne,  "x", "y");
-  checkRelational(4, BinaryOp::Lt,  "x", "y");
-  checkRelational(5, BinaryOp::Le,  "x", "y");
-  checkRelational(6, BinaryOp::Gt,  "x", "y");
-  checkRelational(7, BinaryOp::Ge,  "x", "y");
+  checkRelational(2, RelOp::Eq,  "x", "y");
+  checkRelational(3, RelOp::Ne,  "x", "y");
+  checkRelational(4, RelOp::Lt,  "x", "y");
+  checkRelational(5, RelOp::Le,  "x", "y");
+  checkRelational(6, RelOp::Gt,  "x", "y");
+  checkRelational(7, RelOp::Ge,  "x", "y");
 
-  checkRelational(10, BinaryOp::Lt,  "c1", "c2");
-  checkRelational(11, BinaryOp::Le,  "c1", "c2");
-  checkRelational(12, BinaryOp::Gt,  "c1", "c2");
-  checkRelational(13, BinaryOp::Ge,  "c1", "c2");
-  checkRelational(14, BinaryOp::Eq,  "c1", "c2");
-  checkRelational(15, BinaryOp::Ne,  "c1", "c2");
+  checkRelational(10, RelOp::Lt,  "c1", "c2");
+  checkRelational(11, RelOp::Le,  "c1", "c2");
+  checkRelational(12, RelOp::Gt,  "c1", "c2");
+  checkRelational(13, RelOp::Ge,  "c1", "c2");
+  checkRelational(14, RelOp::Eq,  "c1", "c2");
+  checkRelational(15, RelOp::Ne,  "c1", "c2");
 
-  checkRelational(18, BinaryOp::Eq,  "a", "b");
-  checkRelational(19, BinaryOp::Ne,  "a", "b");
+  checkRelational(18, RelOp::Eq,  "a", "b");
+  checkRelational(19, RelOp::Ne,  "a", "b");
 }
 
 TEST(ExpressionTest, LogicalOperations) {
@@ -561,7 +561,7 @@ TEST(ExpressionTest, LogicalOperations) {
     auto* nexpr = getNExpr(4);
     EXPECT_EQ(nexpr->ops().size(), 1);
     EXPECT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Or);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
   }
@@ -571,8 +571,8 @@ TEST(ExpressionTest, LogicalOperations) {
     auto* nexpr = getNExpr(5);
     EXPECT_EQ(nexpr->ops().size(), 2);
     EXPECT_EQ(nexpr->exprs().size(), 3);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
-    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Or);
+    EXPECT_EQ(nexpr->ops()[1], ALOp::Or);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
@@ -583,8 +583,8 @@ TEST(ExpressionTest, LogicalOperations) {
     auto* nexpr = getNExpr(6);
     EXPECT_EQ(nexpr->ops().size(), 2);
     EXPECT_EQ(nexpr->exprs().size(), 3);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
-    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Or);
+    EXPECT_EQ(nexpr->ops()[1], ALOp::Or);
     EXPECT_TRUE(checkBoolLiteral(nexpr->exprs()[0].get(), false));
     EXPECT_TRUE(checkBoolLiteral(nexpr->exprs()[1].get(), true));
     EXPECT_TRUE(checkBoolLiteral(nexpr->exprs()[2].get(), false));
@@ -595,7 +595,7 @@ TEST(ExpressionTest, LogicalOperations) {
     auto* nexpr = getNExpr(7);
     EXPECT_EQ(nexpr->ops().size(), 1);
     EXPECT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::And);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::And);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
   }
@@ -605,8 +605,8 @@ TEST(ExpressionTest, LogicalOperations) {
     auto* nexpr = getNExpr(8);
     EXPECT_EQ(nexpr->ops().size(), 2);
     EXPECT_EQ(nexpr->exprs().size(), 3);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::And);
-    EXPECT_EQ(nexpr->ops()[1], BinaryOp::And);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::And);
+    EXPECT_EQ(nexpr->ops()[1], ALOp::And);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
@@ -617,13 +617,13 @@ TEST(ExpressionTest, LogicalOperations) {
     auto* nexpr = getNExpr(9);
     EXPECT_EQ(nexpr->ops().size(), 1);
     EXPECT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Or);
 
     // Check Left operand (a and b)
     const auto* left = dynamic_cast<const NExpression*>(nexpr->exprs()[0].get());
     ASSERT_NE(left, nullptr);
     EXPECT_EQ(left->ops().size(), 1);
-    EXPECT_EQ(left->ops()[0], BinaryOp::And);
+    EXPECT_EQ(left->ops()[0], ALOp::And);
     EXPECT_TRUE(checkVariableAccess(left->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(left->exprs()[1].get(), "b"));
 
@@ -636,13 +636,13 @@ TEST(ExpressionTest, LogicalOperations) {
     auto* nexpr = getNExpr(10);
     EXPECT_EQ(nexpr->ops().size(), 1);
     EXPECT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Or);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Or);
 
     // Check Left operand (a and b)
     const auto* left = dynamic_cast<const NExpression*>(nexpr->exprs()[0].get());
     ASSERT_NE(left, nullptr);
     EXPECT_EQ(left->ops().size(), 1);
-    EXPECT_EQ(left->ops()[0], BinaryOp::And);
+    EXPECT_EQ(left->ops()[0], ALOp::And);
     EXPECT_TRUE(checkVariableAccess(left->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(left->exprs()[1].get(), "b"));
 
@@ -650,7 +650,7 @@ TEST(ExpressionTest, LogicalOperations) {
     const auto* right = dynamic_cast<const NExpression*>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
     EXPECT_EQ(right->ops().size(), 1);
-    EXPECT_EQ(right->ops()[0], BinaryOp::And);
+    EXPECT_EQ(right->ops()[0], ALOp::And);
     EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "c"));
     EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "d"));
   }
@@ -712,7 +712,7 @@ TEST(ExpressionTest, AdditiveOperations)
     auto *nexpr = getNExpr(2);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Add);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "ix"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "iy"));
   }
@@ -722,7 +722,7 @@ TEST(ExpressionTest, AdditiveOperations)
     auto *nexpr = getNExpr(3);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Add);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "ix"));
     EXPECT_TRUE(checkIntLiteral(nexpr->exprs()[1].get(), 100));
   }
@@ -732,7 +732,7 @@ TEST(ExpressionTest, AdditiveOperations)
     auto *nexpr = getNExpr(6);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Add);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "ry"));
   }
@@ -742,7 +742,7 @@ TEST(ExpressionTest, AdditiveOperations)
     auto *nexpr = getNExpr(9);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Sub);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "ix"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "iy"));
   }
@@ -752,7 +752,7 @@ TEST(ExpressionTest, AdditiveOperations)
     auto *nexpr = getNExpr(10);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Sub);
     EXPECT_TRUE(checkIntLiteral(nexpr->exprs()[0].get(), 100));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "iy"));
   }
@@ -762,7 +762,7 @@ TEST(ExpressionTest, AdditiveOperations)
     auto *nexpr = getNExpr(13);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Sub);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "ry"));
   }
@@ -821,8 +821,8 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(6);
     ASSERT_EQ(nexpr->ops().size(), 2);
     ASSERT_EQ(nexpr->exprs().size(), 3);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
-    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Add);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Add);
+    EXPECT_EQ(nexpr->ops()[1], ALOp::Add);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
@@ -833,8 +833,8 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(7);
     ASSERT_EQ(nexpr->ops().size(), 2);
     ASSERT_EQ(nexpr->exprs().size(), 3);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Sub);
-    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Sub);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Sub);
+    EXPECT_EQ(nexpr->ops()[1], ALOp::Sub);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
@@ -845,8 +845,8 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(8);
     ASSERT_EQ(nexpr->ops().size(), 2);
     ASSERT_EQ(nexpr->exprs().size(), 3);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Mul);
-    EXPECT_EQ(nexpr->ops()[1], BinaryOp::Mul);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Mul);
+    EXPECT_EQ(nexpr->ops()[1], ALOp::Mul);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "b"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[2].get(), "c"));
@@ -857,7 +857,7 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(9);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Div);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Div);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[1].get(), "ry"));
   }
@@ -867,7 +867,7 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(10);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Div);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Div);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "rx"));
     EXPECT_TRUE(checkRealLiteral(nexpr->exprs()[1].get(), 5.0));
   }
@@ -877,14 +877,14 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(11);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Add);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
 
     // Verify right operand is a multiplication
     auto *right = dynamic_cast<const NExpression *>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
     ASSERT_EQ(right->ops().size(), 1);
-    EXPECT_EQ(right->ops()[0], BinaryOp::Mul);
+    EXPECT_EQ(right->ops()[0], ALOp::Mul);
     EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "b"));
     EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "c"));
   }
@@ -894,13 +894,13 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(12);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Mul);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Mul);
 
     // Check Left (a + b)
     auto *left = dynamic_cast<const NExpression *>(nexpr->exprs()[0].get());
     ASSERT_NE(left, nullptr);
     ASSERT_EQ(left->ops().size(), 1);
-    EXPECT_EQ(left->ops()[0], BinaryOp::Add);
+    EXPECT_EQ(left->ops()[0], ALOp::Add);
     EXPECT_TRUE(checkVariableAccess(left->exprs()[0].get(), "a"));
     EXPECT_TRUE(checkVariableAccess(left->exprs()[1].get(), "b"));
 
@@ -908,7 +908,7 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *right = dynamic_cast<const NExpression *>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
     ASSERT_EQ(right->ops().size(), 1);
-    EXPECT_EQ(right->ops()[0], BinaryOp::Sub);
+    EXPECT_EQ(right->ops()[0], ALOp::Sub);
     EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "c"));
     EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "d"));
   }
@@ -918,14 +918,14 @@ TEST(ExpressionTest, ComplexExpressions)
     auto *nexpr = getNExpr(13);
     ASSERT_EQ(nexpr->ops().size(), 1);
     ASSERT_EQ(nexpr->exprs().size(), 2);
-    EXPECT_EQ(nexpr->ops()[0], BinaryOp::Add);
+    EXPECT_EQ(nexpr->ops()[0], ALOp::Add);
     EXPECT_TRUE(checkVariableAccess(nexpr->exprs()[0].get(), "a"));
 
     // Verify right operand is parenthesized multiplication
     auto *right = dynamic_cast<const NExpression *>(nexpr->exprs()[1].get());
     ASSERT_NE(right, nullptr);
     ASSERT_EQ(right->ops().size(), 1);
-    EXPECT_EQ(right->ops()[0], BinaryOp::Mul);
+    EXPECT_EQ(right->ops()[0], ALOp::Mul);
     EXPECT_TRUE(checkVariableAccess(right->exprs()[0].get(), "b"));
     EXPECT_TRUE(checkVariableAccess(right->exprs()[1].get(), "c"));
   }

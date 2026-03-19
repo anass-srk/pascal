@@ -75,36 +75,33 @@ public:
 };
 
 // Binary operations
-enum struct BinaryOp {
+enum struct ALOp {
+  Add,
+  Sub,
+  Or,
+  Mul,
+  Div,
+  And
+};
+
+enum struct RelOp {
   Eq,
   Ne,
   Lt,
   Le,
   Gt,
-  Ge, // relational
-  Add,
-  Sub,
-  Or, // addition
-  Mul,
-  Div,
-  And // multiplication
-};
-
-static const char *BINARY_OP_NAME[] = {
-    "=", "<>",         "<",  "<=", ">", ">=", // relational
-    "+", "-",          "or",                  // addition
-    "*", "(/ or div)", "and"                  // multiplication
+  Ge
 };
 
 // Only for relational operations
 struct BinaryExpression : public Expression {
 private:
-  BinaryOp m_op;
+  RelOp m_op;
   std::unique_ptr<Expression> m_left;
   std::unique_ptr<Expression> m_right;
 
 public:
-  BinaryExpression(BinaryOp o, std::unique_ptr<Expression> l,
+  BinaryExpression(RelOp o, std::unique_ptr<Expression> l,
                    std::unique_ptr<Expression> r, Lexeme token,
                    const Type *bool_type)
       : Expression(token), m_op(o), m_left(std::move(l)),
@@ -113,7 +110,7 @@ public:
   }
   void validate() override;
 
-  BinaryOp op() const { return m_op; }
+  RelOp op() const { return m_op; }
   const Expression *left() const { return m_left.get(); }
   const Expression *right() const { return m_right.get(); }
 
@@ -122,7 +119,7 @@ public:
 
 struct NExpression : public Expression {
 private:
-  std::vector<BinaryOp> m_ops;
+  std::vector<ALOp> m_ops;
   std::vector<std::unique_ptr<Expression>> m_exprs;
 
 public:
@@ -131,14 +128,14 @@ public:
     m_exprs.push_back(std::move(first));
   }
 
-  void add(BinaryOp op, std::unique_ptr<Expression> exp) {
+  void add(ALOp op, std::unique_ptr<Expression> exp) {
     m_ops.push_back(op);
     m_exprs.push_back(std::move(exp));
   }
 
   void validate() override;
 
-  const std::vector<BinaryOp> &ops() const { return m_ops; }
+  const std::vector<ALOp> &ops() const { return m_ops; }
   const std::vector<std::unique_ptr<Expression>> &exprs() const {
     return m_exprs;
   }
@@ -492,4 +489,4 @@ public:
   const CompoundStatement *main_body() const { return m_main_body.get(); }
 };
 
-} // namespace pascal_compiler
+} 

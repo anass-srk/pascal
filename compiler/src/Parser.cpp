@@ -799,26 +799,26 @@ std::unique_ptr<Expression> Parser::gexpression()
     TOKEN_TYPE::GT_TOKEN, TOKEN_TYPE::LT_TOKEN, TOKEN_TYPE::LE_TOKEN
   }))
   {
-    BinaryOp op;
+    RelOp op;
     switch(m_lexer.getToken().type())
     {
       case TOKEN_TYPE::EQ_TOKEN:
-        op = BinaryOp::Eq;
+        op = RelOp::Eq;
       break;
       case TOKEN_TYPE::NEQ_TOKEN:
-        op = BinaryOp::Ne;
+        op = RelOp::Ne;
       break;
       case TOKEN_TYPE::GE_TOKEN:
-        op = BinaryOp::Ge;
+        op = RelOp::Ge;
       break;
       case TOKEN_TYPE::GT_TOKEN:
-        op = BinaryOp::Gt;
+        op = RelOp::Gt;
       break;
       case TOKEN_TYPE::LT_TOKEN:
-        op = BinaryOp::Lt;
+        op = RelOp::Lt;
       break;
       case TOKEN_TYPE::LE_TOKEN:
-        op = BinaryOp::Le;
+        op = RelOp::Le;
       break;
     }
     adv();
@@ -866,17 +866,17 @@ std::unique_ptr<Expression> Parser::expression()
 
   while (check({TOKEN_TYPE::PLUS_TOKEN, TOKEN_TYPE::MINUS_TOKEN, TOKEN_TYPE::OR_TOKEN}))
   {
-    BinaryOp op;
+    ALOp op;
     switch(m_lexer.getToken().type())
     {
       case TOKEN_TYPE::PLUS_TOKEN:
-        op = BinaryOp::Add;
+        op = ALOp::Add;
       break;
       case TOKEN_TYPE::MINUS_TOKEN:
-        op = BinaryOp::Sub;
+        op = ALOp::Sub;
       break;
       case TOKEN_TYPE::OR_TOKEN:
-        op = BinaryOp::Or;
+        op = ALOp::Or;
       break;
     }
     adv();
@@ -908,18 +908,18 @@ std::unique_ptr<Expression> Parser::term()
 
   while (check({TOKEN_TYPE::STAR_TOKEN, TOKEN_TYPE::SLASH_TOKEN, TOKEN_TYPE::DIV_TOKEN, TOKEN_TYPE::AND_TOKEN}))
   {
-    BinaryOp op;
+    ALOp op;
     switch (m_lexer.getToken().type())
     {
     case TOKEN_TYPE::STAR_TOKEN:
-      op = BinaryOp::Mul;
+      op = ALOp::Mul;
       break;
       case TOKEN_TYPE::SLASH_TOKEN:
       case TOKEN_TYPE::DIV_TOKEN:
-        op = BinaryOp::Div;
+        op = ALOp::Div;
       break;
       case TOKEN_TYPE::AND_TOKEN:
-        op = BinaryOp::And;
+        op = ALOp::And;
       break;
       default:
       break;

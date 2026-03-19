@@ -10,7 +10,8 @@ inline bool is_basic_type(const Type* type) {
   return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
-         name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
+         name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
+         name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)];
 }
 
 inline bool is_boolean_type(const Type* type) {
@@ -29,7 +30,7 @@ inline bool is_array_of_char(const Type* type) {
   return arr->element_type()->get_underlying_type()->id() == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)];
 }
 
-inline bool is_writable_type(const Type* type) {
+inline bool is_io_compatible(const Type *type) {
   if (!type) return false;
   std::string_view name = type->get_underlying_type()->id();
   if (name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
@@ -37,19 +38,6 @@ inline bool is_writable_type(const Type* type) {
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)] ||
-      is_array_of_char(type)) {
-    return true;
-  }
-  return false;
-}
-
-inline bool is_readable_type(const Type* type) {
-  if (!type) return false;
-  std::string_view name = type->get_underlying_type()->id();
-  if (name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
-      name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
-      name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
-      name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
       is_array_of_char(type)) {
     return true;
   }
@@ -68,22 +56,25 @@ inline bool is_valid_unary_operand(UnaryOp op, const Type* type) {
   }
 }
 
-inline bool is_relational_op(BinaryOp op) {
-  return op == BinaryOp::Eq || op == BinaryOp::Ne ||
-         op == BinaryOp::Lt || op == BinaryOp::Le ||
-         op == BinaryOp::Gt || op == BinaryOp::Ge;
+inline bool is_relational_op(RelOp op) {
+  return op == RelOp::Lt || op == RelOp::Le ||
+         op == RelOp::Gt || op == RelOp::Ge;
 }
 
-inline bool is_arithmetic_op(BinaryOp op) {
-  return op == BinaryOp::Add || op == BinaryOp::Sub ||
-         op == BinaryOp::Mul || op == BinaryOp::Div;
+inline bool is_equality_op(RelOp op) {
+  return op == RelOp::Eq || op == RelOp::Ne;
 }
 
-inline bool is_logical_op(BinaryOp op) {
-  return op == BinaryOp::And || op == BinaryOp::Or;
+inline bool is_arithmetic_op(ALOp op) {
+  return op == ALOp::Add || op == ALOp::Sub ||
+         op == ALOp::Mul || op == ALOp::Div;
 }
 
-inline bool is_valid_binary_operand(BinaryOp op, const Type* left, const Type* right) {
+inline bool is_logical_op(ALOp op) {
+  return op == ALOp::And || op == ALOp::Or;
+}
+
+inline bool is_valid_binary_operand(RelOp op, const Type* left, const Type* right) {
   if (!left || !right) return false;
   const auto* left_under = left->get_underlying_type();
   const auto* right_under = right->get_underlying_type();
@@ -95,10 +86,30 @@ inline bool is_valid_binary_operand(BinaryOp op, const Type* left, const Type* r
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
-  } else if (is_arithmetic_op(op)) {
+  } else if(is_equality_op(op)) {
     return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
-           name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)];
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_ENUM)] ||
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)];
+  }
+  return false;
+}
+
+inline bool is_valid_binary_operand(ALOp op, const Type* left, const Type* right) {
+  if (!left || !right) return false;
+  const auto* left_under = left->get_underlying_type();
+  const auto* right_under = right->get_underlying_type();
+  if (left_under != right_under) return false;
+
+  std::string_view name = left_under->id();
+
+  if (is_arithmetic_op(op)) {
+    return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
+           (name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)] && op == ALOp::Add);
   } else if (is_logical_op(op)) {
     return name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
   }
