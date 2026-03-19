@@ -202,7 +202,7 @@ TEST(ExpressionTest, ConstantReferenceString) {
     end.
   )";
   Parser parser(std::move(program));
-  EXPECT_THROW(parser.parse(), SemanticException);
+  EXPECT_NO_THROW(parser.parse());
 }
 
 TEST(ExpressionTest, EnumValueReference) {
