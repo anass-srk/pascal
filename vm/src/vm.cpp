@@ -1,564 +1,351 @@
 #include "vm.hpp"
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <iostream>
+#include <iomanip>
 #include <string>
 
-namespace pascal_vm
-{
+namespace pascal_vm {
 
-VM::VM() : registers({}), flags({})
-{
-  code.reserve(1024);
+void print_op(OPCODE op) {
+  if (!DEBUG_PRINT_OP) return;
+  std::cout << std::left << std::setw(8) << OPCODE_NAMES[int(op)] << '\n';
 }
 
-void VM::dump_state() const
-{
-  std::cout << "\n################################\n";
-  std::cout << "PC : " << std::right << std::setfill('0') <<  std::setw(10) << pc << std::setfill(' '); 
-  std::cout << "    FLAGS(Z, N)    " << '(' << (flags.Z == true) << ", " << (flags.N == true) << ')' << '\n' ;
-  std::cout << std::left;  
-  std::cout << std::setw(8) << "Name" << std::setw(8) << "Char" << std::setw(8) << "Int" << std::setw(8) << "Double" << '\n';
-  std::cout << "================================\n";
-  for(int i = 0;i < registers.size();++i)
-  {
-    const auto& r = registers[i];
-    std::cout << std::setw(8) << "R" + std::to_string(i) << std::setw(8) << int(r.c) << std::setw(8) << r.i << std::setw(8) << r.d << '\n';
-  }
-  std::cout << '\n';
+template <typename T>
+void print_op(OPCODE op, T imm) {
+  if (!DEBUG_PRINT_OP) return;
+  std::cout << std::left << std::setw(8) << OPCODE_NAMES[int(op)] << std::setw(8) << imm << '\n';
 }
 
-#define get_op_args() \
-  const uint8_t dest = fetch_reg(); \
-  const uint8_t src1 = fetch_reg(); \
-  const uint8_t src2 = fetch_reg(); \
-  print_op(opcode, dest, src1, src2, std::optional<int8_t>{});
+#define pop_args(T)               \
+  print_op(op);                   \
+  const auto b = fetch_data<T>(); \
+  const auto a = fetch_data<T>();
+  
 
-#define get_op_args_inter(T)  \
-  const uint8_t dest = fetch_reg(); \
-  const uint8_t src = fetch_reg();  \
-  if constexpr (sizeof(T) > 1) fetch_byte(); \
-  const T val = fetch_value<T>(); \
-  print_op(opcode, dest, src, -1, std::optional(val));
+using Int = int64_t;
+using Real = double;
 
-#define get_cmp_args() \
-  const uint8_t a = fetch_reg();  \
-  const uint8_t b = fetch_reg();  \
-  fetch_byte(); \
-  print_op(opcode, a, b, -1, std::optional<int8_t>{});
-
-#define get_cmp_args_inter(T)  \
-  const uint8_t a = fetch_reg();  \
-  const T b = fetch_value<T>();   \
-  if constexpr (sizeof(T) == 1) fetch_byte(); \
-  print_op(opcode, a, -1, -1, std::optional(b));
-
-#define get_jmp_args()  \
-  fetch_byte(); \
-  const int32_t offset = fetch_offset();  \
-  print_op(opcode, -1, -1, -1, std::optional(offset));
-
-#define get_load_args_inter(T) \
-  const uint8_t reg = fetch_reg();  \
-  const T val = fetch_value<T>(); \
-  if constexpr(sizeof(T) == 1) fetch_byte(); \
-  print_op(opcode, reg, -1, -1, std::optional(val));
-
-#define get_load_args()  \
-  const uint8_t reg = fetch_reg();  \
-  const uint64_t addr = fetch_addr();\
-  print_op(opcode, reg, -1, -1, std::optional(addr));
-
-#define get_store_args() \
-  const uint8_t reg = fetch_reg();  \
-  const uint64_t addr = fetch_addr();\
-  print_op(opcode, reg, -1, -1, std::optional(addr));
-
-#define get_load_local_args() \
-  const uint8_t reg = fetch_reg();  \
-  const int32_t offset = fetch_offset();\
-  print_op(opcode, reg, -1, -1, std::optional(offset));
-
-#define get_store_local_args() \
-  const uint8_t reg = fetch_reg();  \
-  const int32_t offset = fetch_offset();\
-  print_op(opcode, reg, -1, -1, std::optional(offset));
-
-#define get_push_args() \
-  const uint8_t reg = fetch_reg();  \
-  print_op(opcode, reg, -1, -1, std::optional<int8_t>{});
-
-#define get_pop_args()  \
-  const uint8_t reg = fetch_reg();  \
-  print_op(opcode, reg, -1, -1, std::optional<int8_t>{});
-
-#define get_io_args() \
-  const uint8_t reg = fetch_reg();  \
-  print_op(opcode, reg, -1, -1, std::optional<uint8_t>{});
-
-#define get_io_string_args()           \
-  const uint8_t reg = fetch_reg();           \
-  const auto len = fetch_value<uint32_t>(); \
-  print_op(opcode, reg, -1, -1, std::optional(len));
-
-#define get_load_reg_args() \
-  const uint8_t dest = fetch_reg(); \
-  const uint8_t addr_reg = fetch_reg(); \
-  fetch_byte(); \
-  print_op(opcode, dest, addr_reg, -1, std::optional<int8_t>{});
-
-#define get_store_reg_args() \
-  const uint8_t src = fetch_reg(); \
-  const uint8_t addr_reg = fetch_reg(); \
-  fetch_byte(); \
-  print_op(opcode, src, addr_reg, -1, std::optional<int8_t>{});
-
-#define get_load_reg_offset_args() \
-  const uint8_t dest = fetch_reg(); \
-  const uint8_t base_reg = fetch_reg(); \
-  fetch_byte(); /* skip padding byte */ \
-  const int32_t offset = fetch_offset(); \
-  print_op(opcode, dest, base_reg, -1, std::optional(offset));
-
-#define get_store_reg_offset_args() \
-  const uint8_t src = fetch_reg(); \
-  const uint8_t base_reg = fetch_reg(); \
-  fetch_byte(); /* skip padding byte */ \
-  const int32_t offset = fetch_offset(); \
-  print_op(opcode, src, base_reg, -1, std::optional(offset));
-
-#define get_load_reg_reg_args() \
-  const uint8_t dest = fetch_reg(); \
-  const uint8_t base_reg = fetch_reg(); \
-  const uint8_t offset_reg = fetch_reg(); \
-  print_op(opcode, dest, base_reg, offset_reg, std::optional<int8_t>{});
-
-#define get_store_reg_reg_args() \
-  const uint8_t src = fetch_reg(); \
-  const uint8_t base_reg = fetch_reg(); \
-  const uint8_t offset_reg = fetch_reg(); \
-  print_op(opcode, src, base_reg, offset_reg, std::optional<int8_t>{});
-
-void VM::run() const
-{
-  bool running = true;
-  while (running)
-  {
-  print_pc(pc);
-  auto opcode = static_cast<OPCODE>(fetch_byte());
-  switch(opcode)
-  {
-
-    case OPCODE::NOP:{
-      continue;
+void VM::run() const {
+  while(true){
+  const auto op = fetch_op();
+  switch (op) {
+    case OPCODE::PUSH_FP:{
+      print_op(op);
+      add_var(fp);
     }break;
-    case OPCODE::MOV:{
-      const uint8_t dest = fetch_reg();
-      const uint8_t src = fetch_reg();
-      fetch_byte();
-      registers[dest].u = registers[src].u;
-      print_op(opcode, dest, src, -1, std::optional<int8_t>{});
+    case OPCODE::PUSH_Q:{
+      const auto data = fetch_code<Int>();
+      print_op(op, data);
+      add_var(data);
+    }break;
+    case OPCODE::PUSH_B:{
+      const auto data = fetch_code<int8_t>();
+      print_op(op, data);
+      add_var(data);
     }break;
 
-    case OPCODE::LOADIB:{
-      get_load_args_inter(uint8_t)
-      registers[reg].byte = val;
-    }break;
-    case OPCODE::LOADIQ:{
-      get_load_args_inter(uint64_t)
-      registers[reg].u = val;
+    case OPCODE::NOT:{
+      print_op(op);
+      const auto data = fetch_data<bool>();
+      add_var(!data);
     }break;
 
-    case OPCODE::LOADB:{
-      get_load_args()
-      std::memcpy(&registers[reg].byte, &stack[addr], 1);
-    }break;
-    case OPCODE::LOADQ:{
-      get_load_args()
-      std::memcpy(&registers[reg].u, &stack[addr], 8);
-    }break;
-    
-    case OPCODE::LOADLB:{
-      get_load_local_args()
-      std::memcpy(&registers[reg].byte, &stack[registers[NUM_REGISTERS-1].u + offset], 1);
-    }break;
-    case OPCODE::LOADLQ:{
-      get_load_local_args()
-      std::memcpy(&registers[reg].u, &stack[registers[NUM_REGISTERS-1].u + offset], 8);
-    }break;
-    
-    case OPCODE::STOREB:{
-      get_store_args()
-      std::memcpy(&stack[addr], &registers[reg].byte, 1);
-    }break;
-    case OPCODE::STOREQ:{
-      get_store_args()
-      std::memcpy(&stack[addr], &registers[reg].u, 8);
-    }break;
-
-    case OPCODE::STORELB:{
-      get_store_local_args()
-      std::memcpy(&stack[registers[NUM_REGISTERS-1].u + offset], &registers[reg].byte, 1);
-    }break;
-    case OPCODE::STORELQ:{
-      get_store_local_args()
-      std::memcpy(&stack[registers[NUM_REGISTERS-1].u + offset], &registers[reg].u, 8);
-    }break;
-    
-    // Register indirect load/store
-    case OPCODE::LOADQR:{
-      get_load_reg_args()
-      uint64_t addr = registers[addr_reg].u;
-      std::memcpy(&registers[dest].u, &stack[addr], 8);
-    }break;
-    case OPCODE::LOADBR:{
-      get_load_reg_args()
-      uint64_t addr = registers[addr_reg].u;
-      std::memcpy(&registers[dest].byte, &stack[addr], 1);
-    }break;
-    case OPCODE::LOADQRO:{
-      get_load_reg_offset_args()
-      uint64_t addr = registers[base_reg].u + offset;
-      std::memcpy(&registers[dest].u, &stack[addr], 8);
-    }break;
-    case OPCODE::LOADBRO:{
-      get_load_reg_offset_args()
-      uint64_t addr = registers[base_reg].u + offset;
-      std::memcpy(&registers[dest].byte, &stack[addr], 1);
-    }break;
-    case OPCODE::LOADQRR:{
-      get_load_reg_reg_args()
-      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
-      std::memcpy(&registers[dest].u, &stack[addr], 8);
-    }break;
-    case OPCODE::LOADBRR:{
-      get_load_reg_reg_args()
-      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
-      std::memcpy(&registers[dest].byte, &stack[addr], 1);
-    }break;
-    
-    case OPCODE::STOREQR:{
-      get_store_reg_args()
-      uint64_t addr = registers[addr_reg].u;
-      std::memcpy(&stack[addr], &registers[src].u, 8);
-    }break;
-    case OPCODE::STOREBR:{
-      get_store_reg_args()
-      uint64_t addr = registers[addr_reg].u;
-      std::memcpy(&stack[addr], &registers[src].byte, 1);
-    }break;
-    case OPCODE::STOREQRO:{
-      get_store_reg_offset_args()
-      uint64_t addr = registers[base_reg].u + offset;
-      std::memcpy(&stack[addr], &registers[src].u, 8);
-    }break;
-    case OPCODE::STOREBRO:{
-      get_store_reg_offset_args()
-      uint64_t addr = registers[base_reg].u + offset;
-      std::memcpy(&stack[addr], &registers[src].byte, 1);
-    }break;
-    case OPCODE::STOREQRR:{
-      get_store_reg_reg_args()
-      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
-      std::memcpy(&stack[addr], &registers[src].u, 8);
-    }break;
-    case OPCODE::STOREBRR:{
-      get_store_reg_reg_args()
-      uint64_t addr = registers[base_reg].u + registers[offset_reg].u;
-      std::memcpy(&stack[addr], &registers[src].byte, 1);
-    }break;
-    
-    
     case OPCODE::ADD_I:{
-      get_op_args()
-      registers[dest].i = registers[src1].i + registers[src2].i;
+      pop_args(Int)
+      add_var(a+b);
     }break;
     case OPCODE::SUB_I:{
-      get_op_args()
-      registers[dest].i = registers[src1].i - registers[src2].i;
+      pop_args(Int)
+      add_var(a-b);
     }break;
     case OPCODE::MUL_I:{
-      get_op_args()
-      registers[dest].i = registers[src1].i * registers[src2].i;
+      pop_args(Int)
+      add_var(a*b);
     }break;
     case OPCODE::DIV_I:{
-      get_op_args()
-      registers[dest].i = registers[src1].i / registers[src2].i;
-    }break;
-    case OPCODE::MOD_I:{
-      get_op_args()
-      registers[dest].i = registers[src1].i % registers[src2].i;
-    }break;
-
-    case OPCODE::ADDI_I:{
-      get_op_args_inter(int64_t)
-      registers[dest].i = registers[src].i + val;
-    }break;
-    case OPCODE::SUBI_I:{
-      get_op_args_inter(int64_t)
-      registers[dest].i = registers[src].i - val;
-    }break;
-    case OPCODE::MULI_I:{
-      get_op_args_inter(int64_t)
-      registers[dest].i = registers[src].i * val;
-    }break;
-    case OPCODE::DIVI_I:{
-      get_op_args_inter(int64_t)
-      registers[dest].i = registers[src].i / val;
-    }break;
-    case OPCODE::MODI_I:{
-      get_op_args_inter(int64_t)
-      registers[dest].i = registers[src].i % val;
+      pop_args(Int)
+      add_var(a/b);
     }break;
 
     case OPCODE::ADD_C:{
-      get_op_args()
-      registers[dest].c = registers[src1].c + registers[src2].c;
+      pop_args(char)
+      add_var(a+b);
     }break;
     case OPCODE::SUB_C:{
-      get_op_args()
-      registers[dest].c = registers[src1].c - registers[src2].c;
+      pop_args(char)
+      add_var(a-b);
     }break;
     case OPCODE::MUL_C:{
-      get_op_args()
-      registers[dest].c = registers[src1].c * registers[src2].c;
+      pop_args(char)
+      add_var(a*b);
     }break;
     case OPCODE::DIV_C:{
-      get_op_args()
-      registers[dest].c = registers[src1].c / registers[src2].c;
-    }break;
-    case OPCODE::MOD_C:{
-      get_op_args()
-      registers[dest].c = registers[src1].c % registers[src2].c;
+      pop_args(char)
+      add_var(a/b);
     }break;
 
-    case OPCODE::ADD_D:{
-      get_op_args()
-      registers[dest].d = registers[src1].d + registers[src2].d;
+    case OPCODE::ADD_R:{
+      pop_args(Real)
+      add_var(a+b);
     }break;
-    case OPCODE::SUB_D:{
-      get_op_args()
-      registers[dest].d = registers[src1].d - registers[src2].d;
+    case OPCODE::SUB_R:{
+      pop_args(Real)
+      add_var(a-b);
     }break;
-    case OPCODE::MUL_D:{
-      get_op_args()
-      registers[dest].d = registers[src1].d * registers[src2].d;
+    case OPCODE::MUL_R:{
+      pop_args(Real)
+      add_var(a*b);
     }break;
-    case OPCODE::DIV_D:{
-      get_op_args()
-      registers[dest].d = registers[src1].d / registers[src2].d;
-    }break;
-
-    case OPCODE::ADDI_C:{
-      get_op_args_inter(int8_t)
-      registers[dest].c = registers[src].c + val;
-    }break;
-    case OPCODE::SUBI_C:{
-      get_op_args_inter(int8_t)
-      registers[dest].c = registers[src].c - val;
-    }break;
-    case OPCODE::MULI_C:{
-      get_op_args_inter(int8_t)
-      registers[dest].c = registers[src].c * val;
-    }break;
-    case OPCODE::DIVI_C:{
-      get_op_args_inter(int8_t)
-      registers[dest].c = registers[src].c / val;
-    }break;
-    case OPCODE::MODI_C:{
-      get_op_args_inter(int8_t)
-      registers[dest].c = registers[src].c % val;
+    case OPCODE::DIV_R:{
+      pop_args(Real)
+      add_var(a/b);
     }break;
 
-    case OPCODE::ADDI_D:{
-      get_op_args_inter(double)
-      registers[dest].d = registers[src].d + val;
+    case OPCODE::AND:{
+      pop_args(bool)
+      add_var(a && b);
     }break;
-    case OPCODE::SUBI_D:{
-      get_op_args_inter(double)
-      registers[dest].d = registers[src].d - val;
-    }break;
-    case OPCODE::MULI_D:{
-      get_op_args_inter(double)
-      registers[dest].d = registers[src].d * val;
-    }break;
-    case OPCODE::DIVI_D:{
-      get_op_args_inter(double)
-      registers[dest].d = registers[src].d / val;
+    case OPCODE::OR:{
+      pop_args(bool)
+      add_var(a || b);
     }break;
 
     case OPCODE::CMP_I:{
-      get_cmp_args()
-      flags.N = (registers[a].i < registers[b].i);
-      flags.Z = (registers[a].i == registers[b].i);
+      pop_args(Int)
+      add_var((a == b ? char(0) : (a < b ? char(-1) : char(1))));
     }break;
-    case OPCODE::CMPI_I:{
-      get_cmp_args_inter(int64_t)
-      flags.N = (registers[a].i < b);
-      flags.Z = (registers[a].i == b);
-    }break;
-
     case OPCODE::CMP_C:{
-      get_cmp_args()
-      flags.N = (registers[a].c < registers[b].c);
-      flags.Z = (registers[a].c == registers[b].c);
+      pop_args(char)
+      add_var((a == b ? char(0) : (a < b ? char(-1) : char(1))));
     }break;
-    case OPCODE::CMPI_C:{
-      get_cmp_args_inter(int8_t)
-      flags.N = (registers[a].c < b);
-      flags.Z = (registers[a].c == b);
+    case OPCODE::CMP_R:{
+      pop_args(Real)
+      add_var((a == b ? char(0) : (a < b ? char(-1) : char(1))));
     }break;
 
-    case OPCODE::CMP_D:{
-      get_cmp_args()
-      flags.N = (registers[a].d < registers[b].d);
-      flags.Z = (registers[a].d == registers[b].d);
+    case OPCODE::LE: {
+      print_op(op);
+      const char arg = fetch_data<char>();
+      add_var(arg == 1 ? false : true);
+    } break;
+    case OPCODE::LT: {
+      print_op(op);
+      const char arg = fetch_data<char>();
+      add_var(arg == -1 ? true : false);
+    } break;
+    case OPCODE::EQ: {
+      print_op(op);
+      const char arg = fetch_data<char>();
+      add_var(arg == 0 ? true : false);
+    } break;
+    case OPCODE::NE: {
+      print_op(op);
+      const char arg = fetch_data<char>();
+      add_var(arg == 0 ? false : true);
+    } break;
+    case OPCODE::GT: {
+      print_op(op);
+      const char arg = fetch_data<char>();
+      add_var(arg == 1 ? true : false);
+    } break;
+    case OPCODE::GE: {
+      print_op(op);
+      const char arg = fetch_data<char>();
+      add_var(arg == -1 ? false : true);
+    } break;
+
+    case OPCODE::JMP: {
+      const auto data = fetch_addr();
+      print_op(op, data);
+      pc = data;
+    } break;
+    case OPCODE::JMP_TRUE: {
+      const auto data = fetch_addr();
+      print_op(op, data);
+
+      const bool arg = fetch_data<bool>();
+      if(arg) pc = data;
+    } break;
+    case OPCODE::JMP_FALSE: {
+      const auto data = fetch_addr();
+      print_op(op, data);
+
+      const bool arg = fetch_data<bool>();
+      if(!arg) pc = data;
+    } break;
+
+    case OPCODE::LOAD_Q: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+      
+      size_t data;
+      std::memcpy(&data, &stack[addr], sizeof(data));
+      add_var(data);
+    } break;
+    case OPCODE::LOAD_B: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+      add_var(stack[addr]);
+    } break;
+
+    case OPCODE::STORE_Q: {
+      print_op(op);
+      const auto data = fetch_data<size_t>();
+      const auto addr = fetch_data<size_t>();
+      std::memcpy(&stack[addr], &data, sizeof(data));
     }break;
-    case OPCODE::CMPI_D:{
-      get_cmp_args_inter(double)
-      flags.N = (registers[a].d < b);
-      flags.Z = (registers[a].d == b);
+    case OPCODE::STORE_B: {
+      print_op(op);
+      const auto data = fetch_data<char>();
+      const auto addr = fetch_data<size_t>();
+      std::memcpy(&stack[addr], &data, sizeof(data));
     }break;
 
-    case OPCODE::JMP:{
-      get_jmp_args()
-      pc += offset;
+    case OPCODE::POP_Q: {
+      print_op(op);
+      fetch_data<size_t>();
     }break;
-    case OPCODE::JEQ:{
-      get_jmp_args()
-      if(flags.Z) pc += offset;
-    }break;
-    case OPCODE::JNE:{
-      get_jmp_args()
-      if(!flags.Z) pc += offset;
-    }break;
-    case OPCODE::JGT:{
-      get_jmp_args()
-      if(!flags.N && !flags.Z) pc += offset;
-    }break;
-    case OPCODE::JGE:{
-      get_jmp_args()
-      if(flags.Z || !flags.N) pc += offset;
-    }break;
-    case OPCODE::JLT:{
-      get_jmp_args()
-      if(flags.N && !flags.Z) pc += offset;
-    }break;
-    case OPCODE::JLE:{
-      get_jmp_args()
-      if(flags.Z || flags.N) pc += offset;
+    case OPCODE::POP_B: {
+      print_op(op);
+      fetch_data<char>();
     }break;
 
-    case OPCODE::PUSHB:{
-      get_push_args()
-      add_var<int8_t>(registers[reg].c);
-    }break;
-    case OPCODE::PUSHQ:{
-      get_push_args()
-      add_var<int64_t>(registers[reg].i);
-    }break;
-    case OPCODE::POPB:{
-      get_pop_args()
-      registers[reg].byte = stack.back();
-      stack.pop_back();
-    }break;
-    case OPCODE::POPQ:{
-      get_pop_args()
-      std::memcpy(&registers[reg].i, &stack[stack.size()-8], 8);
-      stack.resize(stack.size() - 8);
-    }break;
+    case OPCODE::MODSTK: {
+      const auto data = fetch_code<int32_t>();
+      print_op(op, data);
+      stack.resize(Int(stack.size()) + data, 0); // The usage of 0 is important for string ptrs
+    } break;
 
-    case OPCODE::CALL:{
-      fetch_byte();
-      const auto func_addr = fetch_value<size_t>();
-      print_op(OPCODE::CALL, -1, -1, -1, std::optional(func_addr), std::optional(registers[NUM_REGISTERS-1].u));
+    case OPCODE::PUSH_S: {
+      auto loc = fetch_addr();
+      print_op(op, loc);
 
-      add_var(pc); // return address on the vars stack is pc (now pointing at next instruction)
-      pc = func_addr;
-      add_var(registers[NUM_REGISTERS-1].u);
-      registers[NUM_REGISTERS-1].u = stack.size();
-    }break;
+      uint32_t len;
+      std::memcpy(&len, &code[loc], sizeof(len));
+      loc += sizeof(len);
 
-    case OPCODE::RET:{
-      fetch_byte();
-      const auto func_stack_size = fetch_value<uint32_t>();
+      std::string *s = new std::string();
+      s->reserve(len);
 
-      stack.resize(stack.size() - func_stack_size);
-
-      std::memcpy(&registers[NUM_REGISTERS-1], &stack[stack.size() - 8], 8);
-
-      size_t ret_addr;
-      std::memcpy(&ret_addr, &stack[stack.size() - 16], 8);
-      stack.resize(stack.size() - 16);
-      pc = ret_addr;
-
-      print_op(OPCODE::RET, -1, -1, -1, std::optional(func_stack_size), std::optional(ret_addr));
-    }break;
-
-    case OPCODE::MODSTK:{
-      fetch_byte();
-      const auto size = fetch_value<int32_t>();
-
-      print_op(OPCODE::MODSTK, -1, -1, -1, std::optional(stack.size()), std::optional(size));
-
-      stack.resize(stack.size() + size);
-    }break;
-
-    case OPCODE::READ_I:{
-      get_io_args()
-      std::cin >> registers[reg].i;
-    }break;
-    case OPCODE::READ_C:{
-      get_io_args()
-      std::cin >> registers[reg].c;
-    }break;
-    case OPCODE::READ_D:{
-      get_io_args()
-      std::cin >> registers[reg].d;
-    }break;
-    case OPCODE::READ_S:{
-      get_io_string_args()
-      std::string tmp;
-      std::cin >> tmp;
-      char *str = reinterpret_cast<char *>(stack.data() + registers[reg].u);
-      if(tmp.length() >= len){
-        std::memcpy(str, tmp.data(), len);
-      }else{
-        std::memcpy(str, tmp.data(), tmp.length());
-        str[tmp.length()+1] = '\0';
+      const size_t end = loc + len;
+      for (; loc < end; ++loc) {
+        s->push_back(code[loc]);
       }
-    }break;
-    case OPCODE::WRITE_I:{
-      get_io_args()
-      std::cout << registers[reg].i;
-    }break;
-    case OPCODE::WRITE_C:{
-      get_io_args()
-      std::cout << registers[reg].c;
-    }break;
-    case OPCODE::WRITE_D:{
-      get_io_args()
-      std::cout << registers[reg].d;
-    }break;
-    case OPCODE::WRITE_S:{
-      get_io_string_args()
-      const char *str = reinterpret_cast<char *>(stack.data() + registers[reg].u);
-      for(uint32_t i = 0;i < len && str[i] != '\0';++i){
-        std::cout << str[i];
-      }
-    }break;
 
-    case OPCODE::DMP:{
-      dump_state();
-      fetch_byte();
+      add_var(s);
+    } break;
+    case OPCODE::ADD_S: {
+      pop_args(std::string*)
+      *a += *b;
+      delete b;
+      add_var(a);
+    } break;
+    case OPCODE::CMP_S: {
+      pop_args(std::string*)
+      add_var(char(a->compare(*b)));
+    } break;
+    case OPCODE::LOAD_S: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+
+      std::string* data;
+      std::memcpy(&data, &stack[addr], sizeof(data));
+
+      // Copy if not null
+      if(data) data = new std::string(*data);
+      else data = new std::string();
+
+      add_var(data);
+    } break;
+    case OPCODE::STORE_S: {
+      print_op(op);
+      auto data = fetch_data<std::string*>();
+      const auto addr = fetch_data<size_t>();
+
+      std::string* old_data;
+      std::memcpy(&old_data, &stack[addr], sizeof(data));
+      if(old_data) delete old_data;
+
+      std::memcpy(&stack[addr], &data, sizeof(data));
     }break;
+    case OPCODE::POP_S: {
+      print_op(op);
+      auto data = fetch_data<std::string*>();
+      if(data) delete data;
+    } break;
+
+    case OPCODE::READ_I: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+
+      Int data;
+      std::cin >> data;
+
+      std::memcpy(&stack[addr], &data, sizeof(data));
+    } break;
+    case OPCODE::READ_R: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+
+      Real data;
+      std::cin >> data;
+
+      std::memcpy(&stack[addr], &data, sizeof(data));
+    } break;
+    case OPCODE::READ_S: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+
+      std::string* data;
+      std::memcpy(&data, &stack[addr], sizeof(data));
+      if(!data) data = new std::string();
+
+      std::cin >> *data;
+      std::memcpy(&stack[addr], &data, sizeof(data));
+    } break;
+    case OPCODE::READ_C: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+
+      char data;
+      std::cin >> data;
+
+      std::memcpy(&stack[addr], &data, sizeof(data));
+    } break;
+
+    case OPCODE::WRITE_I: {
+      print_op(op);
+      const auto data = fetch_data<Int>();
+      std::cout << data;
+    } break;
+    case OPCODE::WRITE_R: {
+      print_op(op);
+      const auto data = fetch_data<Real>();
+      std::cout << data;
+    } break;
+    case OPCODE::WRITE_C: {
+      print_op(op);
+      const auto data = fetch_data<char>();
+      std::cout << data;
+    } break;
+    case OPCODE::WRITE_S: {
+      print_op(op);
+      auto data = fetch_data<std::string*>();
+      std::cout << *data;
+      delete data;
+    } break;
+
     case OPCODE::HALT:{
-      running = false;
+      print_op(op);
+      return;
     }break;
-    default:{
-      std::cerr << "Invalid opcode : " << static_cast<int>(opcode) << "!!!\n";
-      running = false;
-    }break;
-  }
-
   }
 }
+}
 
-};
+
+
+}

@@ -1,606 +1,430 @@
-#pragma once
-
-#include <vector>
-#include <iostream>
-#include <iomanip>
-#include <array>
-#include <string>
-#include <optional>
 #include <algorithm>
+#include <cmath>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <vector>
 
-namespace pascal_vm
-{
-  template <typename T, typename... U>
-  concept one_of = (std::is_same_v<T, U> || ...);
 
-  template <typename T>
-  concept VarType = std::integral<T> || std::floating_point<T>;
+namespace pascal_vm {
 
-  // --- Opcodes (1 Byte) ---
-  // TODO: Add versions that take intermediate values
-  enum class OPCODE : uint8_t
-  {
-    NOP,
+template <typename T, typename... U>
+concept one_of = (std::is_same_v<T, U> || ...);
 
-    // Load/Store
-    LOADQ,
-    LOADB,
-    // Intermediate
-    LOADIQ,
-    LOADIB,
-    LOADLQ,
-    LOADLB,
-    MOV,
-    STOREQ,
-    STOREB,
-    STORELQ,
-    STORELB,
-    // Register indirect
-    LOADQR,
-    LOADBR,
-    LOADQRO,
-    LOADBRO,
-    LOADQRR,
-    LOADBRR,
-    STOREQR,
-    STOREBR,
-    STOREQRO,
-    STOREBRO,
-    STOREQRR,
-    STOREBRR,
+template <typename T>
+concept VarType = std::integral<T> || std::floating_point<T>;
 
-    // Stack Operations (from registers)
-    PUSHB,
-    PUSHQ,
-    POPB,
-    POPQ,
+// --- Opcodes (1 Byte) ---
+// immediate arg = embedded in code
+enum class OPCODE : uint8_t {
+  PUSH_S, // immediate arg (8-byte absolute address of string (32-bit len +
+          // char*)) from constants -> push into string_stack (for strings added using add_string)
+  PUSH_Q, // immediate arg (8-bytes) -> push into stack
+  PUSH_B, // immediate arg (1-byte)  -> push into stack
+  PUSH_FP, // no arg, pushes frame pointer into stack
 
-    // Function Operations (stack shape : args | ret_addr | function vars)
-    CALL, // takes argument to unwind the stack
-    RET,  // takes function stack size
-    MODSTK,
+  NOT, // negates boolean at the top of the stack
 
-    // Arithmetic (Int)
-    ADD_I,
-    SUB_I,
-    MUL_I,
-    DIV_I,
-    MOD_I,
-    // Intermidiate version
-    ADDI_I,
-    SUBI_I,
-    MULI_I,
-    DIVI_I,
-    MODI_I,
+  // these operations pop 2 elements from the stack (Int, Real, Char), apply
+  // operation -> push result into stack
+  ADD_I,
+  SUB_I,
+  MUL_I,
+  DIV_I,
 
-    // Arithmetic (Char)
-    ADD_C,
-    SUB_C,
-    MUL_C,
-    DIV_C,
-    MOD_C,
-    // Intermidiate version
-    ADDI_C,
-    SUBI_C,
-    MULI_C,
-    DIVI_C,
-    MODI_C,
+  ADD_R,
+  SUB_R,
+  MUL_R,
+  DIV_R,
 
-    // Arithmetic (Double)
-    ADD_D,
-    SUB_D,
-    MUL_D,
-    DIV_D,
-    // Intermidiate version
-    ADDI_D,
-    SUBI_D,
-    MULI_D,
-    DIVI_D,
+  ADD_C,
+  SUB_C,
+  MUL_C,
+  DIV_C,
 
-    // Comparison
-    CMP_I,
-    CMP_D,
-    CMP_C,
-    CMPI_I,
-    CMPI_D,
-    CMPI_C,
+  ADD_S, // for strings (into stack)
 
-    // Jumps
-    JMP,
-    JLT,
-    JGT,
-    JLE,
-    JGE,
-    JEQ,
-    JNE,
+  // pop 2 bools, push operation result
+  AND,
+  OR,
 
-    // Basic IO
-    READ_C,
-    READ_I,
-    READ_D,
-    READ_S,
-    WRITE_C,
-    WRITE_I,
-    WRITE_D,
-    WRITE_S,
+  // pop 2 elements, compare : left < right -> push char(-1) | left == right ->
+  // push char(0) | left > right -> push char(1) simplifies jumping instructions
+  // : type agnostic + no need to have flags (there's no else if, so the result
+  // is checked once in if)
+  CMP_I,
+  CMP_R,
+  CMP_C,
+  CMP_S, // when not equal, compares in alphanumeric order
 
-    DMP,
-    HALT
-  };
+  // pops 1 char, pushes boolean. It's true if and only if
+  LE, // -1 or 0
+  LT, // -1
+  EQ, //  0
+  NE, // -1 or 1
+  GT, //  1       
+  GE, //  0 or 1
 
-  inline const char* OPCODE_NAMES[] =
-  {
-    "NOP",
-    "LOADQ",
-    "LOADB",
-    "LOADIQ",
-    "LOADIB",
-    "LOADLQ",
-    "LOADLB",
-    "MOV",
-    "STOREQ",
-    "STOREB",
-    "STORELQ",
-    "STORELB",
-    "LOADQR",
-    "LOADBR",
-    "LOADQRO",
-    "LOADBRO",
-    "LOADQRR",
-    "LOADBRR",
-    "STOREQR",
-    "STOREBR",
-    "STOREQRO",
-    "STOREBRO",
-    "STOREQRR",
-    "STOREBRR",
-    "PUSHB",
-    "PUSHQ",
-    "POPB",
-    "POPQ",
-    "CALL",
-    "RET",
-    "MODSTK",
-    "ADD_I",
-    "SUB_I",
-    "MUL_I",
-    "DIV_I",
-    "MOD_I",
-    "ADDI_I",
-    "SUBI_I",
-    "MULI_I",
-    "DIVI_I",
-    "MODI_I",
-    "ADD_C",
-    "SUB_C",
-    "MUL_C",
-    "DIV_C",
-    "MOD_C",
-    "ADDI_C",
-    "SUBI_C",
-    "MULI_C",
-    "DIVI_C",
-    "MODI_C",
-    "ADD_D",
-    "SUB_D",
-    "MUL_D",
-    "DIV_D",
-    "ADDI_D",
-    "SUBI_D",
-    "MULI_D",
-    "DIVI_D",
-    "CMP_I",
-    "CMP_D",
-    "CMP_C",
-    "CMPI_I",
-    "CMPI_D",
-    "CMPI_C",
-    "JMP",
-    "JLT",
-    "JGT",
-    "JLE",
-    "JGE",
-    "JEQ",
-    "JNE",
-    "READ_C",
-    "READ_I",
-    "READ_D",
-    "READ_S",
-    "WRITE_C",
-    "WRITE_I",
-    "WRITE_D",
-    "WRITE_S",
-    "DMP",
-    "HALT"
-  };
+  JMP, // immediate absolute address in the code
+
+  // immediate absolute address in the code, pops 1 boolean
+  JMP_TRUE,
+  JMP_FALSE,
+
+  MODSTK, // immediate 32-bit num to increase/decrease the stack
+
+  // pops 2 elements addr + data, moves data to addr
+  STORE_Q,
+  STORE_B,
+  STORE_S,
+
+  // pops addr, pushes data
+  LOAD_Q,
+  LOAD_B,
+  LOAD_S,
+
+  // pops top of the stack
+  POP_Q,
+  POP_B,
+  POP_S,
+
+  WRITE_I,
+  WRITE_R,
+  WRITE_C,
+  WRITE_S,
+
+  READ_I,
+  READ_R,
+  READ_C,
+  READ_S,
+
+  HALT,
+  MAX = HALT
+};
+
+inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
+  "PUSH_S",  
+  "PUSH_Q",  
+  "PUSH_B",  
+  "PUSH_FP", 
+  "NOT", 
+  "ADD_I",
+  "SUB_I",
+  "MUL_I",
+  "DIV_I",
+  "ADD_R",
+  "SUB_R",
+  "MUL_R",
+  "DIV_R",
+  "ADD_C",
+  "SUB_C",
+  "MUL_C",
+  "DIV_C",
+  "ADD_S", 
+  "AND",
+  "OR",
+  "CMP_I",
+  "CMP_R",
+  "CMP_C",
+  "CMP_S", 
+  "LE", 
+  "LT", 
+  "EQ", 
+  "NE", 
+  "GT", 
+  "GE",
+  "JMP",
+  "JMP_TRUE",
+  "JMP_FALSE",
+  "MODSTK",
+  "STORE_Q",
+  "STORE_B",
+  "STORE_S",
+  "LOAD_Q",
+  "LOAD_B",
+  "LOAD_S",
+  "POP_Q",
+  "POP_B",
+  "POP_S",
+  "WRITE_I",
+  "WRITE_R",
+  "WRITE_C",
+  "WRITE_S",
+  "READ_I",
+  "READ_R",
+  "READ_C",
+  "READ_S",
+  "HALT"
+};
 
 #if DEBUG_VM
-  constexpr bool DEBUG_PRINT_OP = true;
+constexpr bool DEBUG_PRINT_OP = true;
 #else
-  constexpr bool DEBUG_PRINT_OP = false;
+constexpr bool DEBUG_PRINT_OP = false;
 #endif
 
-  inline const char* REG_NAMES[16] = {"R0","R1","R2","R3","R4","R5","R6","R7","R8","R9","R10","R11","R12","R13","R14","R15"};
+class VM {
+public:
+private:
+  std::vector<uint8_t> code;
+  mutable std::vector<uint8_t> stack; // Runtime Stack
+  mutable size_t pc = 0;
+  mutable size_t fp = 0; // Frame pointer
+  std::vector<size_t> jmp_locs;
 
-  template <VarType T, VarType U = T>
-  static void print_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2, std::optional<T> val1, std::optional<U> val2 = std::nullopt)
-  {
-    if constexpr (!DEBUG_PRINT_OP) return;
-    std::cout << std::left <<
-    std::setw(8) << OPCODE_NAMES[static_cast<uint8_t>(op)] << 
-    std::setw(8) << (dest == 255 ? "NAN" : REG_NAMES[dest]) << 
-    std::setw(8) << (src1 == 255 ? "NAN" : REG_NAMES[src1]) << 
-    std::setw(8) << (src2 == 255 ? "NAN" : REG_NAMES[src2]) << std::setw(8);
-    if (val1.has_value()) std::cout << val1.value() << std::setw(8);
-    else std::cout << "NAN" << std::setw(8);
-    if (val2.has_value()) std::cout << val2.value() << '\n';
-    else std::cout << "NAN" << '\n';
+  template <VarType T> inline void add_value(T v) {
+    if constexpr (sizeof(T) == 1) {
+      code.push_back(static_cast<uint8_t>(v));
+    } else {
+      const uint8_t *p = reinterpret_cast<const uint8_t *>(&v);
+      code.insert(code.end(), p, p + sizeof(T));
+    }
   }
 
-  static void print_pc(size_t pc)
-  {
-    if constexpr (DEBUG_PRINT_OP)
-      std::cout << std::left << std::setw(8) << pc;
-  }
-
-  // --- CPU Flags ---
-  struct Flags
-  {
-    bool Z = false;
-    bool N = false;
+  OPCODE fetch_op() const {
+    return static_cast<OPCODE>(code[pc++]);
   };
 
-  // --- The Virtual Machine ---
-  class VM
-  {
-  public:
-    static constexpr size_t NUM_REGISTERS = 16;
-  
-  private:
-    using RegValue = union {
-      uint64_t u;
-      int64_t i;
-      double d;
-      int8_t c;
-      bool b;
-      uint8_t byte;
-    };
+  template <VarType T>
+  T fetch_code() const {
+    T res;
+    std::memcpy(&res, &code[pc], sizeof(T));
+    pc += sizeof(T);
+    return res;
+  }
 
-    std::vector<uint8_t> code;
-    mutable std::array<RegValue, NUM_REGISTERS> registers;
-    mutable std::vector<uint8_t> stack; // Runtime Stack
-    mutable Flags flags;
-    mutable size_t pc = 0;
-    std::vector<size_t> jmp_locs;
+  inline size_t fetch_addr() const {
+    return fetch_code<size_t>();
+  }
 
-  public:
+  template <typename T> T fetch_data() const {
+    T res;
+    std::memcpy(&res, &stack[stack.size() - sizeof(T)], sizeof(T));
+    stack.resize(stack.size() - sizeof(T));
+    return res;
+  }
+
+  template <typename T> inline void add_var(T v) const {
+    if constexpr (sizeof(T) == 1) {
+      stack.push_back(static_cast<uint8_t>(v));
+    } else {
+      const uint8_t *p = reinterpret_cast<const uint8_t *>(&v);
+      stack.insert(stack.end(), p, p + sizeof(T));
+    }
+  }
+
+public:
+  VM() {}
+
+  size_t get_current_location() const { return code.size(); }
+  std::vector<uint8_t> &data() const { return stack; }
+
+  void run() const;
+
+  void dump_state() const;
+
+  /// @brief Adds string length + string data to code
+  void add_string(const std::string& s) {
+    add_value(uint32_t(s.length()));
+    code.insert(code.end(), s.begin(), s.end());
+  }
+
+  template <VarType T> bool add_push(OPCODE op, T imm) {
+    switch (op) {
+      case OPCODE::PUSH_B:
+      case OPCODE::PUSH_Q:
+        add_value(static_cast<uint8_t>(op));
+        add_value(imm);
+        return true;
+      default: 
+        return false;
+    }
+  }
+
+  void add_push_frame_pointer() {
+    add_value(static_cast<uint8_t>(OPCODE::PUSH_FP));
+  }
+
+  void add_push_string(size_t loc) {
+    add_value(static_cast<uint8_t>(OPCODE::PUSH_S));
+    add_value(loc);
+    // std::string s;
     
-    VM();
-
-    // Runtime Execution
-    // void load_program(const std::vector<uint8_t> &bytecode);
-
-    size_t get_current_location() const {return code.size();}
-    std::vector<uint8_t>& data() const {return stack;}
-    const RegValue& get_register(uint8_t i) const {return registers[i];};
-    Flags get_flags() const {return flags;}
-
-    void run() const;
-
-    void dump_state() const;
-
-  private:
+    // uint32_t len;
+    // std::memcpy(&len, &code[loc], sizeof(len));
+    // loc += sizeof(len);
     
-    // Helper for Instructions
-    template <VarType T>
-    inline void add_value(T v)
-    {
-      if constexpr (sizeof(T) == 1)
-      {
-        code.push_back(static_cast<uint8_t>(v));
-      }
-      else
-      {
-        const uint8_t *p = reinterpret_cast<const uint8_t*>(&v);
-        code.insert(code.end(), p, p + sizeof(T));
-      }
-    }
+    // s.reserve(len);
+    // const size_t end = loc + len;
+    // for(;loc < end;++loc) {
+    //   s.push_back(code[loc]);
+    // }
+  }
 
-  public:
+  void add_not_op() {
+    add_value(static_cast<uint8_t>(OPCODE::NOT));
+  }
 
-    // Helper for vars
-    template <VarType T>
-    inline void add_var(T v) const
-    {
-      if constexpr (sizeof(T) == 1)
-      {
-        stack.push_back(static_cast<uint8_t>(v));
-      }
-      else
-      {
-        const uint8_t *p = reinterpret_cast<const uint8_t*>(&v);
-        stack.insert(stack.end(), p, p + sizeof(T));
-      }
-    }
-
-    // Instructions
-
-    template <VarType T>
-    void add_load_inter(OPCODE op, uint8_t reg, T imm)
-    {
+  bool add_arithmetic_op(OPCODE op) {
+    switch (op) {
+    case OPCODE::ADD_I:
+    case OPCODE::SUB_I:
+    case OPCODE::MUL_I:
+    case OPCODE::DIV_I:
+    case OPCODE::ADD_R:
+    case OPCODE::SUB_R:
+    case OPCODE::MUL_R:
+    case OPCODE::DIV_R:
+    case OPCODE::ADD_C:
+    case OPCODE::SUB_C:
+    case OPCODE::MUL_C:
+    case OPCODE::DIV_C:
       add_value(static_cast<uint8_t>(op));
-      add_value(reg);
-      add_value(imm);
-      if(sizeof(T) == 1)
-      {
-        add_value<uint8_t>(0);
-      }
-    }
-
-    void add_load(OPCODE op, uint8_t reg, uint64_t addr)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(reg);
-      add_value(addr);
-    }
-
-    // offset < 0 to access arguments (-16 to skip both return address and saved old base pointer value)
-    // offset >= 0 to access function vars in the stack
-    void add_load_local(OPCODE op, uint8_t reg, int32_t offset)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(reg);
-      add_value((offset >= 0 ? offset : offset - 16));
-    }
-
-    void add_store(OPCODE op, uint8_t reg, uint64_t addr)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(reg);
-      add_value(addr);
-    }
-
-    void add_store_local(OPCODE op, uint8_t reg, int32_t offset)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(reg);
-      add_value((offset >= 0 ? offset : offset - 16));
-    }
-
-    // Register indirect load/store
-    void add_load_reg(OPCODE op, uint8_t dest, uint8_t addr_reg)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(dest);
-      add_value(addr_reg);
-      add_value<uint8_t>(0);
-    }
-
-    void add_store_reg(OPCODE op, uint8_t src, uint8_t addr_reg)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(src);
-      add_value(addr_reg);
-      add_value<uint8_t>(0);
-    }
-
-    // Register + immediate offset (8 bytes total with padding)
-    void add_load_reg_offset(OPCODE op, uint8_t dest, uint8_t base, int32_t offset)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(dest);
-      add_value(base);
-      add_value<uint8_t>(0); // padding for 8-byte alignment
-      add_value(offset);
-    }
-
-    void add_store_reg_offset(OPCODE op, uint8_t src, uint8_t base, int32_t offset)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(src);
-      add_value(base);
-      add_value<uint8_t>(0); // padding for 8-byte alignment
-      add_value(offset);
-    }
-
-    // Register + register offset
-    void add_load_reg_reg(OPCODE op, uint8_t dest, uint8_t base, uint8_t offset_reg)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(dest);
-      add_value(base);
-      add_value(offset_reg);
-    }
-
-    void add_store_reg_reg(OPCODE op, uint8_t src, uint8_t base, uint8_t offset_reg)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(src);
-      add_value(base);
-      add_value(offset_reg);
-    }
-
-    void add_mov(uint8_t dest, uint8_t src)
-    {
-      add_value(static_cast<uint8_t>(OPCODE::MOV));
-      add_value(dest);
-      add_value(src);
-      add_value<uint8_t>(0);
-    }
-
-    void add_halt()
-    {
-      add_value(static_cast<uint8_t>(OPCODE::HALT));
-    }
-
-
-    inline void add_op(OPCODE op, uint8_t dest, uint8_t src1, uint8_t src2)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(dest);
-      add_value(src1);
-      add_value(src2);
-    }
-
-    template <VarType T>
-    inline void add_op_inter(OPCODE op, uint8_t dest, uint8_t src, T imm)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(dest);
-      add_value(src);
-      if constexpr (sizeof(T) > 1)
-      {
-        add_value<uint8_t>(0);
-      }
-      add_value(imm);
-    }
-
-    inline void add_cmp(OPCODE op, uint8_t a, uint8_t b)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(a);
-      add_value(b);
-      add_value<uint8_t>(0);
-    }
-
-    template <VarType T>
-    inline void add_cmp_inter(OPCODE op, uint8_t a, T b)
-    {
-      add_value(static_cast<uint8_t>(op));
-      add_value(a);
-      add_value(b);
-      if constexpr (sizeof(T) == 1)
-      {
-        add_value<uint8_t>(0);
-      }
-    }
-
-    inline size_t add_jmp(OPCODE op)
-    {
-      const size_t size = code.size();
-      jmp_locs.push_back(size);
-      add_value(static_cast<uint8_t>(op));
-      add_value<uint8_t>(0);
-      add_value<int32_t>(0);
-      return size;
-    }
-
-    inline bool conf_jmp(size_t jmp, size_t loc)
-    {
-      if(jmp+6 > code.size() || loc > code.size()) return false;
-      if (!std::binary_search(jmp_locs.begin(), jmp_locs.end(), jmp)) return false;
-      const int32_t offset = -(int32_t)(jmp - loc) - 6;
-      std::memcpy(&code[jmp+2], &offset, sizeof(offset));
       return true;
+    default:
+      return false;
     }
+  }
 
-    inline void add_dump()
-    {
-      add_value(static_cast<uint8_t>(OPCODE::DMP));
-      add_value<uint8_t>(0);
+  void add_string_op() {
+    add_value(static_cast<uint8_t>(OPCODE::ADD_S));
+  }
+
+  bool add_logic_op(OPCODE op) {
+    switch (op) {
+      case OPCODE::AND:
+      case OPCODE::OR:
+        add_value(static_cast<uint8_t>(op));
+        return true;
+      default:
+        return false;
     }
+  }
 
-    inline void add_push(OPCODE op, uint8_t reg)
-    {
+  bool add_cmp(OPCODE op) {
+    switch (op) {
+      case OPCODE::CMP_C:
+      case OPCODE::CMP_I:
+      case OPCODE::CMP_R:
+      case OPCODE::CMP_S:
+        add_value(static_cast<uint8_t>(op));
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  bool add_flag(OPCODE op) {
+    switch(op) {
+      case OPCODE::LE:
+      case OPCODE::LT:
+      case OPCODE::EQ:
+      case OPCODE::NE:
+      case OPCODE::GE:
+      case OPCODE::GT:
+        add_value(static_cast<uint8_t>(op));
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  size_t add_jmp(OPCODE op, size_t loc) {
+    switch (op) {
+      case OPCODE::JMP:
+      case OPCODE::JMP_TRUE:
+      case OPCODE::JMP_FALSE:{
+        add_value(static_cast<uint8_t>(op));
+        const auto res = code.size();
+        jmp_locs.push_back(res);
+        add_value(loc);
+        return res;
+      }
+      default:
+        return -1;
+    }
+  }
+
+  bool conf_jmp(size_t loc, size_t dest) {
+    if((loc + sizeof(loc) > code.size()) ||
+      !std::binary_search(jmp_locs.begin(), jmp_locs.end(), loc)) 
+      return false;
+    std::memcpy(&code[loc], &dest, sizeof(dest));
+    return true;
+  }
+
+  void add_resize_stack(int32_t diff) {
+    add_value(static_cast<uint8_t>(OPCODE::MODSTK));
+    add_value(diff);
+  }
+
+  bool add_move(OPCODE op) {
+    switch (op) {
+      case OPCODE::STORE_B:
+      case OPCODE::STORE_Q:
+      case OPCODE::STORE_S:
+        add_value(static_cast<uint8_t>(op));
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  bool add_load(OPCODE op) {
+    switch (op) {
+    case OPCODE::LOAD_B:
+    case OPCODE::LOAD_Q:
+    case OPCODE::LOAD_S:
       add_value(static_cast<uint8_t>(op));
-      add_value(reg);
+      return true;
+    default:
+      return false;
     }
+  }
 
-    inline void add_pop(OPCODE op, uint8_t reg)
-    {
+  bool add_pop(OPCODE op) {
+    switch (op) {
+    case OPCODE::POP_B:
+    case OPCODE::POP_Q:
+    case OPCODE::POP_S:
       add_value(static_cast<uint8_t>(op));
-      add_value(reg);
+      return true;
+    default:
+      return false;
     }
+  }
 
-    // stack shape : args | ret_addr | function vars
-    // pushes old base pointer value found in the last register
-    inline void add_call(size_t func_addr)
-    {
-      add_value(static_cast<uint8_t>(OPCODE::CALL));
-      add_value<uint8_t>(0);
-      add_value(func_addr);
+  bool add_read(OPCODE op) {
+    switch (op) {
+    case OPCODE::READ_I:
+    case OPCODE::READ_R:
+    case OPCODE::READ_C:
+    case OPCODE::READ_S:
+      add_value(static_cast<uint8_t>(op));
+      return true;
+    default:
+      return false;
     }
+  }
 
-    inline void add_ret(uint32_t func_stack_size)
-    {
-      add_value(static_cast<uint8_t>(OPCODE::RET));
-      add_value<uint8_t>(0);
-      add_value(func_stack_size);
+  bool add_write(OPCODE op) {
+    switch (op) {
+    case OPCODE::WRITE_I:
+    case OPCODE::WRITE_R:
+    case OPCODE::WRITE_C:
+    case OPCODE::WRITE_S:
+      add_value(static_cast<uint8_t>(op));
+      return true;
+    default:
+      return false;
     }
+  }
 
-    inline void add_mod_stack(int32_t size)
-    {
-      add_value(static_cast<uint8_t>(OPCODE::MODSTK));
-      add_value<uint8_t>(0);
-      add_value(size);
-    }
-
-    inline void add_read(OPCODE opcode, uint8_t reg)
-    {
-      add_value(static_cast<uint8_t>(opcode));
-      add_value(reg);
-    }
-
-    inline void add_read(OPCODE opcode, uint8_t reg, uint32_t len) // for array of chars
-    {
-      add_value(static_cast<uint8_t>(opcode));
-      add_value(reg);
-      add_value(len);
-    }
-
-    inline void add_write(OPCODE opcode, uint8_t reg)
-    {
-      add_value(static_cast<uint8_t>(opcode));
-      add_value(reg);
-    }
-
-    inline void add_write(OPCODE opcode, uint8_t reg, uint32_t len) // for array of chars
-    {
-      add_value(static_cast<uint8_t>(opcode));
-      add_value(reg);
-      add_value(len);
-    }
-
-  private:
-
-    // Fetching
-    inline uint8_t fetch_byte() const
-    {
-      return code[pc++];
-    }
-    
-    inline uint8_t fetch_reg() const
-    {
-      return code[pc++];
-    }
-
-    template <VarType T>
-    inline T fetch_value() const
-    {
-      T val;
-      std::memcpy(&val, &code[pc], sizeof(T));
-      pc += sizeof(T);
-      return val;
-    }
-    
-    inline uint64_t fetch_addr() const
-    {
-      uint64_t val;
-      std::memcpy(&val, &code[pc], 8);
-      pc += 8;
-      return val;
-    }
-    
-    // To be used with jmp instructions, with 1 byte padding after the opcode and before the offset
-    // Therefore, adding a jmp instructions + its operands uses 6 bytes
-    inline int32_t fetch_offset() const
-    {
-      int32_t val;
-      std::memcpy(&val, &code[pc], 4);
-      pc += 4;
-      return val;
-    }
-
-  };
+  void add_halt() {
+    add_value(static_cast<uint8_t>(OPCODE::HALT));
+  }
+};
 
 }
