@@ -72,19 +72,19 @@ void VM::run() const {
 
     case OPCODE::ADD_C:{
       pop_args(char)
-      add_var(a+b);
+      add_var<char>(a+b);
     }break;
     case OPCODE::SUB_C:{
       pop_args(char)
-      add_var(a-b);
+      add_var<char>(a-b);
     }break;
     case OPCODE::MUL_C:{
       pop_args(char)
-      add_var(a*b);
+      add_var<char>(a*b);
     }break;
     case OPCODE::DIV_C:{
       pop_args(char)
-      add_var(a/b);
+      add_var<char>(a/b);
     }break;
 
     case OPCODE::ADD_R:{
@@ -219,64 +219,6 @@ void VM::run() const {
       stack.resize(Int(stack.size()) + data, 0); // The usage of 0 is important for string ptrs
     } break;
 
-    case OPCODE::PUSH_S: {
-      auto loc = fetch_addr();
-      print_op(op, loc);
-
-      uint32_t len;
-      std::memcpy(&len, &code[loc], sizeof(len));
-      loc += sizeof(len);
-
-      std::string *s = new std::string();
-      s->reserve(len);
-
-      const size_t end = loc + len;
-      for (; loc < end; ++loc) {
-        s->push_back(code[loc]);
-      }
-
-      add_var(s);
-    } break;
-    case OPCODE::ADD_S: {
-      pop_args(std::string*)
-      *a += *b;
-      delete b;
-      add_var(a);
-    } break;
-    case OPCODE::CMP_S: {
-      pop_args(std::string*)
-      add_var(char(a->compare(*b)));
-    } break;
-    case OPCODE::LOAD_S: {
-      print_op(op);
-      const auto addr = fetch_data<size_t>();
-
-      std::string* data;
-      std::memcpy(&data, &stack[addr], sizeof(data));
-
-      // Copy if not null
-      if(data) data = new std::string(*data);
-      else data = new std::string();
-
-      add_var(data);
-    } break;
-    case OPCODE::STORE_S: {
-      print_op(op);
-      auto data = fetch_data<std::string*>();
-      const auto addr = fetch_data<size_t>();
-
-      std::string* old_data;
-      std::memcpy(&old_data, &stack[addr], sizeof(data));
-      if(old_data) delete old_data;
-
-      std::memcpy(&stack[addr], &data, sizeof(data));
-    }break;
-    case OPCODE::POP_S: {
-      print_op(op);
-      auto data = fetch_data<std::string*>();
-      if(data) delete data;
-    } break;
-
     case OPCODE::READ_I: {
       print_op(op);
       const auto addr = fetch_data<size_t>();
@@ -297,14 +239,20 @@ void VM::run() const {
     } break;
     case OPCODE::READ_S: {
       print_op(op);
+      const auto len = fetch_data<size_t>();
       const auto addr = fetch_data<size_t>();
 
-      std::string* data;
-      std::memcpy(&data, &stack[addr], sizeof(data));
-      if(!data) data = new std::string();
+      std::string data;
+      std::cin >> data;
 
-      std::cin >> *data;
-      std::memcpy(&stack[addr], &data, sizeof(data));
+      if(data.length() >= len) {
+        std::memcpy(&stack[addr], data.data(), len-1);
+        stack[addr+len-1] = '\0';
+      } else {
+        std::memcpy(&stack[addr], data.data(), data.length());
+        stack[addr+data.length()] = '\0';
+      }
+
     } break;
     case OPCODE::READ_C: {
       print_op(op);
@@ -333,9 +281,13 @@ void VM::run() const {
     } break;
     case OPCODE::WRITE_S: {
       print_op(op);
-      auto data = fetch_data<std::string*>();
-      std::cout << *data;
-      delete data;
+      const auto addr = fetch_data<size_t>();
+      std::cout << reinterpret_cast<const char*>(&stack[addr]);
+    } break;
+    case OPCODE::WRITE_CONST_S: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+      std::cout << reinterpret_cast<const char *>(&code[addr]);
     } break;
 
     case OPCODE::HALT:{

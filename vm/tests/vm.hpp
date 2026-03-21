@@ -1,822 +1,765 @@
-#include <gtest/gtest.h>
 #include "../src/vm.hpp"
-#include <cstring>
+#include <array>
+#include <cstdint>
+#include <gtest/gtest.h>
+#include <iostream>
 #include <sstream>
+#include <streambuf>
 #include <string>
 
-using namespace pascal_vm;
+namespace pascal_vm {
 
-// Test Load, Store, Push, Pop, Mov (Memory & Stack Operations)
-TEST(VMTest, MovOps)
-{
-  // Test 1: Load Immediate and Push
-  {
-    VM vm;
+using Real = double;
+using Int = int64_t;
 
-    const int64_t i = 2;
-    vm.add_load_inter(OPCODE::LOADIQ, 0, i);
+class IORedirect {
+public:
+  std::string str() const { return m_output.str(); }
 
-    const int8_t c = 'a';
-    vm.add_load_inter(OPCODE::LOADIB, 2, c);
+  IORedirect(std::string s = "")
+    : m_input(std::move(s)), m_old_output(std::cout.rdbuf(m_output.rdbuf())),
+      m_old_input(std::cin.rdbuf(m_input.rdbuf())) {}
 
-    const double d = 10.56;
-    vm.add_load_inter(OPCODE::LOADIQ, 1, d);
-
-    const bool b = true;
-    vm.add_load_inter(OPCODE::LOADIB, 5, b);
-
-    vm.add_push(OPCODE::PUSHB, 5);
-    vm.add_push(OPCODE::PUSHQ, 1);
-    vm.add_push(OPCODE::PUSHB, 2);
-    vm.add_push(OPCODE::PUSHQ, 0);
-
-    vm.add_halt();
-    vm.run();
-
-    ASSERT_EQ(vm.get_register(0).i, 2);
-    ASSERT_EQ(vm.get_register(2).c, 'a');
-    ASSERT_DOUBLE_EQ(vm.get_register(1).d, 10.56);
-    ASSERT_EQ(vm.get_register(5).b, true);
-
-    auto &stack = vm.data();
-    ASSERT_EQ(stack.size(), 18);
-    ASSERT_EQ(stack[0], b);
-
-    double d_res;
-    std::memcpy(&d_res, &stack[1], sizeof(double));
-    ASSERT_DOUBLE_EQ(d_res, d);
-
-    ASSERT_EQ(static_cast<char>(stack[9]), c);
-
-    int64_t i_res;
-    std::memcpy(&i_res, &stack[10], sizeof(int64_t));
-    ASSERT_EQ(i_res, i);
+  ~IORedirect() {
+    std::cout.rdbuf(m_old_output);
+    std::cin.rdbuf(m_old_input);
   }
 
-  // Test 2: Pop Operations
-  {
-    VM vm;
-
-    const int64_t i = 2;
-    vm.add_load_inter(OPCODE::LOADIQ, 0, i);
-    vm.add_push(OPCODE::PUSHQ, 0);
-
-    const int8_t c = 'a';
-    vm.add_load_inter(OPCODE::LOADIB, 0, c);
-    vm.add_push(OPCODE::PUSHB, 0);
-
-    const double d = 10.56;
-    vm.add_load_inter(OPCODE::LOADIQ, 0, d);
-    vm.add_push(OPCODE::PUSHQ, 0);
-
-    const bool b = true;
-    vm.add_load_inter(OPCODE::LOADIB, 0, b);
-    vm.add_push(OPCODE::PUSHB, 0);
-
-    vm.add_pop(OPCODE::POPB, 6);
-    vm.add_pop(OPCODE::POPQ, 7);
-    vm.add_pop(OPCODE::POPB, 8);
-    vm.add_pop(OPCODE::POPQ, 9);
-
-    vm.add_halt();
-    vm.run();
-
-    ASSERT_EQ(vm.get_register(9).i, i);
-    ASSERT_EQ(vm.get_register(8).c, c);
-    ASSERT_DOUBLE_EQ(vm.get_register(7).d, d);
-    ASSERT_EQ(vm.get_register(6).b, b);
-  }
-
-  // Test 3: Store and Load (Absolute Addressing)
-  {
-    VM vm;
-
-    // Allocate stack space
-    vm.add_push(OPCODE::PUSHB, 0);
-    vm.add_push(OPCODE::PUSHB, 0);
-    vm.add_push(OPCODE::PUSHQ, 0);
-    vm.add_push(OPCODE::PUSHQ, 0);
-
-    const int64_t i = 2;
-    vm.add_load_inter(OPCODE::LOADIQ, 0, i);
-    vm.add_store(OPCODE::STOREQ, 0, 0);
-
-    const int8_t c = 'a';
-    vm.add_load_inter(OPCODE::LOADIB, 1, c);
-    vm.add_store(OPCODE::STOREB, 1, 8);
-
-    const double d = 10.56;
-    vm.add_load_inter(OPCODE::LOADIQ, 1, d);
-    vm.add_store(OPCODE::STOREQ, 1, 9);
-
-    const bool b = true;
-    vm.add_load_inter(OPCODE::LOADIB, 0, b);
-    vm.add_store(OPCODE::STOREB, 0, 17);
-
-    vm.add_load(OPCODE::LOADQ, 3, 0);
-    vm.add_load(OPCODE::LOADB, 4, 8);
-    vm.add_load(OPCODE::LOADQ, 5, 9);
-    vm.add_load(OPCODE::LOADB, 6, 17);
-
-    vm.add_mov(10, 0);
-    vm.add_mov(11, 1);
-
-    vm.add_halt();
-    vm.run();
-
-    ASSERT_EQ(vm.get_register(3).i, i);
-    ASSERT_EQ(vm.get_register(4).c, c);
-    ASSERT_DOUBLE_EQ(vm.get_register(5).d, d);
-    ASSERT_EQ(vm.get_register(6).b, b);
-    ASSERT_EQ(vm.get_register(10).b, b);
-    ASSERT_DOUBLE_EQ(vm.get_register(11).d, d);
-  }
-}
-
-// Test Register Indirect Load/Store Operations
-TEST(VMTest, RegisterIndirectOps)
-{
-  // Test 1: Register indirect (pointer dereference)
-  {
-    VM vm;
-    
-    // Allocate stack space for test data
-    vm.add_mod_stack(32);
-    
-    // Write test values at specific addresses
-    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)999);
-    vm.add_store(OPCODE::STOREQ, 0, 0);
-    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'X');
-    vm.add_store(OPCODE::STOREB, 1, 8);
-    
-    // Load address into register
-    vm.add_load_inter(OPCODE::LOADIQ, 2, (uint64_t)0);
-    vm.add_load_inter(OPCODE::LOADIQ, 3, (uint64_t)8);
-    
-    // Load via register indirect
-    vm.add_load_reg(OPCODE::LOADQR, 4, 2);
-    vm.add_load_reg(OPCODE::LOADBR, 5, 3);
-    
-    // Store via register indirect (different addresses)
-    vm.add_load_inter(OPCODE::LOADIQ, 6, (int64_t)777);
-    vm.add_load_inter(OPCODE::LOADIB, 7, (int8_t)'Y');
-    vm.add_load_inter(OPCODE::LOADIQ, 8, (uint64_t)16);
-    vm.add_load_inter(OPCODE::LOADIQ, 9, (uint64_t)24);
-
-    vm.add_store_reg(OPCODE::STOREQR, 6, 8);
-    vm.add_store_reg(OPCODE::STOREBR, 7, 9);
-    
-    // Verify stores by loading back
-    vm.add_load(OPCODE::LOADQ, 10, 16);
-    vm.add_load(OPCODE::LOADB, 11, 24);
-    
-    vm.add_halt();
-    vm.run();
-    
-    ASSERT_EQ(vm.get_register(4).i, 999);
-    ASSERT_EQ(vm.get_register(5).c, 'X');
-    ASSERT_EQ(vm.get_register(10).i, 777);
-    ASSERT_EQ(vm.get_register(11).c, 'Y');
-  }
-  
-  // Test 2: Register + immediate offset (record field access)
-  {
-    VM vm;
-    
-    vm.add_mod_stack(65);
-    
-    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)12345);
-    vm.add_store(OPCODE::STOREQ, 0, 24);
-    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'Z');
-    vm.add_store(OPCODE::STOREB, 1, 32);
-    
-    // Base address in register
-    vm.add_load_inter(OPCODE::LOADIQ, 2, (uint64_t)16);
-    
-    // Load with offset (24-16=8, 32-16=16)
-    vm.add_load_reg_offset(OPCODE::LOADQRO, 3, 2, 8);
-    vm.add_load_reg_offset(OPCODE::LOADBRO, 4, 2, 16);
-    
-    // Store with offset
-    vm.add_load_inter(OPCODE::LOADIQ, 5, (int64_t)67890);
-    vm.add_load_inter(OPCODE::LOADIB, 6, (int8_t)'W');
-    vm.add_store_reg_offset(OPCODE::STOREQRO, 5, 2, 40);
-    vm.add_store_reg_offset(OPCODE::STOREBRO, 6, 2, 48);
-    
-    vm.add_load(OPCODE::LOADQ, 7, 56); // 16+40
-    vm.add_load(OPCODE::LOADB, 8, 64); // 16+48
-    
-    vm.add_halt();
-    vm.run();
-    
-    ASSERT_EQ(vm.get_register(3).i, 12345);
-    ASSERT_EQ(vm.get_register(4).c, 'Z');
-    ASSERT_EQ(vm.get_register(7).i, 67890);
-    ASSERT_EQ(vm.get_register(8).c, 'W');
-  }
-  
-  // Test 3: Register + register offset (array access)
-  {
-    VM vm;
-    
-    vm.add_mod_stack(128);
-    
-    // Write array of 4 integers
-    for (int i = 0; i < 4; ++i) {
-      vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)(1000 + i));
-      vm.add_store(OPCODE::STOREQ, 0, i * 8);
-    }
-    
-    // Base address
-    vm.add_load_inter(OPCODE::LOADIQ, 1, (uint64_t)0);
-    
-    // Index register (offset: index * 8)
-    vm.add_load_inter(OPCODE::LOADIQ, 2, (int64_t)2); // index 2
-    vm.add_op_inter(OPCODE::MULI_I, 3, 2, (int64_t)8); // byte offset
-    
-    // Load via register+register
-    vm.add_load_reg_reg(OPCODE::LOADQRR, 4, 1, 3);
-    
-    // Store via register+register (different index)
-    vm.add_load_inter(OPCODE::LOADIQ, 5, (int64_t)9999);
-    vm.add_load_inter(OPCODE::LOADIQ, 6, (int64_t)3); // index 3
-    vm.add_op_inter(OPCODE::MULI_I, 7, 6, (int64_t)8);
-    vm.add_store_reg_reg(OPCODE::STOREQRR, 5, 1, 7);
-    
-    vm.add_load(OPCODE::LOADQ, 8, 24); // index 3 * 8
-    
-    vm.add_halt();
-    vm.run();
-    
-    ASSERT_EQ(vm.get_register(4).i, 1002); // array[2]
-    ASSERT_EQ(vm.get_register(8).i, 9999); // array[3]
-  }
-}
-
-// Test all Arithmetic Operations (Int, Char, Double, Immediate variants)
-TEST(VMTest, AllArithmeticOps)
-{
-  // --- Integer Arithmetic ---
-  {
-    VM vm;
-    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)10);
-    vm.add_load_inter(OPCODE::LOADIQ, 1, (int64_t)3);
-
-    vm.add_op(OPCODE::ADD_I, 2, 0, 1); // 10 + 3 = 13
-    vm.add_op(OPCODE::SUB_I, 3, 0, 1); // 10 - 3 = 7
-    vm.add_op(OPCODE::MUL_I, 4, 0, 1); // 10 * 3 = 30
-    vm.add_op(OPCODE::DIV_I, 5, 0, 1); // 10 / 3 = 3
-    vm.add_op(OPCODE::MOD_I, 6, 0, 1); // 10 % 3 = 1
-
-    vm.add_op_inter(OPCODE::ADDI_I, 7, 0, (int64_t)5);  // 10 + 5 = 15
-    vm.add_op_inter(OPCODE::SUBI_I, 8, 0, (int64_t)5);  // 10 - 5 = 5
-    vm.add_op_inter(OPCODE::MULI_I, 9, 0, (int64_t)2);  // 10 * 2 = 20
-    vm.add_op_inter(OPCODE::DIVI_I, 10, 0, (int64_t)2); // 10 / 2 = 5
-    vm.add_op_inter(OPCODE::MODI_I, 11, 0, (int64_t)3); // 10 % 3 = 1
-
-    vm.add_halt();
-    vm.run();
-
-    ASSERT_EQ(vm.get_register(2).i, 13);
-    ASSERT_EQ(vm.get_register(3).i, 7);
-    ASSERT_EQ(vm.get_register(4).i, 30);
-    ASSERT_EQ(vm.get_register(5).i, 3);
-    ASSERT_EQ(vm.get_register(6).i, 1);
-    ASSERT_EQ(vm.get_register(7).i, 15);
-    ASSERT_EQ(vm.get_register(8).i, 5);
-    ASSERT_EQ(vm.get_register(9).i, 20);
-    ASSERT_EQ(vm.get_register(10).i, 5);
-    ASSERT_EQ(vm.get_register(11).i, 1);
-  }
-
-  // --- Double Arithmetic ---
-  {
-    VM vm;
-
-    vm.add_load_inter(OPCODE::LOADIQ, 0, 10.0);
-    vm.add_load_inter(OPCODE::LOADIQ, 1, 4.0);
-
-    vm.add_op(OPCODE::ADD_D, 2, 0, 1); // 10.0 + 4.0 = 14.0
-    vm.add_op(OPCODE::SUB_D, 3, 0, 1); // 10.0 - 4.0 = 6.0
-    vm.add_op(OPCODE::MUL_D, 4, 0, 1); // 10.0 * 4.0 = 40.0
-    vm.add_op(OPCODE::DIV_D, 5, 0, 1); // 10.0 / 4.0 = 2.5
-
-    vm.add_op_inter(OPCODE::ADDI_D, 7, 0, 5.0);  // 10.0 + 5.0 = 15.0
-    vm.add_op_inter(OPCODE::SUBI_D, 8, 0, 5.0);  // 10.0 - 5.0 = 5.0
-    vm.add_op_inter(OPCODE::MULI_D, 9, 0, 2.0);  // 10.0 * 2.0 = 20.0
-    vm.add_op_inter(OPCODE::DIVI_D, 10, 0, 2.5); // 10.0 / 2.5 = 4.0
-
-    vm.add_halt();
-    vm.run();
-
-    ASSERT_DOUBLE_EQ(vm.get_register(2).d, 14.0);
-    ASSERT_DOUBLE_EQ(vm.get_register(3).d, 6.0);
-    ASSERT_DOUBLE_EQ(vm.get_register(4).d, 40.0);
-    ASSERT_DOUBLE_EQ(vm.get_register(5).d, 2.5);
-
-    ASSERT_DOUBLE_EQ(vm.get_register(7).d, 15.0);
-    ASSERT_DOUBLE_EQ(vm.get_register(8).d, 5.0);
-    ASSERT_DOUBLE_EQ(vm.get_register(9).d, 20.0);
-    ASSERT_DOUBLE_EQ(vm.get_register(10).d, 4.0);
-  }
-
-  // --- Char Arithmetic ---
-  {
-    VM vm;
-    vm.add_load_inter(OPCODE::LOADIB, 0, (int8_t)10);
-    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)3);
-
-    vm.add_op(OPCODE::ADD_C, 2, 0, 1); // 10 + 3 = 13
-    vm.add_op(OPCODE::SUB_C, 3, 0, 1); // 10 - 3 = 7
-    vm.add_op(OPCODE::MUL_C, 4, 0, 1); // 10 * 3 = 30
-    vm.add_op(OPCODE::DIV_C, 5, 0, 1); // 10 / 3 = 3
-    vm.add_op(OPCODE::MOD_C, 6, 0, 1); // 10 % 3 = 1
-
-    vm.add_op_inter(OPCODE::ADDI_C, 7, 0, (int8_t)5); // 10 + 5 = 15
-    vm.add_op_inter(OPCODE::SUBI_C, 8, 0, (int8_t)5); // 10 - 5 = 5
-    vm.add_op_inter(OPCODE::MULI_C, 9, 0, (int8_t)5); // 10 * 5 = 50
-    vm.add_op_inter(OPCODE::DIVI_C, 10, 0, (int8_t)4); // 10 / 4 = 2
-    vm.add_op_inter(OPCODE::MODI_C, 11, 0, (int8_t)6);  // 10 % 6 = 4
-
-    vm.add_halt();
-    vm.run();
-
-    ASSERT_EQ(vm.get_register(2).c, 13);
-    ASSERT_EQ(vm.get_register(3).c, 7);
-    ASSERT_EQ(vm.get_register(4).c, 30);
-    ASSERT_EQ(vm.get_register(5).c, 3);
-    ASSERT_EQ(vm.get_register(6).c, 1);
-
-    ASSERT_EQ(vm.get_register(7).c, 15);
-    ASSERT_EQ(vm.get_register(8).c, 5);
-    ASSERT_EQ(vm.get_register(9).c, 50);
-    ASSERT_EQ(vm.get_register(10).c, 2);
-    ASSERT_EQ(vm.get_register(11).c, 4);
-  }
-}
-
-TEST(VMTest, CmpOps)
-{
-  auto test1 = []<typename T>(OPCODE op, T a, T b)
-  {
-    VM vm;
-
-    constexpr auto loadi = (sizeof(T) > 1 ? OPCODE::LOADIQ : OPCODE::LOADIB);
-
-    vm.add_load_inter(loadi, 0, a);
-    vm.add_load_inter(loadi, 1, b);
-
-    vm.add_cmp(op, 0, 1);
-
-    vm.add_halt();
-    vm.run();
-    return vm.get_flags();
-  };
-
-  auto test2 = []<typename T>(OPCODE op, T a, T b)
-  {
-    VM vm;
-
-    constexpr auto loadi = (sizeof(T) > 1 ? OPCODE::LOADIQ : OPCODE::LOADIB);
-    constexpr auto load = (sizeof(T) > 1 ? OPCODE::LOADQ : OPCODE::LOADB);
-
-    vm.add_load_inter(loadi, 0, a);
-
-    vm.add_cmp_inter(op, 0, b);
-
-    vm.add_halt();
-    vm.run();
-    return vm.get_flags();
-  };
-
-  auto test = [&]<typename T>(T a, T b, Flags f)
-  {
-    auto cmp = OPCODE::CMP_I;
-    auto cmpi = OPCODE::CMPI_I;
-
-    if(std::is_same_v<T, double>)
-    {
-      cmp = OPCODE::CMP_D;
-      cmpi = OPCODE::CMPI_D;
-    }
-    else if (std::is_same_v<T, int8_t>)
-    {
-      cmp = OPCODE::CMP_C;
-      cmpi = OPCODE::CMPI_C;
-    }
-
-    auto f1 = test1(cmp, a, b);
-    auto f2 = test2(cmpi, a, b);
-    
-    ASSERT_EQ(f1.N, f2.N);
-    ASSERT_EQ(f1.Z, f2.Z);
-    ASSERT_EQ(f1.N, f.N);
-    ASSERT_EQ(f1.Z, f.Z);
-  };
-
-  test((int64_t)5, (int64_t)5, Flags{.Z=true, .N=false});
-  test((int64_t)-1, (int64_t)5, Flags{.Z=false, .N=true});
-  test((int64_t)-1, (int64_t)-10, Flags{.Z=false, .N=false});
-  
-  test((double)5, (double)5, Flags{.Z=true, .N=false});
-  test((double)-1, (double)5, Flags{.Z=false, .N=true});
-  test((double)-1, (double)-10, Flags{.Z=false, .N=false});
-
-  test((int8_t)5, (int8_t)5, Flags{.Z=true, .N=false});
-  test((int8_t)-1, (int8_t)5, Flags{.Z=false, .N=true});
-  test((int8_t)-1, (int8_t)-10, Flags{.Z=false, .N=false});
-}
-
-// Test Control Flow (Jumps)
-TEST(VMTest, ControlFlowJumps)
-{
-
-  auto test = [](OPCODE op)
-  {
-    VM vm;
-
-    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)5);
-    vm.add_load_inter(OPCODE::LOADIQ, 1, (int64_t)10);
-
-    vm.add_cmp(OPCODE::CMP_I, 0, 1);
-    size_t jmp_loc = vm.add_jmp(op);
-    vm.add_load_inter(OPCODE::LOADIQ, 2, (int64_t)999);
-    vm.conf_jmp(jmp_loc, vm.get_current_location());
-
-    vm.add_cmp(OPCODE::CMP_I, 0, 0);
-    size_t jmp_loc2 = vm.add_jmp(op);
-    vm.add_load_inter(OPCODE::LOADIQ, 3, (int64_t)999);
-    vm.conf_jmp(jmp_loc2, vm.get_current_location());
-
-    vm.add_cmp(OPCODE::CMP_I, 1, 0);
-    size_t jmp_loc3 = vm.add_jmp(op);
-    vm.add_load_inter(OPCODE::LOADIQ, 4, (int64_t)999);
-    vm.conf_jmp(jmp_loc3, vm.get_current_location());
-
-    vm.add_halt();
-
-    vm.run();
-    return vm;
-  };
-
-  // Test JLT (Jump if: N=true, Z=false)
-  {
-    VM vm = test(OPCODE::JLT);
-    ASSERT_NE(vm.get_register(2).i, 999); // 5 < 10 
-    ASSERT_EQ(vm.get_register(3).i, 999); // 5 == 5
-    ASSERT_EQ(vm.get_register(4).i, 999); // 5 > 10
-  }
-
-  // Test JGT (Jump if: N=false, Z=false)
-  {
-    VM vm = test(OPCODE::JGT);
-    ASSERT_EQ(vm.get_register(2).i, 999); // 5 < 10
-    ASSERT_EQ(vm.get_register(3).i, 999); // 5 == 5
-    ASSERT_NE(vm.get_register(4).i, 999); // 5 > 10
-  }
-
-  // Test JEQ (Jump if: Z=true)
-  {
-    VM vm = test(OPCODE::JEQ);
-    ASSERT_EQ(vm.get_register(2).i, 999); // 5 < 10
-    ASSERT_NE(vm.get_register(3).i, 999); // 5 == 5
-    ASSERT_EQ(vm.get_register(4).i, 999); // 5 > 10
-  }
-
-  // Test JNE (Jump if: Z=false)
-  {
-    VM vm = test(OPCODE::JNE);
-    ASSERT_NE(vm.get_register(2).i, 999); // 5 < 10
-    ASSERT_EQ(vm.get_register(3).i, 999); // 5 == 5
-    ASSERT_NE(vm.get_register(4).i, 999); // 5 > 10
-  }
-
-  // Test JLE (Jump if: N=true OR Z=true)
-  {
-    VM vm = test(OPCODE::JLE);
-    ASSERT_NE(vm.get_register(2).i, 999); // 5 < 10
-    ASSERT_NE(vm.get_register(3).i, 999); // 5 == 5
-    ASSERT_EQ(vm.get_register(4).i, 999); // 5 > 10
-  }
-
-  // Test JGE (Jump if: N=false OR Z=true)
-  {
-    VM vm = test(OPCODE::JGE);
-    ASSERT_EQ(vm.get_register(2).i, 999); // 5 < 10
-    ASSERT_NE(vm.get_register(3).i, 999); // 5 == 5
-    ASSERT_NE(vm.get_register(4).i, 999); // 5 > 10
-  }
-}
-
-// Test IO Operations
-TEST(VMTest, IO_Ops)
-{
-  // Redirect cin/cout
-  std::stringstream input;
-  std::stringstream output;
-  auto old_cin = std::cin.rdbuf(input.rdbuf());
-  auto old_cout = std::cout.rdbuf(output.rdbuf());
-
-  input << "42 3.14 z hello";
-
+private:
+  std::ostringstream m_output;
+  std::istringstream m_input;
+  std::streambuf *m_old_input, *m_old_output;
+};
+
+// ==================== BASIC STACK OPERATIONS ====================
+
+TEST(VMTest, PushAndPop_Int64) {
   VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(42));
+  vm.add_pop(OPCODE::POP_Q);
+  vm.add_halt();
+  vm.run();
 
-  // Allocate string buffer on stack (enough for "hello")
-  for (int i = 0; i < 8; ++i)
-    vm.add_push(OPCODE::PUSHB, 0);
+  EXPECT_EQ(vm.data().size(), 0);
+}
 
-  vm.add_read(OPCODE::READ_I, 0);
-  vm.add_read(OPCODE::READ_D, 1);
-  vm.add_read(OPCODE::READ_C, 2);
+TEST(VMTest, PushAndPop_Byte) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, int8_t(127));
+  vm.add_pop(OPCODE::POP_B);
+  vm.add_halt();
+  vm.run();
 
-  // READ_S (reads into address 0, max len 8)
-  vm.add_load_inter(OPCODE::LOADIQ, 3, (int64_t)0);
-  vm.add_read(OPCODE::READ_S, 3, 8);
+  EXPECT_EQ(vm.data().size(), 0);
+}
 
-  vm.add_write(OPCODE::WRITE_I, 0); // Should write 42
-  vm.add_write(OPCODE::WRITE_D, 1); // Should write 3.14
-  vm.add_write(OPCODE::WRITE_C, 2); // Should write z
+TEST(VMTest, Push_MultipleValues) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(10));
+  vm.add_push(OPCODE::PUSH_Q, Int(20));
+  vm.add_pop(OPCODE::POP_Q);
+  vm.add_halt();
+  vm.run();
 
-  vm.add_load_inter(OPCODE::LOADIQ, 4, (int64_t)0);
-  vm.add_write(OPCODE::WRITE_S, 4, 8); // Should write "hello"
+  EXPECT_EQ(vm.fetch_data<Int>(), 10);
+}
+
+// ==================== ARITHMETIC INTEGERS ====================
+
+TEST(VMTest, Add_Integers) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(30));
+  vm.add_push(OPCODE::PUSH_Q, Int(12));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 42);
+}
+
+TEST(VMTest, Subtract_Integers) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(50));
+  vm.add_push(OPCODE::PUSH_Q, Int(8));
+  vm.add_arithmetic_op(OPCODE::SUB_I);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 42);
+}
+
+TEST(VMTest, Multiply_Integers) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(7));
+  vm.add_push(OPCODE::PUSH_Q, Int(6));
+  vm.add_arithmetic_op(OPCODE::MUL_I);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 42);
+}
+
+TEST(VMTest, Divide_Integers) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(100));
+  vm.add_push(OPCODE::PUSH_Q, Int(4));
+  vm.add_arithmetic_op(OPCODE::DIV_I);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 25);
+}
+
+TEST(VMTest, IntegerDivision_Truncates) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(7));
+  vm.add_push(OPCODE::PUSH_Q, Int(3));
+  vm.add_arithmetic_op(OPCODE::DIV_I);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 2);
+}
+
+TEST(VMTest, Subtract_NegativeResult) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(5));
+  vm.add_push(OPCODE::PUSH_Q, Int(10));
+  vm.add_arithmetic_op(OPCODE::SUB_I);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), -5);
+}
+
+// ==================== ARITHMETIC REALS ====================
+
+TEST(VMTest, Add_Reals) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Real(3.5));
+  vm.add_push(OPCODE::PUSH_Q, Real(2.5));
+  vm.add_arithmetic_op(OPCODE::ADD_R);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_DOUBLE_EQ(vm.fetch_data<Real>(), 6.0);
+}
+
+TEST(VMTest, Subtract_Reals) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Real(10.0));
+  vm.add_push(OPCODE::PUSH_Q, Real(3.5));
+  vm.add_arithmetic_op(OPCODE::SUB_R);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_DOUBLE_EQ(vm.fetch_data<Real>(), 6.5);
+}
+
+TEST(VMTest, Multiply_Reals) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Real(4.0));
+  vm.add_push(OPCODE::PUSH_Q, Real(2.5));
+  vm.add_arithmetic_op(OPCODE::MUL_R);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_DOUBLE_EQ(vm.fetch_data<Real>(), 10.0);
+}
+
+TEST(VMTest, Divide_Reals) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Real(10.0));
+  vm.add_push(OPCODE::PUSH_Q, Real(4.0));
+  vm.add_arithmetic_op(OPCODE::DIV_R);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_DOUBLE_EQ(vm.fetch_data<Real>(), 2.5);
+}
+
+// ==================== ARITHMETIC CHARS ====================
+
+TEST(VMTest, Add_Chars) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(5));
+  vm.add_push(OPCODE::PUSH_B, 'A');
+  vm.add_arithmetic_op(OPCODE::ADD_C);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), 'F');
+}
+
+TEST(VMTest, Subtract_Chars) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, 'z');
+  vm.add_push(OPCODE::PUSH_B, 'a');
+  vm.add_arithmetic_op(OPCODE::SUB_C);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), char(25));
+}
+
+TEST(VMTest, Multiply_Chars) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(10));
+  vm.add_push(OPCODE::PUSH_B, char(3));
+  vm.add_arithmetic_op(OPCODE::MUL_C);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), char(30));
+}
+
+TEST(VMTest, Divide_Chars) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, 'A');
+  vm.add_push(OPCODE::PUSH_B, char(2));
+  vm.add_arithmetic_op(OPCODE::DIV_C);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), char(32));
+}
+
+// ==================== LOGICAL OPERATIONS ====================
+
+TEST(VMTest, AND_Operation) {
+  VM vm;
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_logic_op(OPCODE::AND);
+
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_logic_op(OPCODE::AND);
+
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_logic_op(OPCODE::AND);
+
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_logic_op(OPCODE::AND);
 
   vm.add_halt();
   vm.run();
 
-  // Restore buffers
-  std::cin.rdbuf(old_cin);
-  std::cout.rdbuf(old_cout);
-
-  // Verify Reads
-  ASSERT_EQ(vm.get_register(0).i, 42);
-  ASSERT_DOUBLE_EQ(vm.get_register(1).d, 3.14);
-  ASSERT_EQ(vm.get_register(2).c, 'z');
-  ASSERT_STREQ((char *)vm.data().data(), "hello");
-
-  // Verify Writes
-  ASSERT_EQ(output.str(), "423.14zhello");
+  for (bool b : {false, false, false, true}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
 }
 
-// Test basic CALL and RET: a function that does nothing .
-TEST(VMTest, CallRetSimple)
-{
+TEST(VMTest, OR_Operation) {
+  VM vm;
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_logic_op(OPCODE::OR);
+
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_logic_op(OPCODE::OR);
+
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_logic_op(OPCODE::OR);
+
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_logic_op(OPCODE::OR);
+
+  vm.add_halt();
+  vm.run();
+
+  for (bool b : {false, true, true, true}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
+}
+
+TEST(VMTest, NOT_Operation) {
+  VM vm;
+  vm.add_push<bool>(OPCODE::PUSH_B, 1);
+  vm.add_not_op();
+
+  vm.add_push<bool>(OPCODE::PUSH_B, 0);
+  vm.add_not_op();
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_TRUE(vm.fetch_data<bool>());
+  EXPECT_FALSE(vm.fetch_data<bool>());
+}
+
+// ==================== COMPARISON INTEGERS ====================
+
+TEST(VMTest, Compare_Int) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(20));
+  vm.add_push(OPCODE::PUSH_Q, Int(10));
+  vm.add_cmp(OPCODE::CMP_I);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(42));
+  vm.add_push(OPCODE::PUSH_Q, Int(42));
+  vm.add_cmp(OPCODE::CMP_I);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(10));
+  vm.add_push(OPCODE::PUSH_Q, Int(100));
+  vm.add_cmp(OPCODE::CMP_I);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), char(-1));
+  EXPECT_EQ(vm.fetch_data<char>(), char(0));
+  EXPECT_EQ(vm.fetch_data<char>(), char(1));
+}
+
+TEST(VMTest, Compare_Real) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Real(20.8));
+  vm.add_push(OPCODE::PUSH_Q, Real(20.6));
+  vm.add_cmp(OPCODE::CMP_R);
+
+  vm.add_push(OPCODE::PUSH_Q, Real(42.0));
+  vm.add_push(OPCODE::PUSH_Q, Real(42.0));
+  vm.add_cmp(OPCODE::CMP_R);
+
+  vm.add_push(OPCODE::PUSH_Q, Real(-10.14));
+  vm.add_push(OPCODE::PUSH_Q, Real(100));
+  vm.add_cmp(OPCODE::CMP_R);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), char(-1));
+  EXPECT_EQ(vm.fetch_data<char>(), char(0));
+  EXPECT_EQ(vm.fetch_data<char>(), char(1));
+}
+
+TEST(VMTest, Compare_Char) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char('Z'));
+  vm.add_push(OPCODE::PUSH_B, char('A'));
+  vm.add_cmp(OPCODE::CMP_C);
+
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_cmp(OPCODE::CMP_C);
+
+  vm.add_push(OPCODE::PUSH_B, char('?'));
+  vm.add_push(OPCODE::PUSH_B, char('?'));
+  vm.add_cmp(OPCODE::CMP_C);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), char(0));
+  EXPECT_EQ(vm.fetch_data<char>(), char(-1));
+  EXPECT_EQ(vm.fetch_data<char>(), char(1));
+}
+
+// ==================== FLAG OPERATIONS ====================
+
+TEST(VMTest, LE_flag) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_flag(OPCODE::LE);
+
+  vm.add_push(OPCODE::PUSH_B, char(0));
+  vm.add_flag(OPCODE::LE);
+
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_flag(OPCODE::LE);
+
+  vm.add_halt();
+  vm.run();
+
+  for (bool b : {false, true, true}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
+}
+
+TEST(VMTest, LT_flag) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_flag(OPCODE::LT);
+
+  vm.add_push(OPCODE::PUSH_B, char(0));
+  vm.add_flag(OPCODE::LT);
+
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_flag(OPCODE::LT);
+
+  vm.add_halt();
+  vm.run();
+
+  for (bool b : {false, false, true}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
+}
+
+TEST(VMTest, EQ_flag) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_flag(OPCODE::EQ);
+
+  vm.add_push(OPCODE::PUSH_B, char(0));
+  vm.add_flag(OPCODE::EQ);
+
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_flag(OPCODE::EQ);
+
+  vm.add_halt();
+  vm.run();
+
+  for (bool b : {false, true, false}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
+}
+
+TEST(VMTest, NE_flag) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_flag(OPCODE::NE);
+
+  vm.add_push(OPCODE::PUSH_B, char(0));
+  vm.add_flag(OPCODE::NE);
+
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_flag(OPCODE::NE);
+
+  vm.add_halt();
+  vm.run();
+
+  for (bool b : {true, false, true}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
+}
+
+TEST(VMTest, GT_flag) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_flag(OPCODE::GT);
+
+  vm.add_push(OPCODE::PUSH_B, char(0));
+  vm.add_flag(OPCODE::GT);
+
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_flag(OPCODE::GT);
+
+  vm.add_halt();
+  vm.run();
+
+  for (bool b : {true, false, false}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
+}
+
+TEST(VMTest, GE_flag) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_flag(OPCODE::GE);
+
+  vm.add_push(OPCODE::PUSH_B, char(0));
+  vm.add_flag(OPCODE::GE);
+
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_flag(OPCODE::GE);
+
+  vm.add_halt();
+  vm.run();
+
+  for (bool b : {true, true, false}) {
+    EXPECT_EQ(vm.fetch_data<bool>(), b);
+  }
+}
+
+// ==================== JUMP INSTRUCTIONS ====================
+
+TEST(VMTest, JMP_Absolute) {
   VM vm;
 
-  // Jump over the function
-  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  size_t jump_loc = vm.add_jmp(OPCODE::JMP, 0);
+  vm.add_push(OPCODE::PUSH_Q, Int(1));
 
-  // --- Function code (does nothing) ---
-  size_t func_addr = vm.get_current_location();
-  vm.add_ret(0);
-
-  // --- Main code ---
-  vm.conf_jmp(jmp_to_main, vm.get_current_location());
-
-  // Set last register (R15) to a known value (101) to verify it is restored
-  vm.add_load_inter(OPCODE::LOADIQ, VM::NUM_REGISTERS-1, (uint64_t)101);
-
-  vm.add_call(func_addr);
+  ASSERT_TRUE(vm.conf_jmp(jump_loc, vm.get_current_location()));
   vm.add_halt();
 
   vm.run();
 
-  // After return, R15 should be restored to its original value (100)
-  ASSERT_EQ(vm.get_register(15).u, 101);
-  // Stack should be empty (no arguments, no locals)
-  ASSERT_EQ(vm.data().size(), 0);
+  EXPECT_EQ(vm.fetch_data<Int>(), 0);
 }
 
-// Test function with a local variables + cleanup.
-TEST(VMTest, CallRetWithLocals)
-{
+TEST(VMTest, JMP_TRUE_WhenTrue) {
   VM vm;
 
-  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_push(OPCODE::PUSH_B, true);
 
-  // --- Function code ---
-  size_t func_addr = vm.get_current_location();
-  // Allocate 9 bytes
-  vm.add_push(OPCODE::PUSHQ, 0);
-  vm.add_push(OPCODE::PUSHB, 0);
-  
-  vm.add_load_inter(OPCODE::LOADIQ, 1, (int64_t)42);
-  vm.add_store_local(OPCODE::STORELQ, 1, 0);
-  vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'A');
-  vm.add_store_local(OPCODE::STORELB, 1, 8);
+  size_t jump_loc = vm.add_jmp(OPCODE::JMP_TRUE, 0);
 
-  vm.add_load_local(OPCODE::LOADLQ, 2, 0);
-  vm.add_load_local(OPCODE::LOADLB, 3, 8);
+  vm.add_push(OPCODE::PUSH_Q, Int(1));
 
-  // Return, cleaning up the local variables (8 bytes)
-  vm.add_ret(9);
-
-  // --- Main code ---
-  vm.conf_jmp(jmp_to_main, vm.get_current_location());
-
-  vm.add_call(func_addr);
+  ASSERT_TRUE(vm.conf_jmp(jump_loc, vm.get_current_location()));
   vm.add_halt();
 
   vm.run();
 
-  ASSERT_EQ(vm.get_register(2).i, 42);
-  ASSERT_EQ(vm.get_register(3).c, 'A');
-
-  ASSERT_EQ(vm.data().size(), 0);
+  EXPECT_EQ(vm.fetch_data<Int>(), 0);
 }
 
-// Test function that accesses arguments.
-TEST(VMTest, CallRetWithArgs)
-{
+TEST(VMTest, JMP_TRUE_WhenFalse) {
   VM vm;
 
-  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_push(OPCODE::PUSH_B, false);
 
-  // --- Function code ---
-  size_t func_addr = vm.get_current_location();
-  // Expects two arguments (8 byte + 1 byte).
-  vm.add_load_local(OPCODE::LOADLQ, 1, -8); // first argument
-  vm.add_load_local(OPCODE::LOADLB, 2, -9); // second argument
-  vm.add_op(OPCODE::ADD_I, 0, 1, 2);        // R0 = arg1 + arg2
-  vm.add_ret(0);                            // no locals
+  size_t jump_loc = vm.add_jmp(OPCODE::JMP_TRUE, 0);
 
-  // --- Main code ---
-  size_t main_start = vm.get_current_location();
-  vm.conf_jmp(jmp_to_main, main_start);
+  vm.add_push(OPCODE::PUSH_Q, Int(1));
 
-  // Push arguments in reverse order
-  vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)5);
-  vm.add_push(OPCODE::PUSHB, 1);
-  vm.add_load_inter(OPCODE::LOADIQ, 2, (int64_t)10);
-  vm.add_push(OPCODE::PUSHQ, 2);
-
-  vm.add_call(func_addr);
-
-  // After return, arguments remain on stack
-  vm.add_pop(OPCODE::POPQ, 3); // pop 10
-  vm.add_pop(OPCODE::POPB, 4); // pop 5
+  ASSERT_TRUE(vm.conf_jmp(jump_loc, vm.get_current_location()));
   vm.add_halt();
 
   vm.run();
 
-  ASSERT_EQ(vm.get_register(0).i, 15); // 10 + 5
-  ASSERT_EQ(vm.data().size(), 0);      // stack empty after pops
+  EXPECT_EQ(vm.fetch_data<Int>(), 1);
 }
 
-// Test nested calls: main => func1 => func2
-TEST(VMTest, NestedCalls)
-{
+TEST(VMTest, JMP_FALSE_WhenTrue) {
   VM vm;
 
-  size_t jmp_to_main = vm.add_jmp(OPCODE::JMP);
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_push(OPCODE::PUSH_B, true);
 
-  // --- Function 2 (doubles its argument) ---
-  size_t func2_addr = vm.get_current_location();
-  vm.add_load_local(OPCODE::LOADLQ, 1, -8); // argument
-  vm.add_op_inter(OPCODE::MULI_I, 0, 1, (int64_t)2);
-  vm.add_ret(0);
+  size_t jump_loc = vm.add_jmp(OPCODE::JMP_FALSE, 0);
 
-  // --- Function 1 (calls func2, then adds 5) ---
-  size_t func1_addr = vm.get_current_location();
-  // Push argument for func2 (the same argument we received)
-  vm.add_load_local(OPCODE::LOADLQ, 1, -8); // argument
-  vm.add_push(OPCODE::PUSHQ, 1);
-  vm.add_call(func2_addr);
-  // Pop the argument after return and discard it
-  vm.add_pop(OPCODE::POPQ, 2);
-  // Add 5 to result
-  vm.add_op_inter(OPCODE::ADDI_I, 0, 0, (int64_t)5);
-  vm.add_ret(0);
+  vm.add_push(OPCODE::PUSH_Q, Int(1));
 
-  // --- Main code ---
-  vm.conf_jmp(jmp_to_main, vm.get_current_location());
-
-  // Push argument for func1
-  vm.add_load_inter(OPCODE::LOADIQ, 1, (int64_t)7);
-  vm.add_push(OPCODE::PUSHQ, 1);
-  vm.add_call(func1_addr);
-  // Pop argument
-  vm.add_pop(OPCODE::POPQ, 2);
+  ASSERT_TRUE(vm.conf_jmp(jump_loc, vm.get_current_location()));
   vm.add_halt();
 
   vm.run();
 
-  // Expected: (7 * 2) + 5 = 19
-  ASSERT_EQ(vm.get_register(0).i, 19);
-  ASSERT_EQ(vm.data().size(), 0);
+  EXPECT_EQ(vm.fetch_data<Int>(), 1);
 }
 
-// Tests for MODSTK (stack modification)
-TEST(VMTest, StackOps)
-{
+TEST(VMTest, JMP_FALSE_WhenFalse) {
+  VM vm;
 
-  // Test MODSTK with positive size: allocate extra stack space, store/load values
-  {
-    VM vm;
-  
-    // Initially stack is empty
-    ASSERT_EQ(vm.data().size(), 0);
-  
-    // Allocate 16 bytes
-    vm.add_mod_stack(16);
-  
-    // Write some data
-    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)999);
-    vm.add_store(OPCODE::STOREQ, 0, 0);
-    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'X');
-    vm.add_store(OPCODE::STOREB, 1, 8);
-  
-    vm.add_load(OPCODE::LOADQ, 2, 0);
-    vm.add_load(OPCODE::LOADB, 3, 8);
-  
-    vm.add_halt();
-    vm.run();
-  
-    // Verify stack size (should still be 16)
-    ASSERT_EQ(vm.data().size(), 16);
-  
-    // Verify loaded values
-    ASSERT_EQ(vm.get_register(0).i, 999);
-    ASSERT_EQ(vm.get_register(1).c, 'X');
-    ASSERT_EQ(vm.get_register(2).i, 999);
-    ASSERT_EQ(vm.get_register(3).c, 'X');
-  }
-  
-  // Test MODSTK with negative size: shrink the stack, then push/pop at new top
-  {
-    VM vm;
-  
-    vm.add_mod_stack(24);
-  
-    // Write some data at various offsets
-    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)100);
-    vm.add_store(OPCODE::STOREQ, 0, 0);
-    vm.add_load_inter(OPCODE::LOADIB, 1, (int8_t)'w');
-    vm.add_store(OPCODE::STOREB, 1, 8);
-    vm.add_load_inter(OPCODE::LOADIB, 2, (int8_t)'A');
-    vm.add_store(OPCODE::STOREB, 2, 9);
-  
-    // Now shrink by 15 bytes
-    vm.add_mod_stack(-15);
-  
-    vm.add_load_inter(OPCODE::LOADIQ, 3, (int64_t)300);
-    vm.add_push(OPCODE::PUSHQ, 3);
-  
-    vm.add_pop(OPCODE::POPQ, 4);
-  
-    vm.add_load(OPCODE::LOADQ, 5, 0);
-    vm.add_load(OPCODE::LOADB, 6, 8);
-  
-    vm.add_halt();
-    vm.run();
-  
-    // Final stack size should be 9
-    ASSERT_EQ(vm.data().size(), 9);
-  
-    // Verify data
-    ASSERT_EQ(vm.get_register(0).i, 100);
-    ASSERT_EQ(vm.get_register(1).c, 'w');
-    ASSERT_EQ(vm.get_register(2).c, 'A');
-    ASSERT_EQ(vm.get_register(3).i, 300);
-  
-    ASSERT_EQ(vm.get_register(4).i, 300);
-    ASSERT_EQ(vm.get_register(5).i, 100);
-    ASSERT_EQ(vm.get_register(6).c, 'w');
-  }
-  
-  // Test MODSTK with zero size: no change
-  {
-    VM vm;
-  
-    vm.add_push(OPCODE::PUSHQ, 0);
-  
-    vm.add_mod_stack(0); // should do nothing
-  
-    vm.add_pop(OPCODE::POPQ, 0);
-    vm.add_halt();
-    vm.run();
-  
-    ASSERT_EQ(vm.data().size(), 0);
-  }
-  
-  // Test multiple MODSTK operations in sequence
-  {
-    VM vm;
-  
-    // Start empty
-    vm.add_mod_stack(10);  // size = 10
-    vm.add_mod_stack(5);   // size = 15
-    vm.add_mod_stack(-3);  // size = 12
-    vm.add_mod_stack(-12); // size = 0
-  
-    // Push a value to verify stack is usable
-    vm.add_load_inter(OPCODE::LOADIQ, 0, (int64_t)42);
-    vm.add_push(OPCODE::PUSHQ, 0);
-    vm.add_pop(OPCODE::POPQ, 1);
-    vm.add_halt();
-    vm.run();
-  
-    ASSERT_EQ(vm.data().size(), 0);
-    ASSERT_EQ(vm.get_register(1).i, 42);
-  }
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_push(OPCODE::PUSH_B, false);
 
+  size_t jump_loc = vm.add_jmp(OPCODE::JMP_FALSE, 0);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(1));
+
+  ASSERT_TRUE(vm.conf_jmp(jump_loc, vm.get_current_location()));
+  vm.add_halt();
+
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 0);
 }
+
+// ==================== STACK OPERATIONS ====================
+
+TEST(VMTest, MODSTK_IncreaseStackSize) {
+  VM vm;
+  vm.add_resize_stack(16);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_GE(vm.data().size(), 16);
+}
+
+TEST(VMTest, MODSTK_DecreaseStackSize) {
+  VM vm;
+  vm.add_push(OPCODE::PUSH_Q, Int(1));
+  vm.add_push(OPCODE::PUSH_Q, Int(2));
+  vm.add_resize_stack(-8);
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.data().size(), 8);
+}
+
+// ==================== MEMORY OPERATIONS ====================
+
+TEST(VMTest, STORE_Q_and_LOAD_Q) {
+  VM vm;
+  vm.add_resize_stack(16);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_push(OPCODE::PUSH_Q, Int(42));
+  vm.add_move(OPCODE::STORE_Q);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(8));
+  vm.add_push(OPCODE::PUSH_Q, Int(-7));
+  vm.add_move(OPCODE::STORE_Q);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(8));
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), -7);
+  EXPECT_EQ(vm.fetch_data<Int>(), 42);
+}
+
+TEST(VMTest, STORE_B_and_LOAD_B) {
+  VM vm;
+  vm.add_resize_stack(8);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(4));
+  vm.add_push(OPCODE::PUSH_B, int8_t(99));
+  vm.add_move(OPCODE::STORE_B);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(5));
+  vm.add_push(OPCODE::PUSH_B, int8_t(-11));
+  vm.add_move(OPCODE::STORE_B);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(4));
+  vm.add_load(OPCODE::LOAD_B);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(5));
+  vm.add_load(OPCODE::LOAD_B);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<int8_t>(), -11);
+  EXPECT_EQ(vm.fetch_data<int8_t>(), 99);
+}
+
+// ==================== COMPLEX INTEGRATION TESTS ====================
+
+TEST(VMTest, MultipleArithmeticOps) {
+  VM vm;
+
+  vm.add_push(OPCODE::PUSH_Q, Int(3));
+  vm.add_push(OPCODE::PUSH_Q, Int(2));
+  vm.add_arithmetic_op(OPCODE::MUL_I);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(4));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(5));
+  vm.add_arithmetic_op(OPCODE::SUB_I);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 5);
+}
+
+TEST(VMTest, CompareAndBranchSequence) {
+  IORedirect output;
+  VM vm;
+
+  vm.add_resize_stack(8);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_push(OPCODE::PUSH_Q, Int(5));
+  vm.add_move(OPCODE::STORE_Q);
+
+  size_t loop_beg = vm.get_current_location();
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_load(OPCODE::LOAD_Q);
+  vm.add_push(OPCODE::PUSH_Q, Int(7));
+  vm.add_cmp(OPCODE::CMP_I);
+  vm.add_flag(OPCODE::GT);
+
+  size_t jmp_addr = vm.add_jmp(OPCODE::JMP_TRUE, 0);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_write(OPCODE::WRITE_I);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_load(OPCODE::LOAD_Q);
+  vm.add_push(OPCODE::PUSH_Q, Int(1));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+
+  vm.add_move(OPCODE::STORE_Q);
+
+  vm.add_jmp(OPCODE::JMP, loop_beg);
+
+  ASSERT_TRUE(vm.conf_jmp(jmp_addr, vm.get_current_location()));
+
+  vm.add_halt();
+
+  vm.run();
+
+  EXPECT_EQ(output.str(), "567");
+}
+
+TEST(VMTest, IO) {
+
+  IORedirect redirect("Alice\n42\n0\n3.14\n");
+
+  VM vm;
+
+  const auto jmp_addr = vm.add_jmp(OPCODE::JMP, 0);
+  const std::string str = "What's you name, age, digit, PI ?";
+  const auto str_addr = vm.add_string(str);
+  ASSERT_TRUE(vm.conf_jmp(jmp_addr, vm.get_current_location()));
+
+  vm.add_resize_stack(27); // Int + Real + char[10] + char
+
+  vm.add_push(OPCODE::PUSH_Q, Int(str_addr));
+  vm.add_write(OPCODE::WRITE_CONST_S);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(16)); // char[10] address
+  vm.add_push(OPCODE::PUSH_Q, Int(10)); // length
+  vm.add_read_string();
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0)); // Int
+  vm.add_read(OPCODE::READ_I);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(26)); // Char
+  vm.add_read(OPCODE::READ_C);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(8)); // Real
+  vm.add_read(OPCODE::READ_R);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0)); // Int
+  vm.add_load(OPCODE::LOAD_Q);
+  vm.add_write(OPCODE::WRITE_I);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(8)); // Real
+  vm.add_load(OPCODE::LOAD_Q);
+  vm.add_write(OPCODE::WRITE_R);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(16)); // char[10] address
+  vm.add_write(OPCODE::WRITE_S);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(26)); // Char
+  vm.add_load(OPCODE::LOAD_B);
+  vm.add_write(OPCODE::WRITE_C);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), '0');
+  EXPECT_TRUE((vm.fetch_data<std::array<char, 10>>() ==
+              std::array<char, 10>{'A', 'l', 'i', 'c', 'e'}));
+  EXPECT_EQ(vm.fetch_data<Real>(), 3.14);
+  EXPECT_EQ(vm.fetch_data<Int>(), 42);
+
+  EXPECT_EQ(redirect.str(), str + "423.14Alice0");
+}
+
+} // namespace pascal_vm

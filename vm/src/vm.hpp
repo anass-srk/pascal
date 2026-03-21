@@ -19,8 +19,6 @@ concept VarType = std::integral<T> || std::floating_point<T>;
 // --- Opcodes (1 Byte) ---
 // immediate arg = embedded in code
 enum class OPCODE : uint8_t {
-  PUSH_S, // immediate arg (8-byte absolute address of string (32-bit len +
-          // char*)) from constants -> push into string_stack (for strings added using add_string)
   PUSH_Q, // immediate arg (8-bytes) -> push into stack
   PUSH_B, // immediate arg (1-byte)  -> push into stack
   PUSH_FP, // no arg, pushes frame pointer into stack
@@ -44,8 +42,6 @@ enum class OPCODE : uint8_t {
   MUL_C,
   DIV_C,
 
-  ADD_S, // for strings (into stack)
-
   // pop 2 bools, push operation result
   AND,
   OR,
@@ -57,7 +53,6 @@ enum class OPCODE : uint8_t {
   CMP_I,
   CMP_R,
   CMP_C,
-  CMP_S, // when not equal, compares in alphanumeric order
 
   // pops 1 char, pushes boolean. It's true if and only if
   LE, // -1 or 0
@@ -78,22 +73,20 @@ enum class OPCODE : uint8_t {
   // pops 2 elements addr + data, moves data to addr
   STORE_Q,
   STORE_B,
-  STORE_S,
 
   // pops addr, pushes data
   LOAD_Q,
   LOAD_B,
-  LOAD_S,
 
   // pops top of the stack
   POP_Q,
   POP_B,
-  POP_S,
 
   WRITE_I,
   WRITE_R,
   WRITE_C,
   WRITE_S,
+  WRITE_CONST_S,
 
   READ_I,
   READ_R,
@@ -105,7 +98,6 @@ enum class OPCODE : uint8_t {
 };
 
 inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
-  "PUSH_S",  
   "PUSH_Q",  
   "PUSH_B",  
   "PUSH_FP", 
@@ -122,13 +114,11 @@ inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
   "SUB_C",
   "MUL_C",
   "DIV_C",
-  "ADD_S", 
   "AND",
   "OR",
   "CMP_I",
   "CMP_R",
   "CMP_C",
-  "CMP_S", 
   "LE", 
   "LT", 
   "EQ", 
@@ -141,17 +131,15 @@ inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
   "MODSTK",
   "STORE_Q",
   "STORE_B",
-  "STORE_S",
   "LOAD_Q",
   "LOAD_B",
-  "LOAD_S",
   "POP_Q",
   "POP_B",
-  "POP_S",
   "WRITE_I",
   "WRITE_R",
   "WRITE_C",
   "WRITE_S",
+  "WRITE_CONST_S",
   "READ_I",
   "READ_R",
   "READ_C",
@@ -199,13 +187,6 @@ private:
     return fetch_code<size_t>();
   }
 
-  template <typename T> T fetch_data() const {
-    T res;
-    std::memcpy(&res, &stack[stack.size() - sizeof(T)], sizeof(T));
-    stack.resize(stack.size() - sizeof(T));
-    return res;
-  }
-
   template <typename T> inline void add_var(T v) const {
     if constexpr (sizeof(T) == 1) {
       stack.push_back(static_cast<uint8_t>(v));
@@ -223,12 +204,19 @@ public:
 
   void run() const;
 
-  void dump_state() const;
+  template <typename T> T fetch_data() const {
+    T res;
+    std::memcpy(&res, &stack[stack.size() - sizeof(T)], sizeof(T));
+    stack.resize(stack.size() - sizeof(T));
+    return res;
+  }
 
   /// @brief Adds string length + string data to code
-  void add_string(const std::string& s) {
-    add_value(uint32_t(s.length()));
+  size_t add_string(const std::string& s) {
+    const auto addr = code.size();
     code.insert(code.end(), s.begin(), s.end());
+    code.push_back(0);
+    return addr;
   }
 
   template <VarType T> bool add_push(OPCODE op, T imm) {
@@ -245,22 +233,6 @@ public:
 
   void add_push_frame_pointer() {
     add_value(static_cast<uint8_t>(OPCODE::PUSH_FP));
-  }
-
-  void add_push_string(size_t loc) {
-    add_value(static_cast<uint8_t>(OPCODE::PUSH_S));
-    add_value(loc);
-    // std::string s;
-    
-    // uint32_t len;
-    // std::memcpy(&len, &code[loc], sizeof(len));
-    // loc += sizeof(len);
-    
-    // s.reserve(len);
-    // const size_t end = loc + len;
-    // for(;loc < end;++loc) {
-    //   s.push_back(code[loc]);
-    // }
   }
 
   void add_not_op() {
@@ -288,10 +260,6 @@ public:
     }
   }
 
-  void add_string_op() {
-    add_value(static_cast<uint8_t>(OPCODE::ADD_S));
-  }
-
   bool add_logic_op(OPCODE op) {
     switch (op) {
       case OPCODE::AND:
@@ -308,7 +276,6 @@ public:
       case OPCODE::CMP_C:
       case OPCODE::CMP_I:
       case OPCODE::CMP_R:
-      case OPCODE::CMP_S:
         add_value(static_cast<uint8_t>(op));
         return true;
       default:
@@ -364,7 +331,6 @@ public:
     switch (op) {
       case OPCODE::STORE_B:
       case OPCODE::STORE_Q:
-      case OPCODE::STORE_S:
         add_value(static_cast<uint8_t>(op));
         return true;
       default:
@@ -376,7 +342,6 @@ public:
     switch (op) {
     case OPCODE::LOAD_B:
     case OPCODE::LOAD_Q:
-    case OPCODE::LOAD_S:
       add_value(static_cast<uint8_t>(op));
       return true;
     default:
@@ -388,7 +353,6 @@ public:
     switch (op) {
     case OPCODE::POP_B:
     case OPCODE::POP_Q:
-    case OPCODE::POP_S:
       add_value(static_cast<uint8_t>(op));
       return true;
     default:
@@ -401,7 +365,6 @@ public:
     case OPCODE::READ_I:
     case OPCODE::READ_R:
     case OPCODE::READ_C:
-    case OPCODE::READ_S:
       add_value(static_cast<uint8_t>(op));
       return true;
     default:
@@ -409,12 +372,17 @@ public:
     }
   }
 
+  void add_read_string() {
+    add_value(static_cast<uint8_t>(OPCODE::READ_S));
+  } 
+
   bool add_write(OPCODE op) {
     switch (op) {
     case OPCODE::WRITE_I:
     case OPCODE::WRITE_R:
     case OPCODE::WRITE_C:
     case OPCODE::WRITE_S:
+    case OPCODE::WRITE_CONST_S:
       add_value(static_cast<uint8_t>(op));
       return true;
     default:
