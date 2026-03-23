@@ -192,17 +192,19 @@ TEST(ExpressionTest, ConstantReference) {
   }
 }
 
-TEST(ExpressionTest, ConstantReferenceString) {
+TEST(ExpressionTest, NoStringType) {
   std::string program = R"(
     program Test;
     const GREETING = "Hello";
-    var x : String;
+    var 
+      x : String;
+      y : Int;
     begin
-      x := GREETING
+      y := 5
     end.
   )";
   Parser parser(std::move(program));
-  EXPECT_NO_THROW(parser.parse());
+  EXPECT_THROW(parser.parse(), SemanticException);
 }
 
 TEST(ExpressionTest, EnumValueReference) {
@@ -337,19 +339,6 @@ TEST(ExpressionTest, UnaryPlusBoolInvalid) {
     var flag : Bool;
     begin
       x := +flag
-    end.
-  )";
-  Parser parser(std::move(program));
-  EXPECT_THROW(parser.parse(), SemanticException);
-}
-
-TEST(ExpressionTest, UnaryPlusStringInvalid) {
-  std::string program = R"(
-    program Test;
-    var x : Int;
-    var s : String;
-    begin
-      x := +s
     end.
   )";
   Parser parser(std::move(program));
@@ -1535,7 +1524,7 @@ TEST(FunctionCallTest, WrongArgumentType)
       expectsInt := x
     end.
     var result : Int;
-    var s : String;
+    var s : Real;
     begin
       s := "hello";
       result := expectsInt(s)

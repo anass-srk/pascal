@@ -93,7 +93,7 @@ enum class CONST_CAT : int
   CC_INT,
   CC_REAL,
   CC_ENUM,
-  CC_STRING,
+  CC_CONST_STRING,
   CC_BOOL,
   CC_CHAR,
   CC_MAX = CC_CHAR
@@ -109,7 +109,7 @@ static inline const char* CONST_CAT_NAMES[int(CONST_CAT::CC_MAX) + 1] = {
   "Int",
   "Real",
   "Enum",
-  "String",
+  "#CONST_STRING#",
   "Bool",
   "Char"
 };

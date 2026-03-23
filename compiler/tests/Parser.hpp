@@ -232,14 +232,12 @@ TEST(ParserTest, Aliases){
       MyColor = Col;
       MyInt = Int;
       MyReal = Real;
-      MyString = String;
       MyBool = Bool;
     )",
     {
       {"MyColor", "Col"},
       {"MyInt", "Int"},
       {"MyReal", "Real"},
-      {"MyString", "String"},
       {"MyBool", "Bool"},
     }
   );
@@ -307,7 +305,7 @@ TEST(ParserTest, Arrays){
     enum2 = (Monday); sub = 1..10; y = sub; ar1 = array [y] of Int; 
     ar2 = array [Blue..Green] of Char; ar_ = array [1..4, 1..4] of enum;
     ar3 = array [1..4, 1..4] of array [0..5] of Bool;
-    ar4 = array [(small, medium, big), sub] of String;
+    ar4 = array [(small, medium, big), sub] of Int;
     .)");
   parser.parse();
 
@@ -363,7 +361,7 @@ TEST(ParserTest, Arrays){
     }
   );
   EXPECT_EQ(ar4->index_types()[1]->id(), "sub");
-  EXPECT_EQ(ar4->element_type()->id(), "String");
+  EXPECT_EQ(ar4->element_type()->id(), "Int");
   EXPECT_EQ(ar4->element_type()->category(), TYPE_CAT::TC_BASIC);
 
   auto ar3 = static_cast<const Array *>(Block::get("ar3", parser.m_current_block->m_types));
@@ -384,6 +382,7 @@ TEST(ParserTest, Records){
     program Test;
     label a, b123; Const v = 2; v2 = -1;_1 = +v; h = 'h'; 
     hello = "Hello\n";PI=3.14;b = true; type t = Int; enum = (Blue, Red, Green);
+    String = array [0..255] of Char;
     enum2 = (Monday); sub = 1..10; y = sub; ar1 = array [y] of Int; 
     ar2 = array [Blue..Green] of Char; ar_ = array [1..4, 1..4] of enum;
     person = record 
@@ -640,6 +639,7 @@ TEST(ParserTest, FunctionProcedureTypes) {
     std::string program = R"(
       program Test;
       type
+        String = array [0..255] of Char; 
         SimpleFuncType = function : Int;
         StringFunc = function : String;
         BoolFunc = function : Bool;
@@ -668,6 +668,7 @@ TEST(ParserTest, FunctionProcedureTypes) {
     std::string program = R"(
       program Test;
       type
+        String = array [0..255] of Char;
         IntProc = procedure (x : Int);
         TwoIntProc = procedure (a, b : Int);
         MixedParams = procedure (x : Int; s : String; flag : Bool);
@@ -706,7 +707,7 @@ TEST(ParserTest, FunctionProcedureTypes) {
       type
         IntFunc = function (x : Int) : Int;
         RealFunc = function (x : Int; y : Real) : Real;
-        StringFunc = function (a, b : Char) : String;
+        CharFunc = function (a, b : Char) : Char;
       .
     )";
     Parser parser(std::move(program));
@@ -728,9 +729,9 @@ TEST(ParserTest, FunctionProcedureTypes) {
     EXPECT_EQ(ft->args()[0].id(), "x");
     EXPECT_EQ(ft->args()[1].id(), "y");
 
-    ft = static_cast<const FunctionType*>(Block::get("StringFunc", parser.m_current_block->m_types));
+    ft = static_cast<const FunctionType*>(Block::get("CharFunc", parser.m_current_block->m_types));
     ASSERT_NE(ft, nullptr);
-    EXPECT_EQ(ft->return_type()->id(), "String");
+    EXPECT_EQ(ft->return_type()->id(), "Char");
     EXPECT_EQ(ft->args().size(), 2);
     EXPECT_EQ(ft->args()[0].id(), "a");
     EXPECT_EQ(ft->args()[1].id(), "b");
@@ -741,6 +742,7 @@ TEST(ParserTest, FunctionProcedureTypes) {
     std::string program = R"(
       program Test;
       type
+        String = array [0..255] of Char;
         VarIntProc = procedure (var x : Int);
         MixedRefProc = procedure (x : Int; var y : Real; flag : Bool);
         AllRefPtrs = procedure (var a, b : Int; var s : String);
@@ -776,6 +778,7 @@ TEST(ParserTest, FunctionProcedureTypes) {
     std::string program = R"(
       program Test;
       type
+        String = array [0..255] of Char;
         VarIntFunc = function (var x : Int) : Int;
         ComplexFunc = function (a : Int; var b : Real; var c : String) : String;
       .

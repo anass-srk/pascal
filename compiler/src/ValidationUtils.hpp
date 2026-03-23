@@ -10,8 +10,7 @@ inline bool is_basic_type(const Type* type) {
   return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
          name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
-         name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
-         name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)];
+         name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
 }
 
 inline bool is_boolean_type(const Type* type) {
@@ -30,14 +29,29 @@ inline bool is_array_of_char(const Type* type) {
   return arr->element_type()->get_underlying_type()->id() == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)];
 }
 
-inline bool is_io_compatible(const Type *type) {
-  if (!type) return false;
+inline bool is_writable_type(const Type *type) {
+  if (!type)
+    return false;
   std::string_view name = type->get_underlying_type()->id();
   if (name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
       name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
-      name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)] ||
+      name == CONST_CAT_NAMES[int(CONST_CAT::CC_CONST_STRING)] ||
+      is_array_of_char(type)) {
+    return true;
+  }
+  return false;
+}
+
+inline bool is_readable_type(const Type *type) {
+  if (!type)
+    return false;
+  std::string_view name = type->get_underlying_type()->id();
+  if (name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
+      name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
+      name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
+      name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
       is_array_of_char(type)) {
     return true;
   }
@@ -91,8 +105,7 @@ inline bool is_valid_binary_operand(RelOp op, const Type* left, const Type* righ
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)] ||
-           name == CONST_CAT_NAMES[int(CONST_CAT::CC_ENUM)] ||
-           name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)];
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_ENUM)];
   }
   return false;
 }
@@ -108,8 +121,7 @@ inline bool is_valid_binary_operand(ALOp op, const Type* left, const Type* right
   if (is_arithmetic_op(op)) {
     return name == CONST_CAT_NAMES[int(CONST_CAT::CC_INT)] ||
            name == CONST_CAT_NAMES[int(CONST_CAT::CC_REAL)] ||
-           name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)] ||
-           (name == CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)] && op == ALOp::Add);
+           name == CONST_CAT_NAMES[int(CONST_CAT::CC_CHAR)];
   } else if (is_logical_op(op)) {
     return name == CONST_CAT_NAMES[int(CONST_CAT::CC_BOOL)];
   }

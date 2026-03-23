@@ -7,7 +7,7 @@ namespace pascal_compiler
 
 void Block::init_main_block(Block& block){
   auto &types = block.m_types;
-  for (auto type : {CONST_CAT::CC_INT, CONST_CAT::CC_REAL, CONST_CAT::CC_CHAR, CONST_CAT::CC_STRING, CONST_CAT::CC_BOOL})
+  for (auto type : {CONST_CAT::CC_INT, CONST_CAT::CC_REAL, CONST_CAT::CC_CHAR, CONST_CAT::CC_CONST_STRING, CONST_CAT::CC_BOOL})
   {
     auto name = CONST_CAT_NAMES[int(type)];
     types.insert(std::make_pair(name,std::make_shared<Type>(name, 0, 0, TYPE_CAT::TC_BASIC)));
@@ -22,9 +22,9 @@ Const::Const(const Lexeme& token, const EnumValue& value) : ID(token),
 }
 
 Const::Const(const Lexeme &token, std::string &&value, const Block &block) : ID(token),
-    m_type(block.m_types.at(CONST_CAT_NAMES[int(CONST_CAT::CC_STRING)]).get()),
+    m_type(block.m_types.at(CONST_CAT_NAMES[int(CONST_CAT::CC_CONST_STRING)]).get()),
     m_val(std::move(value)),
-    m_cat(CONST_CAT::CC_STRING)
+    m_cat(CONST_CAT::CC_CONST_STRING)
 {
 }
 

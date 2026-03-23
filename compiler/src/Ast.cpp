@@ -84,7 +84,7 @@ void NExpression::validate()
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
-        "Semantic error: Cannot apply binary operation ({}) on an expressions of type ({})! Expected Ints, Reals, Chars, Bools or Strings !",
+        "Semantic error: Cannot apply binary operation ({}) on an expressions of type ({})! Expected Ints, Reals, Chars, or Bools !",
         m_token.to_string(), left->type()->to_string()
       ),
       m_token.line(),
@@ -141,6 +141,8 @@ void LiteralExpression::validate()
 
 const Type * ArraySelector::apply(const Type *type)
 {
+  m_type = type;
+
   if(type->category() != TYPE_CAT::TC_ARRAY)
   {
     throw SemanticException(
@@ -194,6 +196,8 @@ const Type * ArraySelector::apply(const Type *type)
 
 const Type* FieldSelector::apply(const Type* type)
 {
+  m_type = type;
+  
   if(type->category() != TYPE_CAT::TC_RECORD)
   {
     throw SemanticException(
@@ -253,7 +257,7 @@ void AssignmentStatement::validate()
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_CALL,
       std::format(
-        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars, Bools, Enums or Strings !",
+        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars, Bools or Enums !",
         m_token.to_string(), m_lhs->type()->to_string()
       ),
       m_token.line(),
@@ -280,7 +284,7 @@ void WriteStatement::validate()
 {
   for(const auto &exp : m_arguments)
   {
-    if (!validation::is_io_compatible(exp->type())) {
+    if (!validation::is_writable_type(exp->type())) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
@@ -298,11 +302,11 @@ void ReadStatement::validate()
 {
   for(const auto &exp : m_arguments)
   {
-    if (!validation::is_io_compatible(exp->type())) {
+    if (!validation::is_readable_type(exp->type())) {
       throw SemanticException(
         SEMANTIC_ERROR::SE_INVALID_CALL,
         std::format(
-          "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars, Strings, Bools or array of Chars !",
+          "Semantic error: In ({}), cannot read a variable of type ({})! Expected Ints, Reals, Chars, Bools or array of Chars !",
           m_token.to_string(), exp->type()->to_string()
         ),
         m_token.line(),

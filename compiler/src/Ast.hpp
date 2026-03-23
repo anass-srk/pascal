@@ -1,6 +1,7 @@
 #pragma once
 #include "Semantics.hpp"
 #include "Visitor.hpp"
+#include <cstddef>
 
 #define DEFINE_EXPR_ACCEPT()                                                   \
   void accept(ExpressionVisitor &visitor, const Block &ctx) const override {   \
@@ -13,8 +14,9 @@
   }
 
 #define DEFINE_SELECTOR_ACCEPT()                                               \
-  void accept(SelectorVisitor &visitor, const Block &ctx) const override {     \
-    visitor.visit(*this, ctx);                                                 \
+  void accept(SelectorVisitor &visitor, const Block &ctx)    \
+      const override {                                                         \
+    visitor.visit(*this, ctx);                                                \
   }
 
 namespace pascal_compiler {
@@ -147,6 +149,7 @@ public:
 struct Selector : public AstNode {
   virtual ~Selector() = default;
   virtual const Type *apply(const Type *) = 0;
+  virtual const Type *applied_on() const = 0;
 
   virtual void accept(SelectorVisitor &, const Block &) const = 0;
 };
@@ -154,13 +157,15 @@ struct Selector : public AstNode {
 struct ArraySelector : public Selector {
 private:
   std::vector<std::unique_ptr<Expression>> m_indices;
+  const Type *m_type;
 
 public:
   ArraySelector(std::vector<std::unique_ptr<Expression>> &&idx, Lexeme token)
-      : m_indices(std::move(idx)) {
+      : m_indices(std::move(idx)), m_type(nullptr) {
     m_token = token;
   }
   const Type *apply(const Type *) override;
+  const Type *applied_on() const override { return m_type; }
 
   const std::vector<std::unique_ptr<Expression>> &indices() const {
     return m_indices;
@@ -172,12 +177,14 @@ public:
 struct FieldSelector : public Selector {
 private:
   std::string_view m_field;
+  const Type *m_type;
 
 public:
-  FieldSelector(std::string_view f, Lexeme token) : m_field(f) {
+  FieldSelector(std::string_view f, Lexeme token) : m_field(f), m_type(nullptr) {
     m_token = token;
   }
   const Type *apply(const Type *) override;
+  const Type *applied_on() const override { return m_type; }
 
   std::string_view field() const { return m_field; }
 

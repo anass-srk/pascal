@@ -32,7 +32,7 @@ static bool checkRealLiteral(const Expression *expr, Real expected)
 
 static bool checkStringLiteral(const Expression *expr, const std::string &expected)
 {
-  return checkLiteral(expr, expected, CONST_CAT::CC_STRING);
+  return checkLiteral(expr, expected, CONST_CAT::CC_CONST_STRING);
 }
 
 static bool checkCharLiteral(const Expression *expr, char expected)
