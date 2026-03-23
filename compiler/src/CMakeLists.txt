@@ -4,5 +4,7 @@ add_executable(
   Semantics.cpp
   Parser.cpp
   Ast.cpp
+  ../../vm/src/vm.cpp
+  Generator.cpp
   Main.cpp
 )

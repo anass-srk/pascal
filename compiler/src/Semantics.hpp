@@ -137,8 +137,7 @@ public:
   const Type* type() const { return m_type; }
   CONST_CAT category() const { return m_cat; }
 
-  template <typename T>
-  T get() const;
+  template <typename T> T get() const { return std::get<T>(m_val); }
   Int asInt() const;
 
   const std::variant<Int, Real, std::string, char, bool>& value() const;

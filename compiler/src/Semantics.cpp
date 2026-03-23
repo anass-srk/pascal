@@ -51,11 +51,6 @@ Const::Const(const Lexeme &token, T value, const Block& block) : ID(token),
 {
 }
 
-template <typename T>
-T Const::get() const {
-  return std::get<T>(m_val);
-}
-
 Int Const::asInt() const {
   return std::visit([](auto&& val) -> Int {
     using T = std::decay_t<decltype(val)>;

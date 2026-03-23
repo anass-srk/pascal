@@ -263,6 +263,15 @@ void VM::run() const {
 
       std::memcpy(&stack[addr], &data, sizeof(data));
     } break;
+    case OPCODE::READ_B: {
+      print_op(op);
+      const auto addr = fetch_data<size_t>();
+
+      bool data;
+      std::cin >> data;
+
+      std::memcpy(&stack[addr], &data, sizeof(data));
+    } break;
 
     case OPCODE::WRITE_I: {
       print_op(op);
@@ -277,6 +286,11 @@ void VM::run() const {
     case OPCODE::WRITE_C: {
       print_op(op);
       const auto data = fetch_data<char>();
+      std::cout << data;
+    } break;
+    case OPCODE::WRITE_B: {
+      print_op(op);
+      const auto data = fetch_data<bool>();
       std::cout << data;
     } break;
     case OPCODE::WRITE_S: {

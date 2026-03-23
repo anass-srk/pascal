@@ -85,12 +85,14 @@ enum class OPCODE : uint8_t {
   WRITE_I,
   WRITE_R,
   WRITE_C,
+  WRITE_B,
   WRITE_S,
   WRITE_CONST_S,
 
   READ_I,
   READ_R,
   READ_C,
+  READ_B,
   READ_S,
 
   HALT,
@@ -138,11 +140,13 @@ inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
   "WRITE_I",
   "WRITE_R",
   "WRITE_C",
+  "WRITE_B",
   "WRITE_S",
   "WRITE_CONST_S",
   "READ_I",
   "READ_R",
   "READ_C",
+  "READ_B",
   "READ_S",
   "HALT"
 };

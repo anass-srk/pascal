@@ -41,7 +41,8 @@ public:
 public:
   Parser(std::string&&);
 
-  const Block * getTop() {return _top;};
+  const Block * getTop() const { return _top; };
+  const Block * getCtx() const { return m_block.get(); }
 
   void match(TOKEN_TYPE);
   inline void match_adv(TOKEN_TYPE type)
