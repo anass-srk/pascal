@@ -1,5 +1,7 @@
 #include "Ast.hpp"
+#include "Semantics.hpp"
 #include "ValidationUtils.hpp"
+#include <memory>
 
 namespace pascal_compiler
 {
@@ -278,7 +280,19 @@ void AssignmentStatement::validate()
 }
 
 void LabeledStatement::validate()
-{}
+{
+  if(auto ls = dynamic_cast<const LabeledStatement *>(m_stmt.get())) {
+    throw SemanticException(
+      SEMANTIC_ERROR::SE_INVALID_LABEL,
+      std::format(
+        "Semantic error : At ({}), label '{}' cannot be defined as label '{}' !",
+        m_token.to_string(), m_label->id(), ls->label()->id()
+      ),
+      m_token.line(),
+      m_token.column()
+    );
+  }
+}
 
 void WriteStatement::validate()
 {

@@ -213,6 +213,17 @@ void VM::run() const {
       fetch_data<char>();
     }break;
 
+    case OPCODE::DUPL_B: {
+      print_op(op);
+      stack.push_back(stack.back());
+    } break;
+
+    case OPCODE::DUPL_Q: {
+      print_op(op);
+      const uint8_t* ptr = &stack[stack.size() - sizeof(size_t)];
+      stack.insert(stack.end(), ptr, ptr + sizeof(size_t));
+    } break;
+
     case OPCODE::MODSTK: {
       const auto data = fetch_code<int32_t>();
       print_op(op, data);

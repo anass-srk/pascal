@@ -95,6 +95,9 @@ enum class OPCODE : uint8_t {
   READ_B,
   READ_S,
 
+  DUPL_Q,
+  DUPL_B,
+
   HALT,
   MAX = HALT
 };
@@ -148,6 +151,8 @@ inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
   "READ_C",
   "READ_B",
   "READ_S",
+  "DUPL_Q",
+  "DUPL_B",
   "HALT"
 };
 
@@ -387,6 +392,17 @@ public:
     case OPCODE::WRITE_C:
     case OPCODE::WRITE_S:
     case OPCODE::WRITE_CONST_S:
+      add_value(static_cast<uint8_t>(op));
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  bool add_duplicate(OPCODE op) {
+    switch (op) {
+    case OPCODE::DUPL_Q:
+    case OPCODE::DUPL_B:
       add_value(static_cast<uint8_t>(op));
       return true;
     default:

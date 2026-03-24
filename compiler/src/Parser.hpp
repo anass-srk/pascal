@@ -2,6 +2,7 @@
 #include "Semantics.hpp"
 #include "Ast.hpp"
 #include <exception>
+#include <unordered_set>
 
 namespace pascal_compiler
 {
@@ -35,6 +36,7 @@ class Parser
   std::string m_program_name;
   std::unique_ptr<Block> m_block;
   Block *_top;
+  std::unordered_map<const Label*, Lexeme> m_used_labels;
 public:
   Block *m_current_block;
 

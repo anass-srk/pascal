@@ -8,3 +8,9 @@ add_executable(
   Generator.cpp
   Main.cpp
 )
+
+target_compile_definitions(
+  compiler
+  PRIVATE
+  DEBUG_VM=0
+)

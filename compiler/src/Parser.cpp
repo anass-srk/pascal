@@ -943,7 +943,7 @@ std::unique_ptr<Expression> Parser::factor()
     })
   )
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(constant(token)), token);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(constant(token)), token, *m_current_block);
     res->validate();
     adv();
     return res;
@@ -1011,14 +1011,14 @@ std::unique_ptr<Expression> Parser::factor()
 
   if(cons)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(Const(*cons)), token);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(Const(*cons)), token, *m_current_block);
     res->validate();
     adv();
     return res;
   }
   if(ev)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token, *ev), token);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token, *ev), token, *m_current_block);
     res->validate();
     adv();
     return res;
@@ -1183,6 +1183,18 @@ std::unique_ptr<Statement> Parser::statement()
 
     if(label)
     {
+      if(m_used_labels.contains(label)) {
+        throw SemanticException (
+          SEMANTIC_ERROR::SE_INVALID_LABEL,
+          std::format(
+            "Semantic error : At ({}), invalid label '{}' already used in ({}) !",
+            token.to_string(), label->id(), m_used_labels.at(label).to_string()
+          ),
+          token.line(),
+          token.column()
+        );
+      }
+      m_used_labels.emplace(label, token);
       match_adv(TOKEN_TYPE::COLON_TOKEN);
       adv();
       auto res = std::make_unique<LabeledStatement>(label, statement(), token);

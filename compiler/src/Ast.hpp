@@ -48,8 +48,11 @@ private:
   std::unique_ptr<Const> m_constant;
 
 public:
-  LiteralExpression(std::unique_ptr<Const> c, Lexeme token)
-      : Expression(token), m_constant(std::move(c)) {}
+  LiteralExpression(std::unique_ptr<Const> c, Lexeme token, Block& ctx)
+    : Expression(token), m_constant(std::move(c)) {
+      if (m_constant->category() == CONST_CAT::CC_CONST_STRING) 
+        ctx.m_unamed_const_strings.push_back(m_constant.get());
+    }
   void validate() override;
 
   const Const *constant() const { return m_constant.get(); }

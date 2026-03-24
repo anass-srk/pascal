@@ -27,7 +27,8 @@ enum class SEMANTIC_ERROR
   SE_INVALID_INDEX,
   SE_INVALID_ASSIGN,
   SE_INVALID_CALL,
-  SE_INVALID_COND
+  SE_INVALID_COND,
+  SE_INVALID_LABEL
 };
 
 class SemanticException : public std::exception {
@@ -333,6 +334,8 @@ struct Block
   std::vector<std::unique_ptr<Type>> m_unamed_types;
 
   std::unique_ptr<CompoundStatement> body;
+
+  std::vector<const Const*> m_unamed_const_strings; // owned by LiteralExpression
 
   Block(Block *parent = nullptr) : m_parent(parent) {}
 
