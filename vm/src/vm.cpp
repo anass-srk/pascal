@@ -230,6 +230,20 @@ void VM::run() const {
       stack.resize(Int(stack.size()) + data, 0); // The usage of 0 is important for string ptrs
     } break;
 
+    case OPCODE::CALL: {
+      const auto addr = fetch_code<size_t>();
+      add_var(pc);      // return address
+      add_var(fp);      // old frame pointer
+      fp = stack.size();  // new frame pointer points at function vars/consts
+      pc = addr;          // function location
+    } break;
+    case OPCODE::RET: {
+      const auto size = fetch_code<size_t>();
+      stack.resize(stack.size() - size);
+      fp = fetch_data<size_t>();
+      pc = fetch_data<size_t>();
+    } break;
+
     case OPCODE::READ_I: {
       print_op(op);
       const auto addr = fetch_data<size_t>();

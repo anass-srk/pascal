@@ -98,6 +98,9 @@ enum class OPCODE : uint8_t {
   DUPL_Q,
   DUPL_B,
 
+  CALL,
+  RET,
+
   HALT,
   MAX = HALT
 };
@@ -153,6 +156,8 @@ inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
   "READ_S",
   "DUPL_Q",
   "DUPL_B",
+  "CALL",
+  "RET",
   "HALT"
 };
 
@@ -408,6 +413,17 @@ public:
     default:
       return false;
     }
+  }
+
+  // return value | args | return address | old frame pointer | (start=new frame pointer) const + vars ....
+  void add_call(size_t addr) {
+    add_value(static_cast<uint8_t>(OPCODE::CALL));
+    add_value(addr);
+  }
+
+  void add_return(size_t size) {
+    add_value(static_cast<uint8_t>(OPCODE::RET));
+    add_value(size);
   }
 
   void add_halt() {

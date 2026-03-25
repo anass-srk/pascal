@@ -762,4 +762,213 @@ TEST(VMTest, IO) {
   EXPECT_EQ(redirect.str(), str + "423.14Alice0");
 }
 
+TEST(VMTest, Duplicate) {
+  VM vm;
+
+  vm.add_push(OPCODE::PUSH_Q, Int(999999));
+  vm.add_duplicate(OPCODE::DUPL_Q);
+  vm.add_push(OPCODE::PUSH_B, char(-1));
+  vm.add_duplicate(OPCODE::DUPL_B);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<char>(), -1);
+  EXPECT_EQ(vm.fetch_data<char>(), -1);
+  EXPECT_EQ(vm.fetch_data<Int>(), 999999);
+  EXPECT_EQ(vm.fetch_data<Int>(), 999999);
+  EXPECT_TRUE(vm.data().empty());
+}
+
+TEST(VMTest, Function) {
+  VM vm;
+
+  const auto beg_addr = vm.add_jmp(OPCODE::JMP, 0);
+
+  const auto func_beg = vm.get_current_location();
+
+  //  two params f (int i,int j) -> int (i*j)
+  //  return value | args | return address | old frame pointer | consts + vars
+  //  fp -> stack size after all is pushed (excluding consts and vars)
+
+  //  return value address
+  //  addr = -8 (size of the var to point at the start) - 16 (ret_addr + old fp) - 16 (args) = -40
+  vm.add_push_frame_pointer();      
+  vm.add_push(OPCODE::PUSH_Q, Int(-40)); 
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+
+  //  arg 1
+  vm.add_push_frame_pointer();
+  vm.add_push(OPCODE::PUSH_Q, Int(-32));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+  vm.add_load(OPCODE::LOAD_Q);
+
+  //  arg 2
+  vm.add_push_frame_pointer();
+  vm.add_push(OPCODE::PUSH_Q, Int(-24));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_arithmetic_op(OPCODE::MUL_I);
+
+  //  move result to return address
+  vm.add_move(OPCODE::STORE_Q); 
+  //  0 = sizeof(local vars)
+  vm.add_return(0);
+
+  vm.conf_jmp(beg_addr, vm.get_current_location());
+
+  //  allocate space for return address
+  vm.add_resize_stack(8);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(3));
+  vm.add_push(OPCODE::PUSH_Q, Int(-4));
+  
+  vm.add_call(func_beg);
+
+  //  deallocate args (2 Int)
+  vm.add_resize_stack(-16);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.data().size(), 8);
+  EXPECT_EQ(vm.fetch_data<Int>(), -12);
+}
+
+TEST(VMTest, Procedure) {
+  // 3 inputs
+  IORedirect redirect("22\n-4\n0\n");
+  VM vm;
+
+  const auto beg_addr = vm.add_jmp(OPCODE::JMP, 0);
+
+  const std::string ask_str = "Enter an integer :\n";
+  const auto ask = vm.add_string(ask_str);
+
+  // f(Int i) -> void
+  const auto proc_beg = vm.get_current_location();
+  
+  const auto proc_jmp = vm.add_jmp(OPCODE::JMP, 0);
+
+  const std::string pos_str = "Positive !\n";
+  const auto pos = vm.add_string(pos_str);
+  const std::string neg_str = "Negative !\n";
+  const auto neg = vm.add_string(neg_str);
+  const std::string nul_str = "Null !\n";
+  const auto nul = vm.add_string(nul_str);
+  
+  vm.conf_jmp(proc_jmp, vm.get_current_location());
+
+
+  //  Load arg (Int)
+  vm.add_push_frame_pointer();
+  vm.add_push(OPCODE::PUSH_Q, Int(-24));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+
+  //  Compare arg with 0
+  vm.add_cmp(OPCODE::CMP_I);
+  vm.add_flag(OPCODE::GT);
+
+  const auto less_equals = vm.add_jmp(OPCODE::JMP_FALSE, 0);
+  
+  //  arg > 0
+  vm.add_push(OPCODE::PUSH_Q, pos);
+  vm.add_write(OPCODE::WRITE_CONST_S);
+
+  const auto greater_end = vm.add_jmp(OPCODE::JMP, 0);
+
+  vm.conf_jmp(less_equals, vm.get_current_location());
+
+  //  Load arg (Int)
+  vm.add_push_frame_pointer();
+  vm.add_push(OPCODE::PUSH_Q, Int(-24));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+
+  //  Compare arg with 0
+  vm.add_cmp(OPCODE::CMP_I);
+  vm.add_flag(OPCODE::EQ);
+
+  const auto less = vm.add_jmp(OPCODE::JMP_FALSE, 0);
+
+  //  arg == 0
+  vm.add_push(OPCODE::PUSH_Q, nul);
+  vm.add_write(OPCODE::WRITE_CONST_S);
+
+  const auto equals_end = vm.add_jmp(OPCODE::JMP, 0);
+
+  vm.conf_jmp(less, vm.get_current_location());
+
+  //  arg < 0 (else)
+  vm.add_push(OPCODE::PUSH_Q, neg);
+  vm.add_write(OPCODE::WRITE_CONST_S);
+
+  vm.conf_jmp(greater_end, vm.get_current_location());
+  vm.conf_jmp(equals_end, vm.get_current_location());
+
+  vm.add_return(0);
+
+  vm.conf_jmp(beg_addr, vm.get_current_location());
+
+  vm.add_resize_stack(8); // one variable : int i at address 0
+
+  // Ask for input
+  vm.add_push(OPCODE::PUSH_Q, ask);
+  vm.add_write(OPCODE::WRITE_CONST_S);
+
+  // Read input
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_read(OPCODE::READ_I);
+
+  // push local variable as arg for procedure
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_call(proc_beg);
+  vm.add_pop(OPCODE::POP_Q);
+
+  // Ask for input
+  vm.add_push(OPCODE::PUSH_Q, ask);
+  vm.add_write(OPCODE::WRITE_CONST_S);
+
+  // Read input
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_read(OPCODE::READ_I);
+
+  // push local variable as arg for procedure
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_call(proc_beg);
+  vm.add_pop(OPCODE::POP_Q);
+
+  // Ask for input
+  vm.add_push(OPCODE::PUSH_Q, ask);
+  vm.add_write(OPCODE::WRITE_CONST_S);
+
+  // Read input
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_read(OPCODE::READ_I);
+
+  // push local variable as arg for procedure
+  vm.add_push(OPCODE::PUSH_Q, Int(0));
+  vm.add_load(OPCODE::LOAD_Q);
+
+  vm.add_call(proc_beg);
+  vm.add_pop(OPCODE::POP_Q);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(redirect.str(), ask_str + pos_str + ask_str + neg_str + ask_str + nul_str);
+  EXPECT_EQ(vm.data().size(), 8);
+  EXPECT_EQ(vm.fetch_data<Int>(), 0); // last value of the local var from the input
+}
+
 } // namespace pascal_vm
