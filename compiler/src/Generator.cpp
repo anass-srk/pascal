@@ -4,6 +4,7 @@
 #include "Visitor.hpp"
 #include <iostream>
 #include <utility>
+#include <variant>
 
 namespace pascal_compiler {
 
@@ -100,6 +101,17 @@ void Generator::process_context(const Context &ctx) {
     vm.add_string(str);
   }
 
+  for (auto c : ctx.m_unamed_const_strings) {
+    // only strings are stored
+    const auto str = c->get<std::string>();
+
+    m_global_const_info.emplace(
+      c->id(),
+      Info{.location = vm.get_current_location(), .size = str.length() + 1}
+    );
+    vm.add_string(str);
+  }
+
   vm.conf_jmp(addr, vm.get_current_location());
 
   size_t loc = 0;
@@ -114,6 +126,12 @@ void Generator::process_context(const Context &ctx) {
   // deal with functions later
 
   ctx.body->accept(*this, ctx);
+
+  // Process gotos
+
+  for(const auto& [addr, label] :  m_global_goto_map) {
+    vm.conf_jmp(addr, m_global_label_locations.at(label));
+  }
   
   vm.add_halt();
 }
@@ -320,8 +338,7 @@ void Generator::visit(const VariableAccess& var, const Context& ctx) {
   }
 
   for(const auto& selector : var.selectors()) {
-    selector->accept(*this,ctx); // pushes offset for record/array
-    vm.add_arithmetic_op(OPCODE::ADD_I);
+    selector->accept(*this,ctx); // pushes offset for record/array and adds
   }
 
   m_by_value = by_value;
@@ -347,16 +364,19 @@ void Generator::visit(const VariableAccess& var, const Context& ctx) {
 void Generator::visit(const FieldSelector& selector, const Context& ctx) {
   const Record* type = static_cast<const Record*>(selector.applied_on());
   vm.add_push(OPCODE::PUSH_Q, m_record_offsets.at(type).at(selector.field()));
+  vm.add_arithmetic_op(OPCODE::ADD_I);
 }
 
 void Generator::visit(const ArraySelector& selector, const Context& ctx) {
   const Array* type = static_cast<const Array*>(selector.applied_on());
   size_t current_size = get_type_size(type->element_type());
+  int i = 0;
   for(const auto& exp : selector.indices()) {
     exp->accept(*this, ctx); // pushes value
     vm.add_push(OPCODE::PUSH_Q, current_size);
     vm.add_arithmetic_op(OPCODE::MUL_I);
-    current_size *= m_type_lens.at(exp->type());
+    vm.add_arithmetic_op(OPCODE::ADD_I);
+    current_size *= m_type_lens.at(type->index_types()[i]);
   }
 }
 
@@ -409,22 +429,222 @@ void Generator::visit(const ReadStatement& stmt, const Context& ctx) {
     switch (get_catagory(var->type())) {
       case CONST_CAT::CC_INT:
       case CONST_CAT::CC_ENUM:
-        vm.add_write(OPCODE::READ_I);
+        vm.add_read(OPCODE::READ_I);
         break;
       case CONST_CAT::CC_REAL:
-        vm.add_write(OPCODE::READ_R);
+        vm.add_read(OPCODE::READ_R);
         break;
       case CONST_CAT::CC_BOOL:
-        vm.add_write(OPCODE::READ_B);
+        vm.add_read(OPCODE::READ_B);
         break;
       case CONST_CAT::CC_CHAR:
-        vm.add_write(OPCODE::READ_C);
+        vm.add_read(OPCODE::READ_C);
         break;
     }
   }
 
   m_by_value = by_value;
 }
+void Generator::visit(const LabeledStatement& stmt, const Context &ctx) {
+  m_global_label_locations.emplace(stmt.label(), vm.get_current_location());
+  stmt.statement()->accept(*this, ctx);
+}
+
+void Generator::visit(const GotoStatement& stmt, const Context& ctx) {
+  m_global_goto_map.emplace(vm.add_jmp(OPCODE::JMP, 0), stmt.label());
+}
+
+void Generator::visit(const IfStatement& stmt, const Context& ctx) {
+  stmt.condition()->accept(*this, ctx); // puses boolean
+  const size_t else_addr = vm.add_jmp(OPCODE::JMP_FALSE, 0);
+  
+  stmt.then_stmt()->accept(*this, ctx);
+  const size_t end_addr = vm.add_jmp(OPCODE::JMP, 0);
+
+  vm.conf_jmp(else_addr, vm.get_current_location());
+  stmt.else_stmt()->accept(*this, ctx);
+  vm.conf_jmp(end_addr, vm.get_current_location());
+}
+
+void Generator::visit(const WhileStatement& stmt, const Context& ctx) {
+  const size_t loop_beg = vm.get_current_location();
+  stmt.condition()->accept(*this, ctx);
+  const size_t loop_end = vm.add_jmp(OPCODE::JMP_FALSE, 0);
+
+  stmt.body()->accept(*this, ctx);
+  vm.add_jmp(OPCODE::JMP, loop_beg);
+  
+  vm.conf_jmp(loop_end, vm.get_current_location());
+}
+
+void Generator::visit(const RepeatStatement& stmt, const Context& ctx) {
+  const size_t loop_beg = vm.get_current_location();
+  
+  for(const auto& s : stmt.body()) {
+    s->accept(*this, ctx);
+  }
+
+  stmt.condition()->accept(*this, ctx);
+  vm.add_jmp(OPCODE::JMP_FALSE, loop_beg);
+}
+
+
+void Generator::visit(const ForStatement& stmt, const Context& ctx) {
+
+  const auto cat = get_catagory(stmt.var()->type());
+
+  { // Assignment
+    bool by_value = m_by_value;
+    m_by_value = false;
+    stmt.var()->accept(*this, ctx);
+    m_by_value = by_value;
+    // Now we have the address of the variable in the top of the stack
+    
+    switch (cat) {
+    case CONST_CAT::CC_INT:
+    case CONST_CAT::CC_ENUM:
+      vm.add_push(OPCODE::PUSH_Q, stmt.start().get<Int>());
+      vm.add_move(OPCODE::STORE_Q);
+      break;
+    case CONST_CAT::CC_BOOL:
+      vm.add_push(OPCODE::PUSH_B, stmt.start().get<bool>());
+      vm.add_move(OPCODE::STORE_B);
+      break;
+    case CONST_CAT::CC_CHAR:
+      vm.add_push(OPCODE::PUSH_B, stmt.start().get<char>());
+      vm.add_move(OPCODE::STORE_B);
+      break;
+    }
+  }
+
+  const size_t loop_beg = vm.get_current_location();
+  { // condition
+    bool by_value = m_by_value;
+    m_by_value = true;
+    stmt.var()->accept(*this, ctx);
+    m_by_value = by_value;
+    // Now we have the value of the variable in the top of the stack
+
+    switch (cat) {
+    case CONST_CAT::CC_INT:
+    case CONST_CAT::CC_ENUM:
+      vm.add_push(OPCODE::PUSH_Q, stmt.end().get<Int>());
+      vm.add_cmp(OPCODE::CMP_I);
+      break;
+    case CONST_CAT::CC_BOOL:
+      vm.add_push(OPCODE::PUSH_B, stmt.end().get<bool>());
+      vm.add_cmp(OPCODE::CMP_C);
+      break;
+    case CONST_CAT::CC_CHAR:
+      vm.add_push(OPCODE::PUSH_B, stmt.end().get<char>());
+      vm.add_cmp(OPCODE::CMP_C);
+      break;
+    }
+    vm.add_flag(stmt.increasing() ? OPCODE::LE : OPCODE::GE);
+  }
+
+
+  const size_t loop_end = vm.add_jmp(OPCODE::JMP_FALSE, 0);
+
+  stmt.body()->accept(*this, ctx);
+
+  { // Assignment at end of the loop
+    bool by_value = m_by_value;
+    m_by_value = false;
+    stmt.var()->accept(*this, ctx);
+    m_by_value = by_value;
+    // Now we have the address of the variable in the top of the stack
+
+    by_value = m_by_value;
+    m_by_value = true;
+    stmt.var()->accept(*this, ctx);
+    m_by_value = by_value;
+    // push the value of the variable to the stack
+
+    switch (cat) {
+    case CONST_CAT::CC_INT:
+    case CONST_CAT::CC_ENUM:
+      vm.add_push(OPCODE::PUSH_Q, stmt.increasing() ? Int(1) : Int(-1));
+      vm.add_arithmetic_op(OPCODE::ADD_I);
+      vm.add_move(OPCODE::STORE_Q);
+      break;
+    case CONST_CAT::CC_BOOL:
+    case CONST_CAT::CC_CHAR:
+      vm.add_push(OPCODE::PUSH_B, stmt.increasing() ? char(1) : char(-1));
+      vm.add_arithmetic_op(OPCODE::ADD_C);
+      vm.add_move(OPCODE::STORE_B);
+      break;
+    }
+  }
+
+  vm.add_jmp(OPCODE::JMP, loop_beg);
+
+  vm.conf_jmp(loop_end, vm.get_current_location());
+}
+
+void _get_int(VM& vm, const Const& c) {
+  vm.add_duplicate(OPCODE::DUPL_Q);
+  vm.add_push(OPCODE::PUSH_Q, c.get<Int>());
+  vm.add_cmp(OPCODE::CMP_I);
+  vm.add_flag(OPCODE::EQ);
+}
+
+void _get_char(VM &vm, const Const &c) {
+  vm.add_duplicate(OPCODE::DUPL_B);
+  vm.add_push(OPCODE::PUSH_B, c.get<char>());
+  vm.add_cmp(OPCODE::CMP_C);
+  vm.add_flag(OPCODE::EQ);
+}
+
+void _get_bool(VM &vm, const Const &c) {
+  vm.add_duplicate(OPCODE::DUPL_B);
+  vm.add_push(OPCODE::PUSH_B, c.get<bool>());
+  vm.add_cmp(OPCODE::CMP_C);
+  vm.add_flag(OPCODE::EQ);
+}
+
+void Generator::visit(const CaseStatement& stmt, const Context& ctx) {
+  stmt.selector()->accept(*this, ctx);
+
+  auto push = &_get_int;
+  OPCODE POP;
+
+  switch (get_catagory(stmt.selector()->type())) {
+    case CONST_CAT::CC_INT:
+    case CONST_CAT::CC_ENUM:
+      push = &_get_int;
+      POP = OPCODE::POP_Q;
+      break;
+    case CONST_CAT::CC_CHAR:
+      push = &_get_char;
+      POP = OPCODE::POP_B;
+      break;
+    case CONST_CAT::CC_BOOL:
+      push = &_get_bool;
+      POP = OPCODE::POP_B;
+      break;
+  }
+
+  for(const auto& alt : stmt.alternatives()) {
+    std::vector<size_t> jmp_locs;
+    for(int i = 0;i < alt.labels().size()-1;++i) {
+      const auto& c = alt.labels()[i];
+      push(vm, c);
+      jmp_locs.push_back(vm.add_jmp(OPCODE::JMP_TRUE, 0));
+    }
+    push(vm, alt.labels().back());
+    auto end = vm.add_jmp(OPCODE::JMP_FALSE, 0);
+    
+    for(auto addr : jmp_locs) {
+      vm.conf_jmp(addr, vm.get_current_location());
+    }
+    alt.statement()->accept(*this, ctx);
+
+    vm.conf_jmp(end, vm.get_current_location());
+  }
+
+  vm.add_pop(POP);
+} 
 
 
 } // namespace pascal_compiler
