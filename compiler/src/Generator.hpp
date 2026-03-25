@@ -16,17 +16,16 @@ class Generator : CombinedVisitor
 {
 
   struct Info{
-    size_t location;
+    Int location;
     size_t size;
   };
 
-  std::unordered_map<const Var*, Info> m_var_info;                // local variables
-  std::unordered_map<std::string_view, Info> m_const_info;        // local strings
-  std::unordered_map<const Var*, Info> m_global_var_info;         // global
-  std::unordered_map<std::string_view, Info> m_global_const_info;
+  std::vector<std::unordered_map<std::string_view, Info>> m_var_info;                // variables
+  std::vector<std::unordered_map<std::string_view, Info>> m_const_info;        // strings
+  std::vector<std::unordered_map<std::string_view, size_t>> m_func_locations;  // functions/procedures
 
-  std::unordered_map<const Label*, size_t> m_global_label_locations;
-  std::unordered_map<size_t, const Label*> m_global_goto_map;
+  std::vector<std::unordered_map<const Label*, size_t>> m_label_locations;
+  std::vector<std::unordered_map<size_t, const Label*>> m_goto_map;
 
   std::unordered_map<const Type*, size_t> m_type_sizes; // for variables only
   std::unordered_map<const Record*, std::unordered_map<std::string_view, size_t>> m_record_offsets;
@@ -50,6 +49,7 @@ class Generator : CombinedVisitor
 
   size_t get_type_size(const Type *); // For variables only
   void process_context(const Context&);
+  void process_context(const Function&);
 
 public:
   
@@ -70,7 +70,7 @@ private:
   void visit(const VariableAccess&, const Context&) override;   //Push address of the variable into the stack
   void visit(const ArraySelector&, const Context&) override; 
   void visit(const FieldSelector&, const Context&) override;
-  // void visit(const FunctionCall&, const Context&) override;
+  void visit(const FunctionCall&, const Context&) override;
 
   void visit(const WriteStatement&, const Context&) override;
   void visit(const ReadStatement&, const Context&) override;
@@ -78,7 +78,7 @@ private:
   void visit(const LabeledStatement&, const Context& ctx) override;
   void visit(const CompoundStatement&, const Context&) override;
   void visit(const AssignmentStatement&, const Context&) override;  
-  // void visit(const ProcedureCall&, const Context& ctx)
+  void visit(const ProcedureCall&, const Context& ctx) override;
   void visit(const GotoStatement&, const Context& ctx) override;
   void visit(const WhileStatement&, const Context& ctx) override;
   void visit(const RepeatStatement&, const Context& ctx) override;

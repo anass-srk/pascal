@@ -90,13 +90,14 @@ void Generator::process_context(const Context &ctx) {
 
   size_t addr = vm.add_jmp(OPCODE::JMP, 0);
 
+  m_const_info.emplace_back();
   for (const auto &[_, c] : ctx.m_consts) {
     // only strings are stored
     if (c.category() != CONST_CAT::CC_CONST_STRING) continue;
     const auto str = c.get<std::string>();
 
-    m_global_const_info.emplace(
-      c.id(), Info{.location = vm.get_current_location(), .size = str.length()+1}
+    m_const_info.back().emplace(
+      c.id(), Info{.location = Int(vm.get_current_location()), .size = str.length()+1}
     );
     vm.add_string(str);
   }
@@ -104,10 +105,9 @@ void Generator::process_context(const Context &ctx) {
   for (auto c : ctx.m_unamed_const_strings) {
     // only strings are stored
     const auto str = c->get<std::string>();
-
-    m_global_const_info.emplace(
+    m_const_info.back().emplace(
       c->id(),
-      Info{.location = vm.get_current_location(), .size = str.length() + 1}
+      Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
     );
     vm.add_string(str);
   }
@@ -115,25 +115,121 @@ void Generator::process_context(const Context &ctx) {
   vm.conf_jmp(addr, vm.get_current_location());
 
   size_t loc = 0;
-
-  for (const auto &[_, v] : ctx.m_vars) {
+  m_var_info.emplace_back();
+  for (const auto &[name, v] : ctx.m_vars) {
     const size_t size = get_type_size(v.type());
-    m_global_var_info.emplace(&v, Info{.location = loc, .size = size});
+    m_var_info.back().emplace(name, Info{.location = Int(loc), .size = size});
     loc += size;
   }
   vm.add_resize_stack(loc);
 
-  // deal with functions later
+  m_label_locations.emplace_back();
+  m_goto_map.emplace_back();
+  m_func_locations.emplace_back();
+
+  const auto funcs_addr = vm.add_jmp(OPCODE::JMP, 0);
+
+  for (const auto& [name, f] : ctx.m_funcs) {
+    m_func_locations.back().emplace(f.id(), vm.get_current_location());
+    process_context(f);
+  }
+
+  vm.conf_jmp(funcs_addr, vm.get_current_location());
 
   ctx.body->accept(*this, ctx);
 
   // Process gotos
 
-  for(const auto& [addr, label] :  m_global_goto_map) {
-    vm.conf_jmp(addr, m_global_label_locations.at(label));
+  for(const auto& [addr, label] :  m_goto_map.back()) {
+    vm.conf_jmp(addr, m_label_locations.back().at(label));
   }
   
   vm.add_halt();
+}
+
+void Generator::process_context(const Function& f) {
+  
+  size_t addr = vm.add_jmp(OPCODE::JMP, 0);
+
+  m_const_info.emplace_back();
+  for (const auto &[_, c] : f.ctx()->m_consts) {
+    // only strings are stored
+    if (c.category() != CONST_CAT::CC_CONST_STRING) continue;
+    const auto str = c.get<std::string>();
+
+    m_const_info.back().emplace(
+      c.id(), Info{.location = Int(vm.get_current_location()), .size = str.length()+1}
+    );
+    vm.add_string(str);
+  }
+
+  for (auto c : f.ctx()->m_unamed_const_strings) {
+    // only strings are stored
+    const auto str = c->get<std::string>();
+    m_const_info.back().emplace(
+      c->id(),
+      Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
+    );
+    vm.add_string(str);
+  }
+
+  vm.conf_jmp(addr, vm.get_current_location());
+
+  m_var_info.emplace_back();
+
+  Int acc_size = 0;
+  for(int i = f.type()->args().size()-1;i >= 0;--i) {
+    const auto& arg = f.type()->args()[i];
+    const Int type_size = get_type_size(arg.type());
+    m_var_info.back().emplace(
+      arg.id(), Info{.location= - type_size - 16 - acc_size, .size=size_t(type_size) }
+    );
+    acc_size += type_size;
+  }
+
+  if(f.type()->return_type()) {
+    const Int type_size = get_type_size(f.type()->return_type());
+    m_var_info.back().emplace(
+      f.id(), Info{.location= - type_size - 16 - acc_size, .size=size_t(type_size) }
+    );
+  }
+
+  size_t loc = 0;
+  for (const auto &[name, v] : f.ctx()->m_vars) {
+    if(m_var_info.back().contains(name)) continue;
+    const size_t size = get_type_size(v.type());
+    m_var_info.back().emplace(name, Info{.location = Int(loc), .size = size});
+    loc += size;
+  }
+  vm.add_resize_stack(loc);
+
+  m_label_locations.emplace_back();
+  m_goto_map.emplace_back();
+  m_func_locations.emplace_back();
+
+  const auto funcs_addr = vm.add_jmp(OPCODE::JMP, 0);
+
+  for (const auto &[name, g] : f.ctx()->m_funcs) {
+    m_func_locations.back().emplace(g.id(), vm.get_current_location());
+    process_context(g);
+  }
+
+  vm.conf_jmp(funcs_addr, vm.get_current_location());
+
+  f.ctx()->body->accept(*this, *f.ctx());
+
+  // Process gotos
+
+  for (const auto &[addr, label] : m_goto_map.back()) {
+    vm.conf_jmp(addr, m_label_locations.back().at(label));
+  }
+
+  vm.add_return(loc);
+
+  m_var_info.pop_back();
+  m_const_info.pop_back();
+  m_label_locations.pop_back();
+  m_goto_map.pop_back();
 }
 
 void Generator::visit(const CompoundStatement &stmts, const Context &ctx) {
@@ -183,13 +279,12 @@ void Generator::visit(const LiteralExpression &expr, const Context &ctx) {
     vm.add_push(OPCODE::PUSH_Q, c->get<Real>());
     break;
   case CONST_CAT::CC_CONST_STRING: {
-    const auto it = m_const_info.find(c->id());
-    if (it != m_const_info.end()) {
-      vm.add_push_frame_pointer();
-      vm.add_push<Int>(OPCODE::PUSH_Q, it->second.location);
-      vm.add_arithmetic_op(OPCODE::ADD_I);
-    } else
-      vm.add_push<Int>(OPCODE::PUSH_Q, m_global_const_info.at(c->id()).location);
+    for(int i = m_const_info.size()-1;i >= 0;--i) {
+      if(const auto it = m_const_info[i].find(c->id()); it != m_const_info[i].end()) {
+        vm.add_push<Int>(OPCODE::PUSH_Q, it->second.location);
+        break;
+      }
+    }
   } break;
   }
 }
@@ -327,14 +422,20 @@ void Generator::visit(const VariableAccess& var, const Context& ctx) {
   bool by_value = m_by_value;
   m_by_value = true;
 
-  const auto it = m_global_var_info.find(var.base_var());
-  
-  if(it != m_global_var_info.end()) {
-    vm.add_push(OPCODE::PUSH_Q, it->second.location);
-  } else {
-    vm.add_push(OPCODE::PUSH_Q, m_var_info.at(var.base_var()).location);
-    vm.add_push_frame_pointer();
-    vm.add_arithmetic_op(OPCODE::ADD_I);
+  int i = m_var_info.size()-1;
+  while(i >= 1) {
+    const auto it = m_var_info[i].find(var.base_var()->id());
+    if(it != m_var_info[i].end()) {
+      vm.add_push(OPCODE::PUSH_Q, it->second.location);
+      vm.add_push_frame_pointer();
+      vm.add_arithmetic_op(OPCODE::ADD_I);
+      break;
+    }
+    --i;
+  }
+
+  if(i == 0) {
+    vm.add_push(OPCODE::PUSH_Q, m_var_info.front().at(var.base_var()->id()).location);
   }
 
   for(const auto& selector : var.selectors()) {
@@ -446,12 +547,12 @@ void Generator::visit(const ReadStatement& stmt, const Context& ctx) {
   m_by_value = by_value;
 }
 void Generator::visit(const LabeledStatement& stmt, const Context &ctx) {
-  m_global_label_locations.emplace(stmt.label(), vm.get_current_location());
+  m_label_locations.back().emplace(stmt.label(), vm.get_current_location());
   stmt.statement()->accept(*this, ctx);
 }
 
 void Generator::visit(const GotoStatement& stmt, const Context& ctx) {
-  m_global_goto_map.emplace(vm.add_jmp(OPCODE::JMP, 0), stmt.label());
+  m_goto_map.back().emplace(vm.add_jmp(OPCODE::JMP, 0), stmt.label());
 }
 
 void Generator::visit(const IfStatement& stmt, const Context& ctx) {
@@ -645,6 +746,49 @@ void Generator::visit(const CaseStatement& stmt, const Context& ctx) {
 
   vm.add_pop(POP);
 } 
+
+void Generator::visit(const ProcedureCall& stmt, const Context& ctx) {
+  for(const auto& arg : stmt.args()) {
+    arg->accept(*this, ctx);
+  }
+  size_t proc_loc = -1;
+  for(int i = m_func_locations.size()-1;i >= 0;--i) {
+    if(const auto it = m_func_locations[i].find(stmt.procedure()->id());it != m_func_locations[i].end()) {
+      proc_loc = it->second;
+      break;
+    }
+  }
+  vm.add_call(proc_loc);
+  
+  Int args_size = 0;
+  for(const auto& arg : stmt.procedure()->type()->args()) {
+    args_size += get_type_size(arg.type());
+  }
+  vm.add_resize_stack(-args_size);
+}
+
+void Generator::visit(const FunctionCall& expr, const Context& ctx) {
+  const auto ret_size = get_type_size(expr.function()->type()->return_type());
+  vm.add_resize_stack(ret_size);
+  for(const auto& arg : expr.args()) {
+    arg->accept(*this, ctx);
+  }
+  size_t proc_loc = -1;
+  for(int i = m_func_locations.size()-1;i >= 0;--i) {
+    if(const auto it = m_func_locations[i].find(expr.function()->id());it != m_func_locations[i].end()) {
+      proc_loc = it->second;
+      break;
+    }
+  }
+  vm.add_call(proc_loc);
+
+  Int args_size = -Int(ret_size);
+  for (const auto &arg : expr.function()->type()->args()) {
+    args_size += get_type_size(arg.type());
+  }
+  vm.add_resize_stack(-args_size);
+}
+
 
 
 } // namespace pascal_compiler
