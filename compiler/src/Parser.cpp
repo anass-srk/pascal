@@ -960,7 +960,7 @@ std::unique_ptr<Expression> Parser::factor()
   if(check(TOKEN_TYPE::LP_TOKEN))
   {
     adv();
-    auto res = expression();
+    auto res = gexpression();
     match(TOKEN_TYPE::RP_TOKEN);
     adv();
     return res;

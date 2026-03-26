@@ -106,8 +106,7 @@ void Generator::process_context(const Context &ctx) {
     // only strings are stored
     const auto str = c->get<std::string>();
     m_const_info.back().emplace(
-      c->id(),
-      Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
+      c, Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
     );
     vm.add_string(str);
   }
@@ -167,8 +166,7 @@ void Generator::process_context(const Function& f) {
     // only strings are stored
     const auto str = c->get<std::string>();
     m_const_info.back().emplace(
-      c->id(),
-      Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
+      c, Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
     );
     vm.add_string(str);
   }
@@ -281,6 +279,10 @@ void Generator::visit(const LiteralExpression &expr, const Context &ctx) {
   case CONST_CAT::CC_CONST_STRING: {
     for(int i = m_const_info.size()-1;i >= 0;--i) {
       if(const auto it = m_const_info[i].find(c->id()); it != m_const_info[i].end()) {
+        vm.add_push<Int>(OPCODE::PUSH_Q, it->second.location);
+        break;
+      }
+      if(const auto it = m_const_info[i].find(c); it != m_const_info[i].end()) {
         vm.add_push<Int>(OPCODE::PUSH_Q, it->second.location);
         break;
       }
@@ -782,7 +784,7 @@ void Generator::visit(const FunctionCall& expr, const Context& ctx) {
   }
   vm.add_call(proc_loc);
 
-  Int args_size = -Int(ret_size);
+  Int args_size = 0;
   for (const auto &arg : expr.function()->type()->args()) {
     args_size += get_type_size(arg.type());
   }

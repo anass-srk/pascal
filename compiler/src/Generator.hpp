@@ -21,7 +21,7 @@ class Generator : CombinedVisitor
   };
 
   std::vector<std::unordered_map<std::string_view, Info>> m_var_info;                // variables
-  std::vector<std::unordered_map<std::string_view, Info>> m_const_info;        // strings
+  std::vector<std::unordered_map<std::variant<const Const*, std::string_view>, Info>> m_const_info;        // strings
   std::vector<std::unordered_map<std::string_view, size_t>> m_func_locations;  // functions/procedures
 
   std::vector<std::unordered_map<const Label*, size_t>> m_label_locations;
@@ -59,7 +59,7 @@ public:
     process_context(*parser.getCtx());
   }
 
-  void run() const { vm.run(); }
+  const auto& data() const { return vm.bytecode(); }
 
 private:
 

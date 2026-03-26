@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -168,13 +170,13 @@ constexpr bool DEBUG_PRINT_OP = false;
 #endif
 
 class VM {
-public:
 private:
   std::vector<uint8_t> code;
   mutable std::vector<uint8_t> stack; // Runtime Stack
   mutable size_t pc = 0;
   mutable size_t fp = 0; // Frame pointer
   std::vector<size_t> jmp_locs;
+  bool good = false;
 
   template <VarType T> inline void add_value(T v) {
     if constexpr (sizeof(T) == 1) {
@@ -211,10 +213,27 @@ private:
   }
 
 public:
-  VM() {}
+  VM() : good(true) {}
+  VM(const std::string& filename) : good(true) {
+    std::ifstream in(filename, std::ios::binary);
+    if(!in) {
+      good = false;
+      return;
+    }
+    
+    size_t size;
+    in.read(reinterpret_cast<char*>(&size), sizeof(size));
+
+    code.resize(size);
+    in.read(reinterpret_cast<char*>(code.data()), size);
+    in.close();
+  }
 
   size_t get_current_location() const { return code.size(); }
-  std::vector<uint8_t> &data() const { return stack; }
+  std::vector<uint8_t>& data() const { return stack; }
+  const std::vector<uint8_t>& bytecode() const { return code; }
+  
+  operator bool() const { return good; }
 
   void run() const;
 
