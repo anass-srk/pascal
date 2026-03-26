@@ -244,6 +244,11 @@ void VM::run() const {
       pc = fetch_data<size_t>();
     } break;
 
+    case OPCODE::C2I: {
+      const auto c = fetch_data<char>();
+      add_var(Int(c));
+    } break;
+
     case OPCODE::READ_I: {
       print_op(op);
       const auto addr = fetch_data<size_t>();

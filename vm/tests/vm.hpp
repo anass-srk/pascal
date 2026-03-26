@@ -971,4 +971,21 @@ TEST(VMTest, Procedure) {
   EXPECT_EQ(vm.fetch_data<Int>(), 0); // last value of the local var from the input
 }
 
+TEST(VMTest, ConvChar2Int) {
+  VM vm;
+
+  vm.add_push(OPCODE::PUSH_B, char('0'));
+  vm.add_conv<char, Int>();
+
+  vm.add_push(OPCODE::PUSH_B, true);
+  vm.add_conv<char, Int>();
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 1);
+  EXPECT_EQ(vm.fetch_data<Int>(), 48);
+  EXPECT_TRUE(vm.data().empty());
+}
+
 } // namespace pascal_vm

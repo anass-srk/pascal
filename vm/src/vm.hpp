@@ -102,6 +102,7 @@ enum class OPCODE : uint8_t {
 
   CALL,
   RET,
+  C2I,
 
   HALT,
   MAX = HALT
@@ -160,6 +161,7 @@ inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
   "DUPL_B",
   "CALL",
   "RET",
+  "C2I",
   "HALT"
 };
 
@@ -443,6 +445,14 @@ public:
   void add_return(size_t size) {
     add_value(static_cast<uint8_t>(OPCODE::RET));
     add_value(size);
+  }
+
+  template <typename A,typename B>
+  void add_conv();
+
+  template <>
+  void add_conv<char,int64_t>() {
+    add_value(static_cast<uint8_t>(OPCODE::C2I));
   }
 
   void add_halt() {

@@ -1202,7 +1202,7 @@ TEST(FunctionCallTest, NoArguments)
     end.
     var x : Real;
     begin
-      x := getPi
+      x := getPi()
     end.
   )";
   Parser parser(std::move(program));
@@ -1439,10 +1439,10 @@ TEST(FunctionCallTest, DifferentReturnTypes)
     var b : Bool;
     var c : Char;
     begin
-      i := intFunc;
-      r := realFunc;
-      b := boolFunc;
-      c := charFunc
+      i := intFunc();
+      r := realFunc();
+      b := boolFunc();
+      c := charFunc()
     end.
   )";
   Parser parser(std::move(program));
@@ -1629,7 +1629,7 @@ TEST(FunctionCallTest, ProcedureCalledAsStatement)
       tmp := 2
     end.
     begin
-      pr
+      pr()
     end.
   )";
   Parser parser(std::move(program));

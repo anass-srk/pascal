@@ -2,7 +2,6 @@
 #include "Semantics.hpp"
 #include "Ast.hpp"
 #include <exception>
-#include <unordered_set>
 
 namespace pascal_compiler
 {

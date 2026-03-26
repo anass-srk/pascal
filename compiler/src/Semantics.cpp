@@ -164,19 +164,6 @@ void Enum::insert(const Lexeme& token, Block& block){
 }
 
 template <BlockMemberType T>
-inline const auto& getInfo(const T& t){
-  if constexpr (is_one_of<T, Label, Const, Var, EnumValue>){
-    return t;
-  }
-  else if constexpr(std::is_same_v<T, std::shared_ptr<Type>>){
-    return *t.get();
-  }
-  else if constexpr(std::is_same_v<T, Function>){
-    return *t.m_type;
-  }
-}
-
-template <BlockMemberType T>
 size_t getInfoLine(const T& t){
   if constexpr (is_one_of<T, Label, Const, Var, EnumValue>){
     return t.line();

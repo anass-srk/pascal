@@ -138,6 +138,9 @@ std::string Lexeme::to_string_literal() const
       case '"':
         res += '"';
         break;
+      case '0':
+        res += '\0';
+        break;
       }
     }
     else
@@ -320,12 +323,13 @@ void Lexer::read_string()
       case 'n':
       case 't':
       case 'r':
+      case '0':
       case '\\':
       case '"':
         len += 2;
         break;
       default:
-        throw LexerException(LEXER_ERROR::LE_INVALID_STRING,"Lexer error: only \\n, \\t, \\r, \\\\ and \" can be used in a string",m_line,m_col);
+        throw LexerException(LEXER_ERROR::LE_INVALID_STRING,"Lexer error: only \\n, \\t, \\r, \\0, \\\\ and \" can be used in a string",m_line,m_col);
       }
     }
     else

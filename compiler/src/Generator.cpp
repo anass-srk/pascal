@@ -477,6 +477,22 @@ void Generator::visit(const ArraySelector& selector, const Context& ctx) {
   int i = 0;
   for(const auto& exp : selector.indices()) {
     exp->accept(*this, ctx); // pushes value
+    if (type->index_types()[i]->category() == TYPE_CAT::TC_SUBRANGE) {
+      // Could be a bool, char, int, enum(stored as an int). It can also begin with a non-zero value
+      const auto* sub = static_cast<const Subrange*>(type->index_types()[i]);
+      switch(get_catagory(sub)) {
+        case CONST_CAT::CC_BOOL:
+        case CONST_CAT::CC_CHAR:
+          vm.add_conv<char, Int>();
+          break;
+      }
+      // Now it's an int
+      if(sub->start() != 0) {
+        vm.add_push(OPCODE::PUSH_Q, sub->start());
+        vm.add_arithmetic_op(OPCODE::SUB_I);
+      }
+      // Now it starts with zero
+    }
     vm.add_push(OPCODE::PUSH_Q, current_size);
     vm.add_arithmetic_op(OPCODE::MUL_I);
     vm.add_arithmetic_op(OPCODE::ADD_I);

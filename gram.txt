@@ -52,9 +52,10 @@
  factor := NUMBER | STRING | CHAR | CONSTANT_NAME | ENUM_VALUE
  | variable_access | function_designator
  | '(' expression ')' | NOT factor
- function_designator := FUNCTION_NAME [ '(' expression { ',' expression } ')' ]
+ function_designator := FUNCTION_NAME '(' [ expression { ',' expression } ] ')'
  record_access_ := '.' ATTRIBUTE_NAME
- procedure_statement := ((PROCEDURE_NAME | 'write')  [ '(' expression { ',' expression } ')' ])
+ procedure_statement := PROCEDURE_NAME '(' [ expression { ',' expression } ] ')'
+ | 'write'  '(' expression { ',' expression } ')'
  | 'read' '(' variable_access {',' variable_access } ')'
  goto_statement := GOTO LABEL_ID
  structured_statement := compound_statement | repetitive_statement

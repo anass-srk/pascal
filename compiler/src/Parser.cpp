@@ -947,7 +947,7 @@ std::unique_ptr<Expression> Parser::factor()
     })
   )
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(constant(token)), token, *m_current_block);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(constant(token)), token, m_current_block);
     res->validate();
     adv();
     return res;
@@ -1014,14 +1014,14 @@ std::unique_ptr<Expression> Parser::factor()
 
   if(cons)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(Const(*cons)), token, *m_current_block);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(Const(*cons)), token, nullptr);
     res->validate();
     adv();
     return res;
   }
   if(ev)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token, *ev), token, *m_current_block);
+    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token, *ev), token, m_current_block);
     res->validate();
     adv();
     return res;
@@ -1064,26 +1064,20 @@ std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> Pars
   const auto func_type = f->type();
   std::vector<std::unique_ptr<Expression>> args;
   
-  if(check(TOKEN_TYPE::LP_TOKEN))
+  match(TOKEN_TYPE::LP_TOKEN);
+  adv();
+  if(!check(TOKEN_TYPE::RP_TOKEN))
   {
-    adv();
-    if(!check(TOKEN_TYPE::RP_TOKEN))
+    args.push_back(gexpression());
+    while(check(TOKEN_TYPE::COMMA_TOKEN))
     {
+      adv();
       args.push_back(gexpression());
-      while(check(TOKEN_TYPE::COMMA_TOKEN))
-      {
-        adv();
-        args.push_back(gexpression());
-      }
     }
-    // do
-    // {
-    //   adv();
-    //   args.push_back(gexpression());
-    // }while(check(TOKEN_TYPE::COMMA_TOKEN));
-    match(TOKEN_TYPE::RP_TOKEN);
-    adv();
   }
+  match(TOKEN_TYPE::RP_TOKEN);
+  adv();
+
   if(!is_procedure)
   {
     auto res = std::make_unique<FunctionCall>(f, std::move(args), tkn);
