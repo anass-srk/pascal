@@ -1660,5 +1660,5 @@ TEST(FunctionCallTest, ParenthesesWithNoArgs)
     end.
   )";
   Parser parser(std::move(program));
-  EXPECT_THROW(parser.parse(), SyntaxException);
+  EXPECT_NO_THROW(parser.parse());
 }

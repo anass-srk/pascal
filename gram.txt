@@ -31,8 +31,8 @@
  formal_parameter_section := [ VAR ] id_list ':' TYPE_NAME
  variable_declaration_part := VAR id_list ':' type ';'
  { id_list ':' type ';' }
- procedure_definition_part := PROCEDURE NAME [ formal_parameter_list ] ';' block .
- function_definition_part := FUNCTION NAME [ formal_parameter_list ] ':' TYPE_NAME ';' block .
+ procedure_definition_part := PROCEDURE NAME [ formal_parameter_list | '('')' ] ';' block .
+ function_definition_part := FUNCTION NAME [ formal_parameter_list | '('')' ] ':' TYPE_NAME ';' block .
 
  
  statement_part := BEGIN statement_sequence END

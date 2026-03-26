@@ -208,6 +208,7 @@ void Generator::process_context(const Function& f) {
   const auto funcs_addr = vm.add_jmp(OPCODE::JMP, 0);
 
   for (const auto &[name, g] : f.ctx()->m_funcs) {
+    if(g.id() == f.id()) continue; // don't process the function itself twice (infinite recursion)
     m_func_locations.back().emplace(g.id(), vm.get_current_location());
     process_context(g);
   }

@@ -106,8 +106,8 @@ public:
   std::unique_ptr<Expression> term();
   std::unique_ptr<Expression> factor();
 
-  std::unique_ptr<VariableAccess> variable_access(const Var*);
-  std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> function_call(const Function*, bool is_procedure);
+  std::unique_ptr<VariableAccess> variable_access(const Var*, const Lexeme&);
+  std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> function_call(const Function*, bool is_procedure, const Lexeme&);
 
   std::unique_ptr<CompoundStatement> compound_stmt();
   std::unique_ptr<Statement> statement();

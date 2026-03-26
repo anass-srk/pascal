@@ -1,4 +1,5 @@
 #include "Parser.hpp"
+#include "Lexer.hpp"
 #include "Semantics.hpp"
 #include <format>
 #include <utility>
@@ -775,6 +776,9 @@ void Parser::function_definition(bool is_proc)
 
   // to return a value, we assign to a variable with the id of the function (not for procedures)
   if(!is_proc) m_current_block->m_vars.insert(std::make_pair(id, Var(token, func_type->return_type())));
+
+  m_current_block->m_funcs.insert(std::make_pair(id, Function(token, func_type, nullptr)));
+
   for (const auto &arg : func_type->args())
   {
     m_current_block->m_vars.insert(std::make_pair(arg.id(), Var(arg)));
@@ -988,13 +992,12 @@ std::unique_ptr<Expression> Parser::factor()
     if(auto v  = Block::get(id, current->m_vars); v)
     {
       var = v;
-      break;
     }
     if(auto f = Block::get(id, current->m_funcs); f && f->type()->return_type() != nullptr) // A function, not a procedure
     {
       func = f;
-      break;
     }
+    if(var || func) break;
     if(auto e = Block::get(id, current->m_enums_vals); e)
     {
       ev = e;
@@ -1025,14 +1028,27 @@ std::unique_ptr<Expression> Parser::factor()
   }
 
   // Vars or funcs or none (error)
+
+  if(var && func)
+  {
+    adv();
+    if(check(TOKEN_TYPE::LP_TOKEN))
+    {
+      return std::get<std::unique_ptr<FunctionCall>>(function_call(func, false, token));
+    }
+    return variable_access(var, token);
+  }
+
   if(var)
   {
-    return variable_access(var);
+    adv();
+    return variable_access(var, token);
   }
 
   if(func)
   {
-    return std::get<std::unique_ptr<FunctionCall>>(function_call(func, false));
+    adv();
+    return std::get<std::unique_ptr<FunctionCall>>(function_call(func, false, token));
   }
 
   throw SemanticException(
@@ -1043,21 +1059,28 @@ std::unique_ptr<Expression> Parser::factor()
   );
 }
 
-std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> Parser::function_call(const Function *f, bool is_procedure)
+std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> Parser::function_call(const Function *f, bool is_procedure, const Lexeme& tkn)
 {
-  const auto tkn = m_lexer.getToken();
   const auto func_type = f->type();
   std::vector<std::unique_ptr<Expression>> args;
-  match(TOKEN_TYPE::ID_TOKEN);
-  adv();
   
   if(check(TOKEN_TYPE::LP_TOKEN))
   {
-    do
+    adv();
+    if(!check(TOKEN_TYPE::RP_TOKEN))
     {
-      adv();
       args.push_back(gexpression());
-    }while(check(TOKEN_TYPE::COMMA_TOKEN));
+      while(check(TOKEN_TYPE::COMMA_TOKEN))
+      {
+        adv();
+        args.push_back(gexpression());
+      }
+    }
+    // do
+    // {
+    //   adv();
+    //   args.push_back(gexpression());
+    // }while(check(TOKEN_TYPE::COMMA_TOKEN));
     match(TOKEN_TYPE::RP_TOKEN);
     adv();
   }
@@ -1072,12 +1095,9 @@ std::variant<std::unique_ptr<FunctionCall>, std::unique_ptr<ProcedureCall>> Pars
   return res;
 }
 
-std::unique_ptr<VariableAccess> Parser::variable_access(const Var *v)
+std::unique_ptr<VariableAccess> Parser::variable_access(const Var *v, const Lexeme& tkn)
 {
-  const auto tkn = m_lexer.getToken();
-
   std::vector<std::unique_ptr<Selector>> selectors;
-  match(TOKEN_TYPE::ID_TOKEN);
 
   if(v == nullptr)
   {
@@ -1095,8 +1115,6 @@ std::unique_ptr<VariableAccess> Parser::variable_access(const Var *v)
       current = current->m_parent;
     } while (current);
   }
-
-  adv();
 
   while(check({TOKEN_TYPE::DOT_TOKEN, TOKEN_TYPE::LB_TOKEN}))
   {
@@ -1165,13 +1183,12 @@ std::unique_ptr<Statement> Parser::statement()
       if (auto v = Block::get(id, current->m_vars); v)
       {
         var = v;
-        break;
       }
       if (auto f = Block::get(id, current->m_funcs); f && f->type()->return_type() == nullptr) // Not a function, a procedure
       {
         func = f;
-        break;
       }
+      if(var || func) break;
       if (auto l = Block::get(id, current->m_labels); l)
       {
         label = l;
@@ -1202,9 +1219,24 @@ std::unique_ptr<Statement> Parser::statement()
       return res;
     }
 
+    if (var && func) 
+    {
+      adv();
+      if (check(TOKEN_TYPE::LP_TOKEN)) {
+        return std::get<std::unique_ptr<ProcedureCall>>(function_call(func, true, token));
+      }
+      auto v = variable_access(var, token);
+      match(TOKEN_TYPE::ASSIGN_TOKEN);
+      adv();
+      auto res = std::make_unique<AssignmentStatement>(std::move(v), gexpression(), token);
+      res->validate();
+      return res;    
+    }
+
     if(var)
     {
-      auto v = variable_access(var);
+      adv();
+      auto v = variable_access(var, token);
       match(TOKEN_TYPE::ASSIGN_TOKEN);
       adv();
       auto res = std::make_unique<AssignmentStatement>(std::move(v), gexpression(), token);
@@ -1215,7 +1247,8 @@ std::unique_ptr<Statement> Parser::statement()
     // Handle procedures
     if(func)
     {
-      return std::get<std::unique_ptr<ProcedureCall>>(function_call(func, true));
+      adv();
+      return std::get<std::unique_ptr<ProcedureCall>>(function_call(func, true, token));
     }
 
     throw SemanticException(
@@ -1252,7 +1285,9 @@ std::unique_ptr<Statement> Parser::statement()
     do
     {
       adv();
-      args.push_back(variable_access(nullptr));
+      const auto tkn = m_lexer.getToken();
+      adv();
+      args.push_back(variable_access(nullptr, tkn));
     } while (check(TOKEN_TYPE::COMMA_TOKEN));
     match(TOKEN_TYPE::RP_TOKEN);
     adv();
@@ -1336,7 +1371,9 @@ std::unique_ptr<Statement> Parser::statement()
   if(check(TOKEN_TYPE::FOR_TOKEN))
   {
     adv();
-    auto v = variable_access(nullptr);
+    const auto tkn = m_lexer.getToken();
+    adv();
+    auto v = variable_access(nullptr, tkn);
     match(TOKEN_TYPE::ASSIGN_TOKEN);
     adv();
     auto start = constant(m_lexer.getToken());
