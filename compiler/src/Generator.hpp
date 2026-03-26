@@ -22,10 +22,17 @@ class Generator : CombinedVisitor
 
   std::vector<std::unordered_map<std::string_view, Info>> m_var_info;                // variables
   std::vector<std::unordered_map<std::variant<const Const*, std::string_view>, Info>> m_const_info;        // strings
-  std::vector<std::unordered_map<std::string_view, size_t>> m_func_locations;  // functions/procedures
 
   std::vector<std::unordered_map<const Label*, size_t>> m_label_locations;
   std::vector<std::unordered_map<size_t, const Label*>> m_goto_map;
+
+  struct CallInfo{
+    size_t location;
+    std::string_view function_id;
+  };
+
+  std::unordered_map<const Context*, std::unordered_map<std::string_view, size_t>> m_func_locs;
+  std::unordered_map<const Context*, std::vector<CallInfo>> m_func_calls;
 
   std::unordered_map<const Type*, size_t> m_type_sizes; // for variables only
   std::unordered_map<const Record*, std::unordered_map<std::string_view, size_t>> m_record_offsets;

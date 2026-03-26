@@ -3,6 +3,7 @@
 #include "Semantics.hpp"
 #include "Visitor.hpp"
 #include <iostream>
+#include <stdexcept>
 #include <utility>
 #include <variant>
 
@@ -124,12 +125,16 @@ void Generator::process_context(const Context &ctx) {
 
   m_label_locations.emplace_back();
   m_goto_map.emplace_back();
-  m_func_locations.emplace_back();
+
+  m_func_locs[&ctx];
+  m_func_calls[&ctx];
 
   const auto funcs_addr = vm.add_jmp(OPCODE::JMP, 0);
 
   for (const auto& [name, f] : ctx.m_funcs) {
-    m_func_locations.back().emplace(f.id(), vm.get_current_location());
+
+    m_func_locs[&ctx].emplace(f.id(), vm.get_current_location());
+
     process_context(f);
   }
 
@@ -144,6 +149,27 @@ void Generator::process_context(const Context &ctx) {
   }
   
   vm.add_halt();
+
+  for(const auto& [c, infos] : m_func_calls) {
+    for(const auto& info : infos) {
+      auto context = c;
+      bool done = false;
+      while(context) {
+
+        const auto& locs = m_func_locs.at(context);
+        
+        if(auto it = locs.find(info.function_id);it != locs.end()) {
+          done = true;
+          vm.conf_call(info.location, it->second);
+        }
+
+        context = context->m_parent;
+      }
+      if(!done) {
+        throw std::runtime_error("Function '" + std::string(info.function_id) + "' not found !\n");
+      }
+    }
+  }
 }
 
 void Generator::process_context(const Function& f) {
@@ -176,7 +202,7 @@ void Generator::process_context(const Function& f) {
   m_var_info.emplace_back();
 
   Int acc_size = 0;
-  for(int i = f.type()->args().size()-1;i >= 0;--i) {
+  for(int i = int(f.type()->args().size())-1;i >= 0;--i) {
     const auto& arg = f.type()->args()[i];
     const Int type_size = get_type_size(arg.type());
     m_var_info.back().emplace(
@@ -203,13 +229,17 @@ void Generator::process_context(const Function& f) {
 
   m_label_locations.emplace_back();
   m_goto_map.emplace_back();
-  m_func_locations.emplace_back();
+
+  m_func_locs[f.ctx()];
+  m_func_calls[f.ctx()];
 
   const auto funcs_addr = vm.add_jmp(OPCODE::JMP, 0);
 
   for (const auto &[name, g] : f.ctx()->m_funcs) {
     if(g.id() == f.id()) continue; // don't process the function itself twice (infinite recursion)
-    m_func_locations.back().emplace(g.id(), vm.get_current_location());
+
+    m_func_locs[f.ctx()].emplace(g.id(), vm.get_current_location());
+
     process_context(g);
   }
 
@@ -278,7 +308,7 @@ void Generator::visit(const LiteralExpression &expr, const Context &ctx) {
     vm.add_push(OPCODE::PUSH_Q, c->get<Real>());
     break;
   case CONST_CAT::CC_CONST_STRING: {
-    for(int i = m_const_info.size()-1;i >= 0;--i) {
+    for(int i = int(m_const_info.size())-1;i >= 0;--i) {
       if(const auto it = m_const_info[i].find(c->id()); it != m_const_info[i].end()) {
         vm.add_push<Int>(OPCODE::PUSH_Q, it->second.location);
         break;
@@ -425,7 +455,7 @@ void Generator::visit(const VariableAccess& var, const Context& ctx) {
   bool by_value = m_by_value;
   m_by_value = true;
 
-  int i = m_var_info.size()-1;
+  int i = int(m_var_info.size())-1;
   while(i >= 1) {
     const auto it = m_var_info[i].find(var.base_var()->id());
     if(it != m_var_info[i].end()) {
@@ -582,7 +612,7 @@ void Generator::visit(const IfStatement& stmt, const Context& ctx) {
   const size_t end_addr = vm.add_jmp(OPCODE::JMP, 0);
 
   vm.conf_jmp(else_addr, vm.get_current_location());
-  stmt.else_stmt()->accept(*this, ctx);
+  if(stmt.else_stmt()) stmt.else_stmt()->accept(*this, ctx);
   vm.conf_jmp(end_addr, vm.get_current_location());
 }
 
@@ -747,7 +777,7 @@ void Generator::visit(const CaseStatement& stmt, const Context& ctx) {
 
   for(const auto& alt : stmt.alternatives()) {
     std::vector<size_t> jmp_locs;
-    for(int i = 0;i < alt.labels().size()-1;++i) {
+    for(int i = 0;i < int(alt.labels().size())-1;++i) {
       const auto& c = alt.labels()[i];
       push(vm, c);
       jmp_locs.push_back(vm.add_jmp(OPCODE::JMP_TRUE, 0));
@@ -770,14 +800,8 @@ void Generator::visit(const ProcedureCall& stmt, const Context& ctx) {
   for(const auto& arg : stmt.args()) {
     arg->accept(*this, ctx);
   }
-  size_t proc_loc = -1;
-  for(int i = m_func_locations.size()-1;i >= 0;--i) {
-    if(const auto it = m_func_locations[i].find(stmt.procedure()->id());it != m_func_locations[i].end()) {
-      proc_loc = it->second;
-      break;
-    }
-  }
-  vm.add_call(proc_loc);
+
+  m_func_calls.at(&ctx).push_back(CallInfo{.location=vm.add_call(0), .function_id=stmt.procedure()->id()});
   
   Int args_size = 0;
   for(const auto& arg : stmt.procedure()->type()->args()) {
@@ -792,14 +816,8 @@ void Generator::visit(const FunctionCall& expr, const Context& ctx) {
   for(const auto& arg : expr.args()) {
     arg->accept(*this, ctx);
   }
-  size_t proc_loc = -1;
-  for(int i = m_func_locations.size()-1;i >= 0;--i) {
-    if(const auto it = m_func_locations[i].find(expr.function()->id());it != m_func_locations[i].end()) {
-      proc_loc = it->second;
-      break;
-    }
-  }
-  vm.add_call(proc_loc);
+
+  m_func_calls.at(&ctx).push_back(CallInfo{.location=vm.add_call(0), .function_id=expr.function()->id()});
 
   Int args_size = 0;
   for (const auto &arg : expr.function()->type()->args()) {

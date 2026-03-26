@@ -82,6 +82,10 @@ public:
   std::string_view id() const { return m_id; }
   size_t line() const { return m_line; }
   size_t column() const { return m_col; }
+
+  virtual std::string to_string() const {
+    return std::format("\"{}\" at ({},{})", m_id, m_line, m_col);
+  }
 };
 
 struct Label : ID
@@ -144,11 +148,6 @@ public:
   const std::variant<Int, Real, std::string, char, bool>& value() const;
 
   static Const withSign(const Const& original, int sign, const Lexeme& new_token);
-
-  std::string to_string() const
-  {
-    return std::format("\"{}\" at ({},{})", m_id, m_line, m_col);
-  }
 };
 
 enum class TYPE_CAT : int{
@@ -180,9 +179,6 @@ public:
 
   Type(std::string_view name, size_t line, size_t col, TYPE_CAT type) : ID(name, line, col), m_type(type) {}
   Type(const Lexeme& token, TYPE_CAT type_cat) : ID(token), m_type(type_cat) {}
-  std::string to_string() const{
-    return std::format("\"{}\" at ({},{})", m_id, m_line, m_col); 
-  }
 
   const TYPE_CAT category() const { return m_type; }
 
@@ -263,11 +259,6 @@ public:
   Var(std::string_view id, size_t line, size_t col, const Type *type)
       : ID(id, line, col), m_type(type) {}
 
-  std::string to_string() const
-  {
-    return std::format("\"{}\" at ({},{})", m_id, m_line, m_col);
-  }
-
   const Type* type() const { return m_type; }
 };
 
@@ -314,6 +305,24 @@ public:
   const Type* return_type() const { return m_ret_type; }
   void set_args(std::vector<Arg>&& args) { m_args = std::move(args); }
   void set_return_type(const Type* type) { m_ret_type = type; }
+
+  std::string to_string() const override {
+    std::string type(m_id);
+    type += '(';
+    for(const auto& arg : m_args) {
+      type += ' ';
+      if(arg.is_ref()) type += "var ";
+      type += arg.id();
+      type += ": ";
+      type += arg.type()->id();
+      type += ',';
+    }
+    type.pop_back();
+    type += ") : ";
+    type += (m_ret_type ? m_ret_type->id() : "void");
+
+    return std::format("\"{}\" at ({},{})", type, m_line, m_col);
+  }
 };
 
 template <typename T>
@@ -360,7 +369,9 @@ public:
 
   Function(const Lexeme& , const FunctionType*, Block*);
   const FunctionType* type() const { return m_type; }
+  void set_type(const FunctionType* type) { m_type = type; }
   const Block* ctx() const { return block.get(); };
+  void set_ctx(std::unique_ptr<Block>&& ctx) { block = std::move(ctx); }
 
 };
 

@@ -178,6 +178,7 @@ private:
   mutable size_t pc = 0;
   mutable size_t fp = 0; // Frame pointer
   std::vector<size_t> jmp_locs;
+  std::vector<size_t> call_locs;
   bool good = false;
 
   template <VarType T> inline void add_value(T v) {
@@ -437,9 +438,20 @@ public:
   }
 
   // return value | args | return address | old frame pointer | (start=new frame pointer) const + vars ....
-  void add_call(size_t addr) {
+  size_t add_call(size_t addr) {
     add_value(static_cast<uint8_t>(OPCODE::CALL));
+    const auto res = code.size();
+    call_locs.push_back(res);
     add_value(addr);
+    return res;
+  }
+
+  bool conf_call(size_t loc, size_t dest) {
+    if((loc + sizeof(loc) > code.size()) ||
+      !std::binary_search(call_locs.begin(), call_locs.end(), loc)) 
+      return false;
+    std::memcpy(&code[loc], &dest, sizeof(dest));
+    return true;
   }
 
   void add_return(size_t size) {

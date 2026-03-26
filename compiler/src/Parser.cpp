@@ -55,6 +55,8 @@ void Parser::program()
 
   m_current_block = m_block.get();
   _top = m_current_block;
+
+  adv();
   block();
 
   match(TOKEN_TYPE::DOT_TOKEN);
@@ -71,8 +73,6 @@ void Parser::block()
 
 void Parser::declaration()
 {
-
-  adv();
 
   while(!check(TOKEN_TYPE::BEGIN_TOKEN)){
 
@@ -744,10 +744,16 @@ void Parser::function_definition(bool is_proc)
 
   auto token = m_lexer.getToken();
   const auto id = token.id();
+
+  Function* func = nullptr;
+  if(const auto it = m_current_block->m_funcs.find(id);it != m_current_block->m_funcs.end()) {
+    func = &it->second;
+  } else {
+    m_current_block->check_used_id(token);
+  }
+
   auto func_type_unique = std::make_unique<FunctionType>(token, nullptr);
   auto func_type = func_type_unique.get();
-
-  m_current_block->check_used_id(token);
 
   adv();
   if(check(TOKEN_TYPE::LP_TOKEN)){
@@ -765,6 +771,74 @@ void Parser::function_definition(bool is_proc)
     match_adv(TOKEN_TYPE::ID_TOKEN);
     func_type->set_return_type(find_type(true));
     match_adv(TOKEN_TYPE::SEMI_TOKEN);
+  }
+
+  if(func) {
+    if(func->type()->return_type() != func_type->return_type()) {
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_INVALID_TYPE,
+        std::format(
+          "Semantic Error : At ({}), function/procedure definition of ({}) has mismatching return type with declaration ({}) !\n",
+          token.to_string(), func_type->to_string(), func->to_string()
+        ),
+        token.line(),
+        token.column()
+      );
+    }
+    if(func->type()->args().size() != func_type->args().size()) {
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_INVALID_TYPE,
+        std::format(
+          "Semantic Error : At ({}), function/procedure definition of ({}) has mismatching number of arguments with declaration ({}) !\n",
+          token.to_string(), func_type->to_string(), func->to_string()
+        ),
+        token.line(),
+        token.column()
+      );
+    }
+    for(int i = 0;i < int(func->type()->args().size())-1;++i){
+      const auto& oarg = func->type()->args()[i];
+      const auto& narg = func_type->args()[i]; 
+      if(oarg.is_ref() != narg.is_ref() || oarg.type() != narg.type()) {
+        throw SemanticException(
+          SEMANTIC_ERROR::SE_INVALID_TYPE,
+          std::format(
+            "Semantic Error : At ({}), function/procedure definition of ({}) has mismatching argument-{} with declaration ({}) !\n",
+            token.to_string(), func_type->to_string(), i+1, func->to_string()
+          ),
+          token.line(),
+          token.column()
+        );
+      }
+    }
+    for(auto it = m_current_block->m_unamed_types.begin();it != m_current_block->m_unamed_types.end();++it) {
+      if(it->get() == func->type()) {
+        m_current_block->m_unamed_types.erase(it);
+        break;
+      }
+    }
+    func->set_type(func_type);
+  }
+
+  adv();
+  if (check(TOKEN_TYPE::DOT_TOKEN)) {
+    adv();
+
+    if(func) {
+      throw SemanticException(
+        SEMANTIC_ERROR::SE_INVALID_TYPE,
+        std::format(
+          "Semantic Error : At ({}), function/procedure declaration of ({}) is duplicate ({}) !\n",
+          token.to_string(), func_type->to_string(), func->to_string()
+        ),
+        token.line(),
+        token.column()
+      );
+    }
+
+    m_current_block->m_unamed_types.emplace_back(std::move(func_type_unique));
+    m_current_block->m_funcs.insert(std::make_pair(id, Function(token, func_type, nullptr)));
+    return;
   }
 
   m_current_block->m_unamed_types.emplace_back(std::move(func_type_unique));
@@ -791,7 +865,10 @@ void Parser::function_definition(bool is_proc)
   auto *func_block = m_current_block;
   m_current_block = parent;
 
-  m_current_block->m_funcs.insert(std::make_pair(id, Function(token, func_type, new_block.release())));
+  if (func)
+    func->set_ctx(std::move(new_block));
+  else 
+    m_current_block->m_funcs.insert(std::make_pair(id, Function(token, func_type, new_block.release())));
 }
 
 std::unique_ptr<Expression> Parser::gexpression()

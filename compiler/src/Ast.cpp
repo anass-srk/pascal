@@ -74,7 +74,7 @@ void NExpression::validate()
       SEMANTIC_ERROR::SE_INVALID_OP,
       std::format(
         "Semantic error: At {}, found {} expressions and {} binary operations ! Expected {} binary operations !",
-        m_token.to_string(), m_exprs.size(), m_ops.size(), m_exprs.size()-1
+        m_token.to_string(), m_exprs.size(), m_ops.size(), int(m_exprs.size())-1
       ),
       m_token.line(),
       m_token.column()
