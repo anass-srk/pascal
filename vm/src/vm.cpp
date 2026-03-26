@@ -273,7 +273,7 @@ void VM::run() const {
       const auto addr = fetch_data<size_t>();
 
       std::string data;
-      std::cin >> data;
+      std::getline(std::cin, data);
 
       if(data.length() >= len) {
         std::memcpy(&stack[addr], data.data(), len-1);

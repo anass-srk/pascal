@@ -570,7 +570,7 @@ void Generator::visit(const ReadStatement& stmt, const Context& ctx) {
       const Array* arr = static_cast<const Array*>(var->type()->get_underlying_type());
       size_t len = 1;
       for(const auto& i : arr->index_types()) {
-        len *= m_type_sizes.at(i);
+        len *= m_type_lens.at(i);
       }
       vm.add_push(OPCODE::PUSH_Q, Int(len));
       vm.add_read_string();
