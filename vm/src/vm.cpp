@@ -245,6 +245,7 @@ void VM::run() const {
     } break;
 
     case OPCODE::C2I: {
+      print_op(op);
       const auto c = fetch_data<char>();
       add_var(Int(c));
     } break;
