@@ -98,16 +98,17 @@ void Generator::process_context(const Context &ctx) {
     const auto str = c.get<std::string>();
 
     m_const_info.back().emplace(
-      c.id(), Info{.location = Int(vm.get_current_location()), .size = str.length()+1}
+      &c, Info{.location = Int(vm.get_current_location()), .size = str.length()+1}
     );
     vm.add_string(str);
   }
 
-  for (auto c : ctx.m_unamed_const_strings) {
+  for (const auto& c : ctx.m_unamed_consts) {
+    if(c->category() != CONST_CAT::CC_CONST_STRING) continue;
     // only strings are stored
     const auto str = c->get<std::string>();
     m_const_info.back().emplace(
-      c, Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
+      c.get(), Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
     );
     vm.add_string(str);
   }
@@ -183,16 +184,17 @@ void Generator::process_context(const Function& f) {
     const auto str = c.get<std::string>();
 
     m_const_info.back().emplace(
-      c.id(), Info{.location = Int(vm.get_current_location()), .size = str.length()+1}
+      &c, Info{.location = Int(vm.get_current_location()), .size = str.length()+1}
     );
     vm.add_string(str);
   }
 
-  for (auto c : f.ctx()->m_unamed_const_strings) {
+  for (const auto& c : f.ctx()->m_unamed_consts) {
+    if(c->category() != CONST_CAT::CC_CONST_STRING) continue;
     // only strings are stored
     const auto str = c->get<std::string>();
     m_const_info.back().emplace(
-      c, Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
+      c.get(), Info{.location = Int(vm.get_current_location()), .size = str.length() + 1}
     );
     vm.add_string(str);
   }
@@ -309,10 +311,6 @@ void Generator::visit(const LiteralExpression &expr, const Context &ctx) {
     break;
   case CONST_CAT::CC_CONST_STRING: {
     for(int i = int(m_const_info.size())-1;i >= 0;--i) {
-      if(const auto it = m_const_info[i].find(c->id()); it != m_const_info[i].end()) {
-        vm.add_push<Int>(OPCODE::PUSH_Q, it->second.location);
-        break;
-      }
       if(const auto it = m_const_info[i].find(c); it != m_const_info[i].end()) {
         vm.add_push<Int>(OPCODE::PUSH_Q, it->second.location);
         break;

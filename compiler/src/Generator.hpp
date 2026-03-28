@@ -21,7 +21,7 @@ class Generator : CombinedVisitor
   };
 
   std::vector<std::unordered_map<std::string_view, Info>> m_var_info;                // variables
-  std::vector<std::unordered_map<std::variant<const Const*, std::string_view>, Info>> m_const_info;        // strings
+  std::vector<std::unordered_map<const Const*, Info>> m_const_info;        // strings
 
   std::vector<std::unordered_map<const Label*, size_t>> m_label_locations;
   std::vector<std::unordered_map<size_t, const Label*>> m_goto_map;

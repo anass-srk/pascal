@@ -45,17 +45,14 @@ public:
 
 struct LiteralExpression : public Expression {
 private:
-  std::unique_ptr<Const> m_constant;
+  const Const* m_constant;
 
 public:
-  LiteralExpression(std::unique_ptr<Const> c, Lexeme token, Block* ctx)
-    : Expression(token), m_constant(std::move(c)) {
-      if (ctx && m_constant->category() == CONST_CAT::CC_CONST_STRING) 
-        ctx->m_unamed_const_strings.push_back(m_constant.get());
-    }
-  void validate() override;
+  LiteralExpression(const Const* c, Lexeme token)
+    : Expression(token), m_constant(c) {}
+  void validate() override { this->m_expr_type = m_constant->type(); }
 
-  const Const *constant() const { return m_constant.get(); }
+  const Const *constant() const { return m_constant; }
 
   DEFINE_EXPR_ACCEPT()
 };

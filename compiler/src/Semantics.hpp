@@ -344,7 +344,7 @@ struct Block
 
   std::unique_ptr<CompoundStatement> body;
 
-  std::vector<const Const*> m_unamed_const_strings; // owned by LiteralExpression
+  std::vector<std::unique_ptr<Const>> m_unamed_consts;
 
   Block(Block *parent = nullptr) : m_parent(parent) {}
 

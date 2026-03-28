@@ -136,11 +136,6 @@ void NExpression::validate()
   }
 }
 
-void LiteralExpression::validate()
-{
-  this->m_expr_type = m_constant->type();
-}
-
 const Type * ArraySelector::apply(const Type *type)
 {
   m_type = type;

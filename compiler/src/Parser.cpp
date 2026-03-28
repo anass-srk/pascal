@@ -2,6 +2,7 @@
 #include "Lexer.hpp"
 #include "Semantics.hpp"
 #include <format>
+#include <memory>
 #include <utility>
 
 namespace pascal_compiler
@@ -1024,7 +1025,8 @@ std::unique_ptr<Expression> Parser::factor()
     })
   )
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(constant(token)), token, m_current_block);
+    const Const* c = m_current_block->m_unamed_consts.emplace_back(std::make_unique<Const>(constant(token))).get();
+    auto res = std::make_unique<LiteralExpression>(c, token);
     res->validate();
     adv();
     return res;
@@ -1091,14 +1093,15 @@ std::unique_ptr<Expression> Parser::factor()
 
   if(cons)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(Const(*cons)), token, nullptr);
+    auto res = std::make_unique<LiteralExpression>(cons, token);
     res->validate();
     adv();
     return res;
   }
   if(ev)
   {
-    auto res = std::make_unique<LiteralExpression>(std::make_unique<Const>(token, *ev), token, m_current_block);
+    const Const* c = m_current_block->m_unamed_consts.emplace_back(std::make_unique<Const>(token, *ev)).get();
+    auto res = std::make_unique<LiteralExpression>(c, token);
     res->validate();
     adv();
     return res;
