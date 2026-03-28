@@ -988,4 +988,48 @@ TEST(VMTest, ConvChar2Int) {
   EXPECT_TRUE(vm.data().empty());
 }
 
+TEST(VMTest, LOAD_STORE_N) {
+  VM vm;
+
+  vm.add_push(OPCODE::PUSH_Q, Int(5)); //var0 at 0
+  vm.add_push(OPCODE::PUSH_Q, Int(-5));
+
+  vm.add_resize_stack(17); // var1 at 16
+
+  vm.add_push(OPCODE::PUSH_Q, Int(99));
+
+  vm.add_push(OPCODE::PUSH_Q, Int(16)); // destination (var1)
+
+  vm.add_push(OPCODE::PUSH_Q, Int(-1)); // var2 at 33 
+  vm.add_push(OPCODE::PUSH_B, char(1));
+  vm.add_push(OPCODE::PUSH_Q, Int(7));
+
+  vm.add_move_n(17);
+
+  vm.add_push(OPCODE::PUSH_Q, Int(0)); // push var0
+  vm.add_load_n(16);
+
+  vm.add_halt();
+  vm.run();
+
+  EXPECT_EQ(vm.data().size(), 57);
+
+  // data in reverse order for var0 copy
+  EXPECT_EQ(vm.fetch_data<Int>(), -5);
+  EXPECT_EQ(vm.fetch_data<Int>(), 5);
+
+  EXPECT_EQ(vm.fetch_data<Int>(), 99);
+
+  // data in reverse order for var1
+  EXPECT_EQ(vm.fetch_data<Int>(), 7);
+  EXPECT_EQ(vm.fetch_data<char>(), 1);
+  EXPECT_EQ(vm.fetch_data<Int>(), -1);
+
+  // data in reverse order for var0
+  EXPECT_EQ(vm.fetch_data<Int>(), -5);
+  EXPECT_EQ(vm.fetch_data<Int>(), 5);
+
+  EXPECT_TRUE(vm.data().empty());
+}
+
 } // namespace pascal_vm

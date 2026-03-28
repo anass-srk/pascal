@@ -250,17 +250,6 @@ void CompoundStatement::validate()
 
 void AssignmentStatement::validate()
 {
-  if (!validation::is_basic_type(m_lhs->type()) && !validation::is_enum_type(m_lhs->type())) {
-    throw SemanticException(
-      SEMANTIC_ERROR::SE_INVALID_CALL,
-      std::format(
-        "Semantic error: In ({}), cannot assign an expressions to a variable of type ({})! Expected Ints, Reals, Chars, Bools or Enums !",
-        m_token.to_string(), m_lhs->type()->to_string()
-      ),
-      m_token.line(),
-      m_token.column()
-    );
-  }
   if (!validation::types_compatible(m_lhs->type(), m_rhs->type())) {
     throw SemanticException(
       SEMANTIC_ERROR::SE_INVALID_ASSIGN,

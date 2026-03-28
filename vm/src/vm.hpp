@@ -103,6 +103,8 @@ enum class OPCODE : uint8_t {
   CALL,
   RET,
   C2I,
+  LOAD_N,
+  STORE_N,
 
   HALT,
   MAX = HALT
@@ -162,6 +164,8 @@ inline const char* OPCODE_NAMES[int(OPCODE::MAX)+1] = {
   "CALL",
   "RET",
   "C2I",
+  "LOAD_N",
+  "STORE_N",
   "HALT"
 };
 
@@ -459,6 +463,15 @@ public:
     add_value(size);
   }
 
+  void add_load_n(uint32_t size) {
+    add_value(static_cast<uint8_t>(OPCODE::LOAD_N));
+    add_value(size);
+  }
+
+  void add_move_n(uint32_t size) {
+    add_value(static_cast<uint8_t>(OPCODE::STORE_N));
+    add_value(size);
+  }
   template <typename A,typename B>
   void add_conv();
 

@@ -277,9 +277,14 @@ void Generator::visit(const AssignmentStatement &stmt, const Context &ctx) {
   // Now we have the address of the variable in the top of the stack
   stmt.expr()->accept(*this, ctx);
   // Now the value is in the top of the stack
-  // store the value depending on the type (same type for both at the moment, basic types only)
+  // store the value depending on the type (same type for both at the moment)
+
+  if(stmt.expr()->type()->get_underlying_type()->category() != TYPE_CAT::TC_BASIC) {
+    vm.add_move_n(get_type_size(stmt.expr()->type()));
+    return;
+  }
+
   const auto cat = get_catagory(stmt.expr()->type());
-  
   switch (cat) {
     case CONST_CAT::CC_INT:
     case CONST_CAT::CC_REAL:
@@ -475,8 +480,14 @@ void Generator::visit(const VariableAccess& var, const Context& ctx) {
 
   m_by_value = by_value;
 
-  // Basic types only
   if(m_by_value) {
+
+    if(var.type()->get_underlying_type()->category() != TYPE_CAT::TC_BASIC) {
+      vm.add_load_n(get_type_size(var.type()));
+      return;
+    }
+
+    // Basic types only
     const auto cat = get_catagory(var.type());
     switch(cat) {
       case CONST_CAT::CC_INT:

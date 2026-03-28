@@ -204,6 +204,22 @@ void VM::run() const {
       std::memcpy(&stack[addr], &data, sizeof(data));
     }break;
 
+    case OPCODE::LOAD_N: {
+      const auto size = fetch_code<uint32_t>();
+      print_op(op, size);
+      const auto addr = fetch_data<size_t>();
+      stack.insert(stack.end(), stack.begin() + addr, stack.begin() + addr + size);
+    } break;
+    case OPCODE::STORE_N: {
+      const auto size = fetch_code<uint32_t>();
+      print_op(op, size);
+      const auto data_addr = stack.size() - size;
+      size_t dest_addr;
+      std::memcpy(&dest_addr, &stack[data_addr - sizeof(dest_addr)], sizeof(dest_addr));
+      std::memcpy(&stack[dest_addr], &stack[data_addr] , size);
+      stack.resize(stack.size() - size - sizeof(dest_addr));
+    } break;
+
     case OPCODE::POP_Q: {
       print_op(op);
       fetch_data<size_t>();
