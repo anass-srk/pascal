@@ -55,6 +55,13 @@ class Generator : CombinedVisitor
   }
 
   size_t get_type_size(const Type *); // For variables only
+  size_t get_type_size(const Var& v) {
+    if(v.is_ref()) {
+      process_type(v.type());
+      return 8;
+    }
+    return get_type_size(v.type());
+  }
   void process_context(const Context&);
   void process_context(const Function&);
 

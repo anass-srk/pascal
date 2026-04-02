@@ -96,7 +96,7 @@ public:
   std::vector<Lexeme> id_list();
   std::unique_ptr<Record> field_list(const Lexeme&);
   std::vector<Const> case_label_list();
-  std::vector<Arg> args_list();
+  std::vector<Var> args_list();
 
   const Type* find_type(bool required);
 

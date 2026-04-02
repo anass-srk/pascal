@@ -474,6 +474,10 @@ void Generator::visit(const VariableAccess& var, const Context& ctx) {
     vm.add_push(OPCODE::PUSH_Q, m_var_info.front().at(var.base_var()->id()).location);
   }
 
+  if(var.base_var()->is_ref()) {
+    vm.add_load(OPCODE::LOAD_Q);
+  }
+
   for(const auto& selector : var.selectors()) {
     selector->accept(*this,ctx); // pushes offset for record/array and adds
   }
@@ -806,15 +810,20 @@ void Generator::visit(const CaseStatement& stmt, const Context& ctx) {
 } 
 
 void Generator::visit(const ProcedureCall& stmt, const Context& ctx) {
-  for(const auto& arg : stmt.args()) {
+  const auto& type_args = stmt.procedure()->type()->args();
+  for(int i = 0;i < stmt.args().size();++i) {
+    const auto& arg = stmt.args()[i];
+    bool by_value = m_by_value;
+    m_by_value = !type_args[i].is_ref();
     arg->accept(*this, ctx);
+    m_by_value = by_value;
   }
 
   m_func_calls.at(&ctx).push_back(CallInfo{.location=vm.add_call(0), .function_id=stmt.procedure()->id()});
   
   Int args_size = 0;
   for(const auto& arg : stmt.procedure()->type()->args()) {
-    args_size += get_type_size(arg.type());
+    args_size += get_type_size(arg);
   }
   vm.add_resize_stack(-args_size);
 }
@@ -822,15 +831,21 @@ void Generator::visit(const ProcedureCall& stmt, const Context& ctx) {
 void Generator::visit(const FunctionCall& expr, const Context& ctx) {
   const auto ret_size = get_type_size(expr.function()->type()->return_type());
   vm.add_resize_stack(ret_size);
-  for(const auto& arg : expr.args()) {
+
+  const auto &type_args = expr.function()->type()->args();
+  for (int i = 0; i < expr.args().size(); ++i) {
+    const auto &arg = expr.args()[i];
+    bool by_value = m_by_value;
+    m_by_value = !type_args[i].is_ref();
     arg->accept(*this, ctx);
+    m_by_value = by_value;
   }
 
   m_func_calls.at(&ctx).push_back(CallInfo{.location=vm.add_call(0), .function_id=expr.function()->id()});
 
   Int args_size = 0;
   for (const auto &arg : expr.function()->type()->args()) {
-    args_size += get_type_size(arg.type());
+    args_size += get_type_size(arg);
   }
   vm.add_resize_stack(-args_size);
 }

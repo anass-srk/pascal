@@ -250,15 +250,17 @@ public:
 
 class Var : public ID
 {
+  bool m_ref;
   const Type *m_type;
 
 public:
 
-  Var(const Lexeme& token, const Type* type) 
-    : ID(token), m_type(type) {}
-  Var(std::string_view id, size_t line, size_t col, const Type *type)
-      : ID(id, line, col), m_type(type) {}
+  Var(const Lexeme& token, const Type* type, bool by_ref = false) 
+    : ID(token), m_type(type), m_ref(by_ref) {}
+  Var(std::string_view id, size_t line, size_t col, const Type *type, bool by_ref = false)
+      : ID(id, line, col), m_type(type), m_ref(by_ref) {}
 
+  const bool is_ref() const { return m_ref; }
   const Type* type() const { return m_type; }
 };
 
@@ -280,30 +282,18 @@ public:
 
 };
 
-class Arg : public Var
-{
-  bool m_ref;
-
-public:
-
-  Arg(bool by_ref, const Lexeme& token, const Type* type) 
-    : Var(token, type), m_ref(by_ref) {}
-    
-  const bool is_ref() const { return m_ref; }
-};
-
 class FunctionType : public Type
 {
 
-  std::vector<Arg> m_args;
+  std::vector<Var> m_args;
   const Type* m_ret_type; // Null for procedures
 
 public:
 
   FunctionType(const Lexeme& token, Type* ret_type) : Type(token, TYPE_CAT::TC_FUNCTION), m_ret_type(ret_type) {}
-  const std::vector<Arg>& args() const { return m_args; }
+  const std::vector<Var>& args() const { return m_args; }
   const Type* return_type() const { return m_ret_type; }
-  void set_args(std::vector<Arg>&& args) { m_args = std::move(args); }
+  void set_args(std::vector<Var>&& args) { m_args = std::move(args); }
   void set_return_type(const Type* type) { m_ret_type = type; }
 
   std::string to_string() const override {

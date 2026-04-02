@@ -500,9 +500,9 @@ const Type* Parser::find_type(bool required)
   return t;
 }
 
-std::vector<Arg> Parser::args_list()
+std::vector<Var> Parser::args_list()
 {
-  std::vector<Arg> args;
+  std::vector<Var> args;
   std::unordered_map<std::string_view, Lexeme> used_ids;
   match(TOKEN_TYPE::LP_TOKEN);
   do{
@@ -531,7 +531,7 @@ std::vector<Arg> Parser::args_list()
       }
       used_ids.insert(std::make_pair(id.id(), id));
 
-      args.emplace_back(ref, id, t);
+      args.emplace_back(id, t, ref);
     }
 
     adv();
